@@ -1,0 +1,97 @@
+  /* Clipboard */
+.clipboard_container{float:right;position:relative}
+.toggle_clipboard{font-size:14px;line-height:1;padding:0;cursor:pointer;position:relative}
+.toggle_clipboard:hover{color:white}
+.toggle_clipboard.has_clips{padding-right:10px}
+.clipboard{background:#fff;position:absolute;right:0;width:300px;height:200px;top:20px;display:none;box-sizing:border-box;padding:2px;box-shadow:0 2px 20px 0 #447a82;font-size:14px;z-index:2000}
+.clipboard::after{bottom:100%;left:calc(100% - 5px);border:solid transparent;content:" ";height:0;width:0;position:absolute;pointer-events:none;border-bottom-color:#fff;border-width:5px;margin-left:-5px}
+.clipboard_title{width:100%;text-align:center;border-bottom:1px solid #333;margin:0 0 8px 0;font-weight:bold;line-height:23px}
+.clipboard .copy_button{float:right;margin-left:.5em;line-height:1;margin-top:5px}
+.clipboard .toggle_help{font-size:10px;cursor:pointer;padding:0 6px;line-height:23px;background:#eee}
+.clipboard .toggle_help:hover{background:#333;color:#fff}
+.clipboard .history,.clipboard .clipboard_help{overflow-y:scroll;height:calc(100% - 32px - 20px)}
+.clipboard .history_item{padding:0 4px;margin:0 0 8px 0;width:100%;line-height:1.2;box-sizing:border-box;cursor:pointer}
+.clipboard .history_item:hover{background:#eef0ee}
+.clipboard .history_item .text{white-space:pre-wrap}
+.clipboard .history_item .meta{font-size:12px;color:#888}
+.clear_clipboard_container{font-size:14px;line-height:20px;height:20px;width:100%;text-align:center;background:#EEE;cursor:pointer}
+.clear_clipboard_container:hover{background:#CCC}
+.clipboard-counter{position:absolute;top:-2px;left:11px;background-color:rgba(212,19,13,1);color:#fff;border-radius:3px;padding:1px 3px;font:8px Verdana;display:none}
+/* Breadcrumb */
+.main .pre_breadcrumb_section{float:left;width:1px;height:0}
+.main .section.breadcrumb_section{padding:10px!important;overflow:visible;height:36px}
+.docked .main .pre_breadcrumb_section{height:36px}
+.docked .main .section.breadcrumb_section{background-color:#60b7c2;border-bottom:1px solid #FFFFFF55;height:auto;position:fixed;top:0;z-index:2000;box-sizing:border-box;padding:10px!important}
+.docked .main .section.breadcrumb_section .section_inner{max-width:none}
+.breadcrumb{float:left;font-size:14px;line-height:1;margin:0;padding:0}
+.breadcrumb li{list-style:none;display:inline;margin:0;padding:0}
+.breadcrumb a{color:inherit}
+/* Section */
+.main .section{padding:10px!important;float:left;width:100%;box-sizing:border-box;overflow:hidden}
+.show_nav .main .section{padding:10px 10px 10px 140px!important}
+.main .section .section_inner{max-width:880px}
+.ad{background:rgb(96,184,195)}
+.ad.bottom{min-height:90px}
+.main .section .main_image{clear:right;float:right;max-width:100%;height:auto;margin:0 0 10px 10px;box-sizing:border-box}
+.main .section.title_section{padding-top:0}
+.docked .nav{margin-top:36px;height:calc(100% - 36px)}
+.docked .right{margin-top:36px;height:calc(100% - 36px)}
+/* Textarea */
+.textarea .name{float:left;width:29%;font-size:20px;line-height:1.2}
+.textarea textarea{font:inherit;font-size:20px;box-sizing:border-box;float:left;width:71%;background:rgba(255,255,255,.5);border:transparent;line-height:1.2;height:4.8em}
+.textarea textarea:focus{outline:0;background:rgba(255,255,255,.9)}
+/* Style sections */
+.main .divider_section{background:rgb(96,184,195)}
+.main .style_sections{font-size:17px}
+.main .style_sections .section:nth-child(even),.main .section.article_toc{background:#6DBDC9}
+.main .style_sections .name{float:left;width:29%}
+.main .style_sections .name a{color:#000;border-bottom:1px solid #2B5E65;text-decoration:none}
+.main .style_sections .example{float:left;width:71%}
+.main .style_sections .example .value_inner{white-space:pre-wrap}
+.main .style_sections .buttons{float:right;position:relative}
+.main .style_sections .buttons button{font:inherit;font-family:"Times New Roman";padding:2px 4px;font-size:13px;background:rgba(255,255,255,0.2);border:0;border-radius:4px;cursor:pointer}
+.main .style_sections .buttons button:hover{background:rgba(255,255,255,0.3)}
+.main .style_sections .buttons .after_copy{display:inline-block;position:absolute;bottom:24px;width:270px;right:0;font-size:18px;padding:10px}
+.main .style_sections .buttons .after_copy button{position:absolute;bottom:2px;right:2px;background:white;font-size:11px}
+.main .section.article_toc a{color:inherit;text-decoration:none;border-bottom:1px solid #FEF200}
+.main .section.article_toc ul{border:1px solid #000;margin:0;padding:1em 1em 1em 2em;float:left}
+.main .section.article_content ul{padding:0 0 0 1em}
+.main .section.article_toc li{margin:0 0 .5em;padding:0}
+.main .section.article_content li{margin:0 0 2em;padding:0}
+.main .section.article_content li p{margin:0 0 0.5em}
+.main .section.article_content p img{float:right;margin-left:10px;margin-bottom:10px;max-width:500px;height:auto;border:1px solid rgba(255,255,255,.33);box-shadow:2px 4px 5px rgba(0,0,0,.33)}
+.main .section.article_content li p img{float:none;margin:0}
+.main .section.article_content hr{border:1px solid rgba(255,255,255,0.85)}
+.main .section .more_info_links_container{float:left;width:100%}
+.main .section .more_info_links_container .q{color:#FFFFFF80;font-size:60px;width:60px;float:left}
+.main .section .more_info_links{box-sizing:border-box;border:1px solid #FFFFFF80;padding:.8em .3em .3em .3em;margin:0 0 1.5em 10px;float:left;width:calc(100% - 70px);min-height:60px}
+.main .section .more_info_links p{font-size:.9em;line-height:1.2;margin:0 0 .5em}
+/* Preview sections */
+.main .preview_sections .section:nth-child(even){background:#6DBDC9}
+.main .preview_sections .name{font-size:20px;margin:10px 0 30px}
+.main .preview_sections .name a{color:#000}
+.main .preview_sections .images{float:left}
+.main .preview_sections .image{float:left;padding:0 8px 12px 0;width:33%;box-sizing:border-box}
+.main .preview_sections .image:nth-child(3n+1){clear:left}
+.main .preview_sections .image img{float:left;clear:left;width:100%;height:auto}
+.main .preview_sections .image div.label{float:left;clear:left;font-size:13px;font-family:monospace}
+/* Responsive stuff */
+@media screen and (max-width:1384px){.right{display:none}.main .preview_sections .image{width:50%}.main .preview_sections .image:nth-child(3n+1){clear:none}.main .preview_sections .image:nth-child(2n+1){clear:left}}
+@media screen and (max-width:600px){.loading .nav{display:none}.loading .main .section{padding:10px!important}.main .style_sections .name{width:100%;margin:0 0 5px 0}.main .style_sections .example{width:100%;font-size:16px}.main .style_sections .buttons button{font-size:10px;float:left;clear:left;margin:0 0 2px}.main .style_sections .buttons .after_copy{bottom:auto;right:50px}.main .preview_sections .image{max-width:100%;width:auto}.main .preview_sections .image:nth-child(2n+1){clear:none}.main .preview_sections .image:nth-child(3n+1){clear:none}h1{font-size:60px}h2{font-size:32px}h3{font-size:30px}}
+@media screen and (max-width:652px){.main .section.article_content p img{max-width:100%}}
+@media screen and (max-width:800px){.main .section .main_image{display:none}}
+@media screen and (min-width:1000px){.main .section .section_inner{margin:0 auto}}
+@media screen and (min-width:1384px){.main .section .section_inner{margin:0 345px 0 35px;max-width:none}.main .section.breadcrumb_section .section_inner{margin-left:0}}
+.notification{position:fixed;bottom:0;left:0;right:0;background:#333;color:white;margin:4px;border-radius:4px;z-index:1000;text-align:center;font-size:18px;line-height:2;box-sizing:border-box;height:36px;transition-property:all;transition-duration:.5s;transition-timing-function:cubic-bezier(0,1,0.5,1);opacity:1}
+.notification.closed{bottom:-36px;height:0}
+.notification.clear{bottom:18px;opacity:0}
+.main .style_sections .buttons button{font-family:'Roboto',sans-serif;background:#9c27b0;color:#fff;border-radius:100px}
+.textarea textarea{font-size:15px;border-radius:3px;color:#5c6771;border:1px solid}
+.main .style_sections .name,.textarea .name{font-size:15px;font-weight:700}
+p#tool-title,span   .value_inner.times{font-size:15px}
+p#tool-title{width:100%;text-align:center;background-color:#343352;padding:10px 0;color:#fff}
+.show_nav .main .section{padding:10px!important;background:#f6f6f6}
+.main .section.article_toc,.main .style_sections .section:nth-child(even){background:#F3E5F5}
+.main .style_sections .buttons button:hover{background:#2c59d3}
+/* Css dark mode */
+.drK .main .section.article_toc,.drK .main .style_sections .section{background-color:#6DBDC9}
