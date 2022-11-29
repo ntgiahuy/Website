@@ -29,7 +29,6 @@
   .form-gdrive.output:after{content:"Links:"}
   button#get-button{display:inline-flex;align-items:center;margin:10px 0;padding:12px 15px;outline:0;border:0;border-radius:var(--buttonR);line-height:20px;color:#fffdfc;background:var(--linkB);font-size:14px;font-family:var(--fontB);white-space:nowrap;overflow:hidden;max-width:320px;}
   button#copy,button#download,button#reset{display:inline-flex;align-items:center;margin:10px 0;padding:12px 15px;outline:0;border:0;border-radius:var(--buttonR);line-height:20px;color:#fffdfc;background:var(--linkB);font-size:14px;font-family:var(--fontB);white-space:nowrap;overflow:hidden;max-width:320px;}
-  .drK button#get-button,button#copy,button#download,button#reset{background:var(--darkU)};
 
 /*! SafeLink Generator */
   .hidden{display:none !important}
