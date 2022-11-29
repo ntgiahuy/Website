@@ -3,6 +3,18 @@
   .headH .headSub{max-width:none}
   .headH .headSub::before{content:'Link Generator'}
   .pTtl.itm {display:none!important}
+
+/*! Generate URL */
+  a.button{display:inline-flex;align-items:center;margin:10px 0;padding:12px 15px;outline:0;border:0;border-radius:var(--buttonR);line-height:20px;color:#fffdfc;background:var(--linkB);font-size:14px;font-family:var(--fontB);white-space:nowrap;overflow:hidden;max-width:320px;}
+  #input{border-radius:5px}
+  #copyBtn{display:inline-flex;align-items:center;margin:10px 0;padding:12px 15px;outline:0;border:0;border-radius:var(--buttonR);line-height:20px;color:#fffdfc;background:var(--linkB);font-size:14px;font-family:var(--fontB);white-space:nowrap;overflow:hidden;max-width:320px;}
+  #resetBtn{opacity:0;position:absolute;cursor:pointer;border-radius:5px}
+  .nhaptieude{width:100%;border-radius:5px}
+  .xuattieude{width:100%;border-radius:5px;margin-bottom:20px!important}
+  .nhaptieude,.xuattieude{position:relative;z-index:2;margin-bottom:0;height:45px;font-size:15px;line-  height:1.42857143;color:#555;background-color:#ebeff3;background-image:none;border:1px solid #ccc;text-indent:10px}
+  .drK .button, .copyBtn{background:var(--darkU)};
+
+/*! Get Google Drive */
   .generator-gdrive{position:relative;display:block;margin:auto;padding:20px 0;max-width:800px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";line-height:1.3}
   .form-gdrive{position:relative;display:block}
   .form-gdrive.output,.tombol-copy-reset{display:none}
@@ -18,17 +30,9 @@
   button#get-button{display:inline-flex;align-items:center;margin:10px 0;padding:12px 15px;outline:0;border:0;border-radius:var(--buttonR);line-height:20px;color:#fffdfc;background:var(--linkB);font-size:14px;font-family:var(--fontB);white-space:nowrap;overflow:hidden;max-width:320px;}
   button#copy,button#download,button#reset{display:inline-flex;align-items:center;margin:10px 0;padding:12px 15px;outline:0;border:0;border-radius:var(--buttonR);line-height:20px;color:#fffdfc;background:var(--linkB);font-size:14px;font-family:var(--fontB);white-space:nowrap;overflow:hidden;max-width:320px;}
   .drK button#get-button,button#copy,button#download,button#reset{background:var(--darkU)};
-  /*! SafeLink Generator CSS */
+
+/*! SafeLink Generator */
   .hidden{display:none !important}
   button{cursor:pointer}
   button:hover{opacity:.9}
-  /*! Generate URL */
-  a.button{display:inline-flex;align-items:center;margin:10px 0;padding:12px 15px;outline:0;border:0;border-radius:var(--buttonR);line-height:20px;color:#fffdfc;background:var(--linkB);font-size:14px;font-family:var(--fontB);white-space:nowrap;overflow:hidden;max-width:320px;}
-  #input{border-radius:5px}
-  #copyBtn{display:inline-flex;align-items:center;margin:10px 0;padding:12px 15px;outline:0;border:0;border-radius:var(--buttonR);line-height:20px;color:#fffdfc;background:var(--linkB);font-size:14px;font-family:var(--fontB);white-space:nowrap;overflow:hidden;max-width:320px;}
-  #resetBtn{opacity:0;position:absolute;cursor:pointer;border-radius:5px}
-  .nhaptieude{width:100%;border-radius:5px}
-  .xuattieude{width:100%;border-radius:5px;margin-bottom:20px!important}
-  .nhaptieude,.xuattieude{position:relative;z-index:2;margin-bottom:0;height:45px;font-size:15px;line-  height:1.42857143;color:#555;background-color:#ebeff3;background-image:none;border:1px solid #ccc;text-indent:10px}
-  .drK .button, .copyBtn{background:var(--darkU)};
 /*]]>*/
