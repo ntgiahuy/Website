@@ -11,7 +11,7 @@
   #resetBtn{opacity:0;position:absolute;cursor:pointer;border-radius:5px}
   .nhaptieude{width:100%;border-radius:5px}
   .xuattieude{width:100%;border-radius:5px;margin-bottom:20px!important}
-  .nhaptieude,.xuattieude{position:relative;z-index:2;margin-bottom:0;height:45px;font-size:15px;line-  height:1.42857143;color:#555;background-color:#ebeff3;background-image:none;border:1px solid #ccc;text-indent:10px}
+  .nhaptieude,.xuattieude{display:block;width:100%;outline:0;border:0;border-bottom:1px solid rgba(0,0,0,.25);border-radius:4px 4px 0 0;background:#f3f3f4;padding:15px 16px 8px 16px;line-height:1.6em;transition:var(--trans-1);}
   .drK .button, .copyBtn{background:var(--darkU)};
 
 /*! Get Google Drive */
