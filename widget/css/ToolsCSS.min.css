@@ -17,7 +17,7 @@ code{color:darkblue}
 .box p{margin:0 0 2px}
 button{font:normal bold 12px Arial,Sans-Serif;cursor:pointer;padding:2px 5px}
 .button-group button{padding:7px 18px}
-.col{padding:0 10px;margin:10px 0 30px}
+.col{padding:0 10px;margin:10px 0 10px}
 .left{width:65%;float:left}
 .right{width:35%;float:right}
 label{cursor:pointer;text-decoration:none}
