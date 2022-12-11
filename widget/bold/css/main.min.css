@@ -38,7 +38,7 @@
 .docked .right{margin-top:36px;height:calc(100% - 36px)}
 /* Textarea */
 .textarea .name{float:left;width:29%;font-size:20px;line-height:1.2}
-.textarea textarea{font:inherit;font-size:20px;box-sizing:border-box;float:left;width:71%;background:rgba(255,255,255,.5);border:transparent;line-height:1.2;height:4.8em}
+.textarea textarea{font:inherit;font-size:20px;box-sizing:border-box;float:left;width:100%;background:rgba(255,255,255,.5);border:transparent;line-height:1.2;height:4.8em}
 .textarea textarea:focus{outline:0;background:rgba(255,255,255,.9)}
 /* Style sections */
 .main .divider_section{background:rgb(96,184,195)}
