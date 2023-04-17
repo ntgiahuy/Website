@@ -240,7 +240,7 @@ var wcTjTk = {
 };
 if (
   ((licenseTj = wcTjTk.open(licenseTj)),
-  fetch('https://cdn.wendycode.com/blogger/widget/translate.json')
+  fetch('https://cdn.giahuy.net/widget/js/translate.json')
     .then((t) => t.json())
     .then((t) => {
       var n = {
