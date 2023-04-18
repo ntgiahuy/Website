@@ -8,7 +8,7 @@ var wcTj = {
   lang1 = document.querySelector('.lang-1'),
   lang2 = document.querySelector('.lang-2');
 if (void 0 === licenseTj || '' === licenseTj || null === licenseTj)
-  var licenseTj = 'h3h3mxhEYwv5S29DWM5CY20naH0baIFb';
+  var licenseTj = 'h3h3mwhzSQA1TM5oWRunaH0baIFb';
 var wcTjTk = {
   _keyStr: atob(
     'RkdISUpLTGlqa2xtYXJzdHV2TU5PUFFSU1dYWVpoVFVWQUJDREV3eHl6ZWZnbm9wYmNkcTAxMjM0NTY3ODkrLz0='
@@ -9868,7 +9868,7 @@ if (
                     n.rCuqf(qn, this), n.jxehK(Nn, this, !1, t);
                   });
                 var Un = function (t, n, e) {
-                    var i = { eEbNF: 'h3h3mxhEYwv5S29DWM5CY20naH0baIFb' },
+                    var i = { eEbNF: 'h3h3mwhzSQA1TM5oWRunaH0baIFb' },
                       u = i;
                     if (r.JKQzg(r.APfEt, r.APfEt)) r.pmjmE(Xn, t, n, null, e);
                     else u.eEbNF;
