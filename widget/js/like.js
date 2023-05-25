@@ -1,3 +1,5 @@
+// Visitor counter firebase realtime database by www.giahuy.net
+// Last update 23-05-23 16:39 WIB
 var a = ghLikeFbase.sharedBy;
 if ('www.giahuy.net' === a) {
   function intToString(e) {
