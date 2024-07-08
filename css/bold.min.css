@@ -1,3 +1,5 @@
+p#tool-title{width:100%;text-align:center;background-color:#7B1FA2;padding:10px 0;color:#fff}
+p#tool-title,span .value_inner.times{font-size:15px}
 .clipboard_container{float:right;position:relative}
 .toggle_clipboard{font-size:14px;line-height:1;padding:0;cursor:pointer;position:relative}
 .toggle_clipboard:hover{color:white}
