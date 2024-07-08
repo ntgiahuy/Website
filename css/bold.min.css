@@ -17,7 +17,7 @@ p#tool-title,span .value_inner.times{font-size:15px}
 .clear_clipboard_container{font-size:14px;line-height:20px;height:20px;width:100%;text-align:center;background:#EEE;cursor:pointer}
 .clear_clipboard_container:hover{background:#CCC}
 .clipboard-counter{position:absolute;top:-2px;left:11px;background-color:rgba(212,19,13,1);color:#fff;border-radius:3px;padding:1px 3px;font:8px Verdana;display:none}
-.main .section{margin:10px;float:left;width:100%;box-sizing:border-box;overflow:hidden;position:relative;display:block;clear:both;border-radius:4px;background:var(--synBg);border:1px solid var(--sideBd-color);transition:all .6s;padding:10px}
+.main .section{float:left;width:100%;box-sizing:border-box;overflow:hidden;position:relative;display:block;clear:both;border-radius:4px;background:var(--synBg);border:1px solid var(--sideBd-color);transition:all .6s;padding:10px;margin:0 0 20px}
 .main .section .section_inner{max-width:880px}
 .textarea .name{float:left;width:29%;font-size:20px;line-height:1.2}
 .textarea textarea{font-size:16px;box-sizing:border-box;float:left;width:100%;background:rgba(255,255,255,.5);border:transparent;line-height:1.2;height:4.8em;padding:10px}
