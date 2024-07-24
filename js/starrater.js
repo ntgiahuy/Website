@@ -74,7 +74,7 @@ const StarRatingGenerator = typeof StarRatingGenerator == "undefined" ? 0x0 : St
     }, 0xdac);
   }
   function _0x44b558(_0x3bc1b1) {
-    let _0x58bcd1 = document.querySelectorAll("script[src=\"https://cdn.jsdelivr.net/gh/starratingsystem/script@1.0.1/starrater.js\"]")[_0x3bc1b1];
+    let _0x58bcd1 = document.querySelectorAll("script[src=\"https://www.giahuy.net/js/starrater.js\"]")[_0x3bc1b1];
     let _0x4a2f7c = location.host.replace("www.", "").replace(/\./g, "_").replace(/\//g, "__");
     if (_0x4a2f7c === "") {
       _0x4a2f7c = "other";
