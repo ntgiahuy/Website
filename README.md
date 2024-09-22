@@ -1,4 +1,3 @@
-<style>/*<![CDATA[*/
 /* About Author Page */
 .aAthrP{font-size:1.1rem}
 .aAthrP svg{width:18px;height:18px;fill:none!important;stroke:#fefefe;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.5;margin-right:7px}
@@ -24,9 +23,6 @@
 .darkMode .webStsC{background-color:#252526;box-shadow:0 5px 20px rgba(0,0,0,.2)}
 .darkMode .webSts svg{stroke:var(--synC)}
 @media screen and (min-width:641px){.aAdm .aAdmC{max-width:97%}.webSts{flex-direction:row}.webStsC{max-width:46%;margin:12px}}
-/*]]>*/</style>
-
-<script>/*<![CDATA[*/ function webStats(json){document.write(parseInt(json.feed.openSearch$totalResults.$t,10))} /*]]>*/</script>
 
 <!--[ About Author Page ]-->
 <div class='aAthrP'>
@@ -77,7 +73,6 @@
         </div>
         <div class='statsNu'>
           <!--[ Stats Number ]-->
-          <script src='/feeds/posts/default?alt=json-in-script&callback=webStats'></script>
         </div>
       </div>
     </div>
@@ -93,7 +88,6 @@
         </div>
         <div class='statsNu'>
           <!--[ Stats Number ]-->
-          <script src='/feeds/comments/default?alt=json-in-script&callback=webStats'></script>
         </div>
       </div>
     </div>
