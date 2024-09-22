@@ -1,5 +1,4 @@
- <!--[ Author Profile Picture ]-->
-      <img alt='Giới thiệu về Gia Huy' src='https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjc9oGZQVmAguD-s0uCEmV6NlNfpOZLc75oruUa6_A9dAiWtOE9BjpcBPCZpzLfzWtUlxqNqLKcaDfWqOOsS7OZCjPNuXUqoJcge8ske8_Yk90jYn3aQqlv3nhBO795ri9bYlQtw5zV92uIvnyAg8fhyphenhyphenQrcKEiZnPu_nEWj47nMh5kI0Q/s480-d-rw/logo.png' />
+<img alt='Giới thiệu về Gia Huy' src='https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjc9oGZQVmAguD-s0uCEmV6NlNfpOZLc75oruUa6_A9dAiWtOE9BjpcBPCZpzLfzWtUlxqNqLKcaDfWqOOsS7OZCjPNuXUqoJcge8ske8_Yk90jYn3aQqlv3nhBO795ri9bYlQtw5zV92uIvnyAg8fhyphenhyphenQrcKEiZnPu_nEWj47nMh5kI0Q/s480-d-rw/logo.png' />
       <!--[ Author Description ]-->
       <div class='aAdmD'>
         <p>Xin chào!</p>
