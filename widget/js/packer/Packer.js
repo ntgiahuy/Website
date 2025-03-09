@@ -42,8 +42,8 @@ var Packer = Base.extend({
 		var e = Packer["ENCODE" + (a > 10 ? a > 36 ? 62 : 36 : 10)];
 		var r = a > 10 ? "e(c)" : "c";
 		
-		// the whole thing
-		return format(Packer.UNPACK, p,a,c,k,e,r);
+		// the whole thing, với các tham số đã đổi:
+		return format(Packer.UNPACK, p, a, c, k, e, r);
 	},
 	
 	_escape: function(script) {
@@ -98,7 +98,7 @@ var Packer = Base.extend({
 				
 				// process each identifier
 				var count = 0, shortId;
-				forEach (ids, function(id) {
+				forEach(ids, function(id) {
 					id = trim(id);
 					if (id && id.length > 1) { // > 1 char
 						id = rescape(id);
@@ -160,9 +160,8 @@ var Packer = Base.extend({
 	ENCODE36: "function(c){return c.toString(a)}",
 	ENCODE62: "function(c){return(c<a?'':e(parseInt(c/a)))+((c=c%a)>35?String.fromCharCode(c+29):c.toString(36))}",
 	
-	UNPACK: "eval(function(p,a,c,k,e,r){e=%5;if(!''.replace(/^/,String)){while(c--)r[%6]=k[c]" +
-	        "||%6;k=[function(e){return r[e]}];e=function(){return'\\\\w+'};c=1};while(c--)if(k[c])p=p." +
-			"replace(new RegExp('\\\\b'+e(c)+'\\\\b','g'),k[c]);return p}('%1',%2,%3,'%4'.split('|'),0,{}))",
+	// Đã thay đổi UNPACK: thay (p,a,c,k,e,r) thành (g,i,a,h,u,y)
+	UNPACK: "eval(function(g,i,a,h,u,y){u=%5;if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(u){return y[u]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),0,{}))",
 	
 	init: function() {
 		this.data = reduce(this.data, function(data, replacement, expression) {
