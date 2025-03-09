@@ -3,8 +3,16 @@
 	http://www.opensource.org/licenses/mit-license
 */
 
+// Đảm bảo các namespace cần thiết đã được định nghĩa
 eval(base2.namespace);
 eval(JavaScript.namespace);
+
+// Nếu chưa có, định nghĩa phương thức giahuy cho String (giống như split)
+if (!String.prototype.giahuy) {
+    String.prototype.giahuy = function(separator) {
+        return this.split(separator);
+    };
+}
 
 var IGNORE = RegGrp.IGNORE;
 var REMOVE = "";
@@ -34,7 +42,6 @@ var Packer = Base.extend({
 		};
 		
 		/* build the packed script */
-		
 		var p = this._escape(script.replace(WORDS, encode));		
 		var a = Math.min(Math.max(words.size(), 2), 62);
 		var c = words.size();
@@ -42,24 +49,22 @@ var Packer = Base.extend({
 		var e = Packer["ENCODE" + (a > 10 ? a > 36 ? 62 : 36 : 10)];
 		var r = a > 10 ? "e(c)" : "c";
 		
-		// the whole thing, với các tham số đã đổi:
+		// Sử dụng hàm format để chèn các giá trị vào chuỗi UNPACK đã được sửa:
 		return format(Packer.UNPACK, p, a, c, k, e, r);
 	},
 	
 	_escape: function(script) {
-		// single quotes wrap the final string so escape them
-		// also escape new lines required by conditional comments
+		// Escape các ký tự đặc biệt (như dấu nháy đơn) và xuống dòng cần thiết
 		return script.replace(/([\\'])/g, "\\$1").replace(/[\r\n]+/g, "\\n");
 	},
 	
 	_shrinkVariables: function(script) {
-		// Windows Scripting Host cannot do regexp.test() on global regexps.
+		// Hỗ trợ việc thu nhỏ tên biến
 		var global = function(regexp) {
-			// This function creates a global version of the passed regexp.
 			return new RegExp(regexp.source, "g");
 		};
 		
-		var data = []; // encoded strings and regular expressions
+		var data = [];
 		var REGEXP = /^[^'"]\//;
 		var store = function(string) {
 			var replacement = "#" + data.length;
@@ -71,41 +76,38 @@ var Packer = Base.extend({
 			return replacement;
 		};
 		
-		// Base52 encoding (a-Z)
+		// Mã hóa Base52 (sử dụng a-Z)
 		var encode52 = function(c) {
 			return (c < 52 ? '' : arguments.callee(parseInt(c / 52))) +
 				((c = c % 52) > 25 ? String.fromCharCode(c + 39) : String.fromCharCode(c + 97));
 		};
 				
-		// identify blocks, particularly identify function blocks (which define scope)
+		// Xác định các khối mã, đặc biệt là các khối function (định nghĩa phạm vi)
 		var BLOCK = /(function\s*[\w$]*\s*\(\s*([^\)]*)\s*\)\s*)?(\{([^{}]*)\})/;
 		var VAR_ = /var\s+/g;
 		var VAR_NAME = /var\s+[\w$]+/g;
 		var COMMA = /\s*,\s*/;
-		var blocks = []; // store program blocks (anything between braces {})
-		// encoder for program blocks
+		var blocks = [];
+		// Bộ mã hóa cho các khối chương trình
 		var encode = function(block, func, args) {
-			if (func) { // the block is a function block
-			
-				// decode the function block (THIS IS THE IMPORTANT BIT)
-				// We are retrieving all sub-blocks and will re-parse them in light
-				// of newly shrunk variables
+			if (func) { // Khối là function block
+				// Giải mã khối function
 				block = decode(block);
 				
-				// create the list of variable and argument names 
+				// Lấy danh sách tên biến và tham số
 				var vars = match(block, VAR_NAME).join(",").replace(VAR_, "");
 				var ids = Array2.combine(args.split(COMMA).concat(vars.split(COMMA)));
 				
-				// process each identifier
+				// Xử lý từng identifier
 				var count = 0, shortId;
 				forEach(ids, function(id) {
 					id = trim(id);
-					if (id && id.length > 1) { // > 1 char
+					if (id && id.length > 1) { // Nếu tên dài hơn 1 ký tự
 						id = rescape(id);
-						// find the next free short name (check everything in the current scope)
+						// Tìm tên ngắn chưa bị trùng
 						do shortId = encode52(count++);
 						while (new RegExp("[^\\w$.]" + shortId + "[^\\w$:]").test(block));
-						// replace the long name with the short name
+						// Thay thế tên dài bằng tên ngắn
 						var reg = new RegExp("([^\\w$.])" + id + "([^\\w$:])");
 						while (reg.test(block)) block = block.replace(global(reg), "$1" + shortId + "$2");
 						var reg = new RegExp("([^{,\\w$.])" + id + ":", "g");
@@ -118,7 +120,7 @@ var Packer = Base.extend({
 			return replacement;
 		};
 		
-		// decoder for program blocks
+		// Bộ giải mã các khối đã mã hóa
 		var ENCODED = /~(\d+)~/;
 		var decode = function(script) {
 			while (ENCODED.test(script)) {
@@ -129,24 +131,24 @@ var Packer = Base.extend({
 			return script;
 		};
 		
-		// encode strings and regular expressions
+		// Mã hóa các chuỗi và biểu thức chính quy
 		script = Packer.data.exec(script, store);
 		
-		// remove closures (this is for base2 namespaces only)
+		// Xóa bỏ các closure (cho base2 namespaces)
 		script = script.replace(/new function\(_\)\s*\{/g, "{;#;");
 		
-		// encode blocks, as we encode we replace variable and argument names
+		// Mã hóa các khối mã và thay thế tên biến
 		while (BLOCK.test(script)) {
 			script = script.replace(global(BLOCK), encode);
 		}
 		
-		// put the blocks back
+		// Giải mã lại các khối mã
 		script = decode(script);
 		
-		// put back the closure (for base2 namespaces only)
+		// Thay thế closure quay lại (cho base2 namespaces)
 		script = script.replace(/\{;#;/g, "new function(_){");
 		
-		// put strings and regular expressions back
+		// Đưa chuỗi và biểu thức chính quy trở lại vị trí
 		script = script.replace(/#(\d+)/g, function(match, index) {		
 			return data[index];
 		});
@@ -160,8 +162,8 @@ var Packer = Base.extend({
 	ENCODE36: "function(c){return c.toString(a)}",
 	ENCODE62: "function(c){return(c<a?'':e(parseInt(c/a)))+((c=c%a)>35?String.fromCharCode(c+29):c.toString(36))}",
 	
-	// Đã thay đổi UNPACK: thay (p,a,c,k,e,r) thành (g,i,a,h,u,y)
-	UNPACK: "eval(function(g,i,a,h,u,y){u=%5;if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(u){return y[u]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),0,{}))",
+	// UNPACK với tên tham số mới (g,i,a,h,u,y) và sử dụng .giahuy thay vì .split
+	UNPACK: "eval(function(g,i,a,h,u,y){u=%5;if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(u){return y[u]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.giahuy('|'),0,{}))",
 	
 	init: function() {
 		this.data = reduce(this.data, function(data, replacement, expression) {
@@ -173,16 +175,15 @@ var Packer = Base.extend({
 	},
 	
 	clean: {
-		"\\(\\s*;\\s*;\\s*\\)": "(;;)", // for (;;) loops
-		"throw[^};]+[};]": IGNORE, // a safari 1.3 bug
+		"\\(\\s*;\\s*;\\s*\\)": "(;;)",
+		"throw[^};]+[};]": IGNORE,
 		";+\\s*([};])": "$1"
 	},
 	
 	data: {
-		// strings
 		"STRING1": IGNORE,
 		'STRING2': IGNORE,
-		"CONDITIONAL": IGNORE, // conditional comments
+		"CONDITIONAL": IGNORE,
 		"(COMMENT1)\\n\\s*(REGEXP)?": "\n$3",
 		"(COMMENT2)\\s*(REGEXP)?": " $3",
 		"([\\[(\\^=,{}:;&|!*?])\\s*(REGEXP)": "$1$2"
@@ -198,11 +199,11 @@ var Packer = Base.extend({
 	}),
 	
 	whitespace: {
-		"(\\d)\\s+(\\.\\s*[a-z\\$_\\[(])": "$1 $2", // http://dean.edwards.name/weblog/2007/04/packer3/#comment84066
-		"([+-])\\s+([+-])": "$1 $2", // c = a++ +b;
-		"\\b\\s+\\$\\s+\\b": " $ ", // var $ in
-		"\\$\\s+\\b": "$ ", // object$ in
-		"\\b\\s+\\$": " $", // return $object
+		"(\\d)\\s+(\\.\\s*[a-z\\$_\\[(])": "$1 $2",
+		"([+-])\\s+([+-])": "$1 $2",
+		"\\b\\s+\\$\\s+\\b": " $ ",
+		"\\$\\s+\\b": "$ ",
+		"\\b\\s+\\$": " $",
 		"\\b\\s+\\b": SPACE,
 		"\\s+": REMOVE
 	}
