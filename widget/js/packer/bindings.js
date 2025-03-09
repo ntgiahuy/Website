@@ -10,7 +10,7 @@ new base2.JSB.RuleList({
 		},
 		
 		ready: function() {
-			message.write("ready");
+			message.write("Sẵn sàng");
 			input.focus();
 		}
 	},
@@ -104,7 +104,7 @@ new base2.JSB.RuleList({
 			}
 			var calc = output.value.length + "/" + length;
 			var ratio = (output.value.length / length).toFixed(3);
-			this.write((message ? message + ", " : "") + format("compression ratio: %1=%2", calc, ratio));
+			this.write((message ? message + ", " : "") + format("Tỉ số nén: %1=%2", calc, ratio));
 		},
 		
 		write: function(text, className) {
