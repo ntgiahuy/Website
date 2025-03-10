@@ -34,17 +34,15 @@ var Packer = Base.extend({
 		};
 		
 		/* build the packed script */
-		
-		var p = this._escape(script.replace(WORDS, encode));		
+		var p = this._escape(script.replace(WORDS, encode));
 		var a = Math.min(Math.max(words.size(), 2), 62);
 		var c = words.size();
 		var k = words;
-		// Thay "e" và "r" bằng các biến mới: "u" và "y"
+		// Sử dụng biến u thay cho e, và biến y thay cho r.
 		var u = Packer["ENCODE" + (a > 10 ? a > 36 ? 62 : 36 : 10)];
-		var y = a > 10 ? "u(c)" : "c";
+		var r = a > 10 ? "u(c)" : "c";
 		
-		// Gọi hàm format với các tham số mới:
-		return format(Packer.UNPACK, p, a, c, k, u, y);
+		return format(Packer.UNPACK, p, a, c, k, u, r);
 	},
 	
 	_escape: function(script) {
@@ -54,13 +52,11 @@ var Packer = Base.extend({
 	},
 	
 	_shrinkVariables: function(script) {
-		// Windows Scripting Host cannot do regexp.test() on global regexps.
 		var global = function(regexp) {
-			// This function creates a global version of the passed regexp.
 			return new RegExp(regexp.source, "g");
 		};
 		
-		var data = []; // encoded strings and regular expressions
+		var data = [];
 		var REGEXP = /^[^'"]\//;
 		var store = function(string) {
 			var replacement = "#" + data.length;
@@ -78,33 +74,26 @@ var Packer = Base.extend({
 				((c = c % 52) > 25 ? String.fromCharCode(c + 39) : String.fromCharCode(c + 97));
 		};
 				
-		// identify blocks, particularly identify function blocks (which define scope)
+		// Identify blocks, particularly function blocks (which define scope)
 		var BLOCK = /(function\s*[\w$]*\s*\(\s*([^\)]*)\s*\)\s*)?(\{([^{}]*)\})/;
 		var VAR_ = /var\s+/g;
 		var VAR_NAME = /var\s+[\w$]+/g;
 		var COMMA = /\s*,\s*/;
-		var blocks = []; // store program blocks (anything between braces {})
-		// encoder for program blocks
+		var blocks = [];
+		// Encoder cho các block
 		var encode = function(block, func, args) {
-			if (func) { // the block is a function block
-			
-				// decode the function block (THIS IS THE IMPORTANT BIT)
+			if (func) {
+				// Decode function block để có thể xử lý các biến bên trong
 				block = decode(block);
-				
-				// create the list of variable and argument names 
 				var vars = match(block, VAR_NAME).join(",").replace(VAR_, "");
 				var ids = Array2.combine(args.split(COMMA).concat(vars.split(COMMA)));
-				
-				// process each identifier
 				var count = 0, shortId;
 				forEach(ids, function(id) {
 					id = trim(id);
-					if (id && id.length > 1) { // > 1 char
+					if (id && id.length > 1) {
 						id = rescape(id);
-						// find the next free short name (check everything in the current scope)
 						do shortId = encode52(count++);
 						while (new RegExp("[^\\w$.]" + shortId + "[^\\w$:]").test(block));
-						// replace the long name with the short name
 						var reg = new RegExp("([^\\w$.])" + id + "([^\\w$:])");
 						while (reg.test(block)) block = block.replace(global(reg), "$1" + shortId + "$2");
 						var reg = new RegExp("([^{,\\w$.])" + id + ":", "g");
@@ -117,7 +106,6 @@ var Packer = Base.extend({
 			return replacement;
 		};
 		
-		// decoder for program blocks
 		var ENCODED = /~(\d+)~/;
 		var decode = function(script) {
 			while (ENCODED.test(script)) {
@@ -128,28 +116,16 @@ var Packer = Base.extend({
 			return script;
 		};
 		
-		// encode strings and regular expressions
 		script = Packer.data.exec(script, store);
-		
-		// remove closures (this is for base2 namespaces only)
 		script = script.replace(/new function\(_\)\s*\{/g, "{;#;");
-		
-		// encode blocks, as we encode we replace variable and argument names
 		while (BLOCK.test(script)) {
 			script = script.replace(global(BLOCK), encode);
 		}
-		
-		// put the blocks back
 		script = decode(script);
-		
-		// put back the closure (for base2 namespaces only)
 		script = script.replace(/\{;#;/g, "new function(_){");
-		
-		// put strings and regular expressions back
-		script = script.replace(/#(\d+)/g, function(match, index) {		
+		script = script.replace(/#(\d+)/g, function(match, index) {
 			return data[index];
 		});
-		
 		return script;
 	}
 }, {
@@ -157,11 +133,11 @@ var Packer = Base.extend({
 	
 	ENCODE10: "String",
 	ENCODE36: "function(c){return c.toString(a)}",
-	// Update ENCODE62: thay "e" bằng "u"
-	ENCODE62: "function(c){return(c<a?'':u(parseInt(c/a)))+((c=c%a)>35?String.fromCharCode(c+29):c.toString(36))}",
+	// Sửa ENCODE62: sử dụng u thay vì e và i thay cho a (theo thứ tự của wrapper mới)
+	ENCODE62: "function(c){return(c<i?'':u(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))}",
 	
-	// Updated UNPACK string with new parameters (g,i,a,h,u,y)
-	UNPACK: "eval(function(g,i,a,h,u,y){u=%5;if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(u){return y[u]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),%5,%6))",
+	// Đã sửa UNPACK để sử dụng tham số mới (g,i,a,h,u,y) và đảm bảo không còn tham chiếu tới e hoặc r.
+	UNPACK: "eval(function(g,i,a,h,u,y){u=function(c){return(c<i?'':u(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))};if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(u){return y[u]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),0,{}))",
 	
 	init: function() {
 		this.data = reduce(this.data, function(data, replacement, expression) {
@@ -173,16 +149,15 @@ var Packer = Base.extend({
 	},
 	
 	clean: {
-		"\\(\\s*;\\s*;\\s*\\)": "(;;)", // for (;;) loops
-		"throw[^};]+[};]": IGNORE, // a safari 1.3 bug
+		"\\(\\s*;\\s*;\\s*\\)": "(;;)",
+		"throw[^};]+[};]": IGNORE,
 		";+\\s*([};])": "$1"
 	},
 	
 	data: {
-		// strings
 		"STRING1": IGNORE,
 		'STRING2': IGNORE,
-		"CONDITIONAL": IGNORE, // conditional comments
+		"CONDITIONAL": IGNORE,
 		"(COMMENT1)\\n\\s*(REGEXP)?": "\n$3",
 		"(COMMENT2)\\s*(REGEXP)?": " $3",
 		"([\\[(\\^=,{}:;&|!*?])\\s*(REGEXP)": "$1$2"
@@ -198,11 +173,11 @@ var Packer = Base.extend({
 	}),
 	
 	whitespace: {
-		"(\\d)\\s+(\\.\\s*[a-z\\$_\\[(])": "$1 $2", // http://dean.edwards.name/weblog/2007/04/packer3/#comment84066
-		"([+-])\\s+([+-])": "$1 $2", // c = a++ +b;
-		"\\b\\s+\\$\\s+\\b": " $ ", // var $ in
-		"\\$\\s+\\b": "$ ", // object$ in
-		"\\b\\s+\\$": " $", // return $object
+		"(\\d)\\s+(\\.\\s*[a-z\\$_\\[(])": "$1 $2",
+		"([+-])\\s+([+-])": "$1 $2",
+		"\\b\\s+\\$\\s+\\b": " $ ",
+		"\\$\\s+\\b": "$ ",
+		"\\b\\s+\\$": " $",
 		"\\b\\s+\\b": SPACE,
 		"\\s+": REMOVE
 	}
