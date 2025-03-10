@@ -38,14 +38,15 @@ var Packer = Base.extend({
 		var a = Math.min(Math.max(words.size(), 2), 62);
 		var c = words.size();
 		var k = words;
-		// Gọi hàm format để thay thế các placeholder %1, %2, %3, %4.
-		// Các tham số cố định (0, {}) ở cuối chuỗi UNPACK sẽ được giữ nguyên.
-		return format(Packer.UNPACK, p, a, c, k);
+		// Lấy hàm mã hóa ENCODE từ Packer, phiên bản mới của ENCODE62 sử dụng hàm _encode
+		var u = Packer["ENCODE" + (a > 10 ? a > 36 ? 62 : 36 : 10)];
+		var r = a > 10 ? "u(c)" : "c";
+		
+		return format(Packer.UNPACK, p, a, c, k, u, r);
 	},
 	
 	_escape: function(script) {
-		// single quotes wrap the final string so escape them
-		// also escape new lines required by conditional comments
+		// Escape ký tự \ và ' vì chuỗi cuối cùng được bọc trong dấu nháy đơn
 		return script.replace(/([\\'])/g, "\\$1").replace(/[\r\n]+/g, "\\n");
 	},
 	
@@ -129,12 +130,11 @@ var Packer = Base.extend({
 	
 	ENCODE10: "String",
 	ENCODE36: "function(c){return c.toString(a)}",
-	// Sửa ENCODE62: sử dụng 'encode' làm tên hàm đệ quy thay vì 'u'
-	ENCODE62: "function(c){return(c<i?'':encode(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))}",
+	// Sửa ENCODE62: dùng _encode (đệ quy) với biến i (thứ 2) thay cho a
+	ENCODE62: "function(c){return(c<i?'':_encode(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))}",
 	
-	// Đã cập nhật UNPACK để sử dụng tham số mới (g,i,a,h,u,y)
-	// Và định nghĩa hàm đệ quy với tên 'encode' bên trong wrapper, tránh tham chiếu đến 'u'
-	UNPACK: "eval(function(g,i,a,h,u,y){u=function encode(c){return(c<i?'':encode(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))};if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(x){return y[x]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),0,{}))",
+	// UNPACK: wrapper với tham số (g,i,a,h,u,y) sử dụng hàm _encode để thực hiện chuyển đổi số
+	UNPACK: "eval(function(g,i,a,h,u,y){u=function _encode(c){return(c<i?'':_encode(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))};if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(x){return y[x]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),0,{}))",
 	
 	init: function() {
 		this.data = reduce(this.data, function(data, replacement, expression) {
