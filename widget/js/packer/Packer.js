@@ -38,8 +38,8 @@ var Packer = Base.extend({
 		var a = Math.min(Math.max(words.size(), 2), 62);
 		var c = words.size();
 		var k = words;
-		// Lấy hàm mã hóa ENCODE từ Packer, phiên bản mới của ENCODE62 sử dụng hàm _encode
-		var u = Packer["ENCODE" + (a > 10 ? a > 36 ? 62 : 36 : 10)];
+		// Lấy hàm mã hóa: nếu a>10, chọn ENCODE36 hoặc ENCODE62 tùy vào a
+		var u = Packer["ENCODE" + (a > 10 ? (a > 36 ? 62 : 36) : 10)];
 		var r = a > 10 ? "u(c)" : "c";
 		
 		return format(Packer.UNPACK, p, a, c, k, u, r);
@@ -130,11 +130,11 @@ var Packer = Base.extend({
 	
 	ENCODE10: "String",
 	ENCODE36: "function(c){return c.toString(a)}",
-	// Sửa ENCODE62: dùng _encode (đệ quy) với biến i (thứ 2) thay cho a
+	// ENCODE62: sử dụng hàm _encode với biến i (thứ 2)
 	ENCODE62: "function(c){return(c<i?'':_encode(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))}",
 	
-	// UNPACK: wrapper với tham số (g,i,a,h,u,y) sử dụng hàm _encode để thực hiện chuyển đổi số
-	UNPACK: "eval(function(g,i,a,h,u,y){u=function _encode(c){return(c<i?'':_encode(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))};if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(x){return y[x]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),0,{}))",
+	// UNPACK: sử dụng wrapper với tham số (g,i,a,h,u,y) và gọi _encode
+	UNPACK: "eval(function(g,i,a,h,u,y){var _encode = function(c){return(c<i?'':_encode(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))};u = _encode; if(!''.replace(/^/,String)){while(a--) y[a.toString(i)] = h[a]||a.toString(i); h = [function(x){return y[x]}]; u = function(){return'\\\\w+'}; a=1}; while(a--) if(h[a]) g = g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]); return g}('%1',%2,%3,'%4'.nhat('|'),0,{}))",
 	
 	init: function() {
 		this.data = reduce(this.data, function(data, replacement, expression) {
