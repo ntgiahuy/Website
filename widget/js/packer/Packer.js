@@ -38,11 +38,9 @@ var Packer = Base.extend({
 		var a = Math.min(Math.max(words.size(), 2), 62);
 		var c = words.size();
 		var k = words;
-		// Lấy hàm mã hóa theo base (10, 36 hoặc 62) từ Packer, với ENCODE62 đã được cập nhật:
-		var u = Packer["ENCODE" + (a > 10 ? a > 36 ? 62 : 36 : 10)];
-		var r = a > 10 ? "u(c)" : "c";
-		
-		return format(Packer.UNPACK, p, a, c, k, u, r);
+		// Gọi hàm format để thay thế các placeholder %1, %2, %3, %4.
+		// Các tham số cố định (0, {}) ở cuối chuỗi UNPACK sẽ được giữ nguyên.
+		return format(Packer.UNPACK, p, a, c, k);
 	},
 	
 	_escape: function(script) {
@@ -120,7 +118,7 @@ var Packer = Base.extend({
 		}
 		script = decode(script);
 		script = script.replace(/\{;#;/g, "new function(_){");
-		script = script.replace(/#(\d+)/g, function(match, index) {
+		script = script.replace(/#(\d+)/g, function(match, index) {		
 			return data[index];
 		});
 		
@@ -131,10 +129,11 @@ var Packer = Base.extend({
 	
 	ENCODE10: "String",
 	ENCODE36: "function(c){return c.toString(a)}",
-	// ENCODE62: Sử dụng biến u trong hàm để mã hóa số, đảm bảo dùng i thay cho a trong điều kiện
-	ENCODE62: "function(c){return(c<i?'':u(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))}",
+	// Sửa ENCODE62: sử dụng 'encode' làm tên hàm đệ quy thay vì 'u'
+	ENCODE62: "function(c){return(c<i?'':encode(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))}",
 	
-	// Đã sửa UNPACK để sử dụng wrapper với tham số (g,i,a,h,u,y) và sử dụng hàm đệ quy tên encode để tránh lỗi u is not defined.
+	// Đã cập nhật UNPACK để sử dụng tham số mới (g,i,a,h,u,y)
+	// Và định nghĩa hàm đệ quy với tên 'encode' bên trong wrapper, tránh tham chiếu đến 'u'
 	UNPACK: "eval(function(g,i,a,h,u,y){u=function encode(c){return(c<i?'':encode(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))};if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(x){return y[x]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),0,{}))",
 	
 	init: function() {
