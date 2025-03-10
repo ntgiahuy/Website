@@ -39,11 +39,12 @@ var Packer = Base.extend({
 		var a = Math.min(Math.max(words.size(), 2), 62);
 		var c = words.size();
 		var k = words;
-		var e = Packer["ENCODE" + (a > 10 ? a > 36 ? 62 : 36 : 10)];
-		var r = a > 10 ? "e(c)" : "c";
+		// Thay "e" và "r" bằng các biến mới: "u" và "y"
+		var u = Packer["ENCODE" + (a > 10 ? a > 36 ? 62 : 36 : 10)];
+		var y = a > 10 ? "u(c)" : "c";
 		
-		// the whole thing
-		return format(Packer.UNPACK, p,a,c,k,e,r);
+		// Gọi hàm format với các tham số mới:
+		return format(Packer.UNPACK, p, a, c, k, u, y);
 	},
 	
 	_escape: function(script) {
@@ -88,8 +89,6 @@ var Packer = Base.extend({
 			if (func) { // the block is a function block
 			
 				// decode the function block (THIS IS THE IMPORTANT BIT)
-				// We are retrieving all sub-blocks and will re-parse them in light
-				// of newly shrunk variables
 				block = decode(block);
 				
 				// create the list of variable and argument names 
@@ -98,7 +97,7 @@ var Packer = Base.extend({
 				
 				// process each identifier
 				var count = 0, shortId;
-				forEach (ids, function(id) {
+				forEach(ids, function(id) {
 					id = trim(id);
 					if (id && id.length > 1) { // > 1 char
 						id = rescape(id);
@@ -158,9 +157,11 @@ var Packer = Base.extend({
 	
 	ENCODE10: "String",
 	ENCODE36: "function(c){return c.toString(a)}",
-	ENCODE62: "function(c){return(c<a?'':e(parseInt(c/a)))+((c=c%a)>35?String.fromCharCode(c+29):c.toString(36))}",
+	// Update ENCODE62: thay "e" bằng "u"
+	ENCODE62: "function(c){return(c<a?'':u(parseInt(c/a)))+((c=c%a)>35?String.fromCharCode(c+29):c.toString(36))}",
 	
-	UNPACK: "eval(function(g,i,a,h,u,y){u=%5;if(!''.replace(/^/,String)){while(a--)y[%6]=h[a]||%6;h=[function(e){return y[e]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),0,{}))",
+	// Updated UNPACK string with new parameters (g,i,a,h,u,y)
+	UNPACK: "eval(function(g,i,a,h,u,y){u=%5;if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(u){return y[u]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),%5,%6))",
 	
 	init: function() {
 		this.data = reduce(this.data, function(data, replacement, expression) {
