@@ -38,7 +38,7 @@ var Packer = Base.extend({
 		var a = Math.min(Math.max(words.size(), 2), 62);
 		var c = words.size();
 		var k = words;
-		// Sử dụng biến u thay cho e, và biến y thay cho r.
+		// Lấy hàm mã hóa theo base (10, 36 hoặc 62) từ Packer, với ENCODE62 đã được cập nhật:
 		var u = Packer["ENCODE" + (a > 10 ? a > 36 ? 62 : 36 : 10)];
 		var r = a > 10 ? "u(c)" : "c";
 		
@@ -74,16 +74,13 @@ var Packer = Base.extend({
 				((c = c % 52) > 25 ? String.fromCharCode(c + 39) : String.fromCharCode(c + 97));
 		};
 				
-		// Identify blocks, particularly function blocks (which define scope)
 		var BLOCK = /(function\s*[\w$]*\s*\(\s*([^\)]*)\s*\)\s*)?(\{([^{}]*)\})/;
 		var VAR_ = /var\s+/g;
 		var VAR_NAME = /var\s+[\w$]+/g;
 		var COMMA = /\s*,\s*/;
 		var blocks = [];
-		// Encoder cho các block
 		var encode = function(block, func, args) {
 			if (func) {
-				// Decode function block để có thể xử lý các biến bên trong
 				block = decode(block);
 				var vars = match(block, VAR_NAME).join(",").replace(VAR_, "");
 				var ids = Array2.combine(args.split(COMMA).concat(vars.split(COMMA)));
@@ -126,6 +123,7 @@ var Packer = Base.extend({
 		script = script.replace(/#(\d+)/g, function(match, index) {
 			return data[index];
 		});
+		
 		return script;
 	}
 }, {
@@ -133,11 +131,11 @@ var Packer = Base.extend({
 	
 	ENCODE10: "String",
 	ENCODE36: "function(c){return c.toString(a)}",
-	// Sửa ENCODE62: sử dụng u thay vì e và i thay cho a (theo thứ tự của wrapper mới)
+	// ENCODE62: Sử dụng biến u trong hàm để mã hóa số, đảm bảo dùng i thay cho a trong điều kiện
 	ENCODE62: "function(c){return(c<i?'':u(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))}",
 	
-	// Đã sửa UNPACK để sử dụng tham số mới (g,i,a,h,u,y) và đảm bảo không còn tham chiếu tới e hoặc r.
-	UNPACK: "eval(function(g,i,a,h,u,y){u=function(c){return(c<i?'':u(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))};if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(u){return y[u]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),0,{}))",
+	// Đã sửa UNPACK để sử dụng wrapper với tham số (g,i,a,h,u,y) và sử dụng hàm đệ quy tên encode để tránh lỗi u is not defined.
+	UNPACK: "eval(function(g,i,a,h,u,y){u=function encode(c){return(c<i?'':encode(parseInt(c/i)))+((c=c%i)>35?String.fromCharCode(c+29):c.toString(36))};if(!''.replace(/^/,String)){while(a--)y[a.toString(i)]=h[a]||a.toString(i);h=[function(x){return y[x]}];u=function(){return'\\\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\\\b'+u(a)+'\\\\b','g'),h[a]);return g}('%1',%2,%3,'%4'.split('|'),0,{}))",
 	
 	init: function() {
 		this.data = reduce(this.data, function(data, replacement, expression) {
