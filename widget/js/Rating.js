@@ -50,7 +50,7 @@ function loadScript(src, callback) {
       var hasilRating = document.querySelector('.hasil-rating');
       var sudahRt = document.querySelector('.sudahRt');
       
-      // Tham chiếu đến nút lưu trữ đánh giá trên Firebase với cấu trúc:
+      // Tham chiếu đến nút lưu trữ đánh giá trên Firebase với cấu trúc mong muốn:
       // BlogID_xxxxxxxxxxxx/ghRatings/PostID_xxxxxxxxxxxx
       var ratingRef = firebase.database().ref(ratingPath);
       
@@ -72,11 +72,6 @@ function loadScript(src, callback) {
           updateRatingDisplay(0, 0);
         }
       });
-      
-      // Kiểm tra nếu người dùng đã đánh giá theo localStorage (dùng key "rated_" + ratingPath)
-      if(localStorage.getItem("rated_" + ratingPath) === "true") {
-        sudahRt.style.display = 'block';
-      }
       
       // Hàm gửi đánh giá lên Firebase sử dụng giao dịch (transaction)
       function submitRating(rating) {
@@ -100,16 +95,18 @@ function loadScript(src, callback) {
           } else {
             console.log('Đánh giá đã được ghi nhận.');
             sudahRt.style.display = 'block';
-            // Lưu cờ "đã đánh giá" vào localStorage để không cho phép đánh giá lại
-            localStorage.setItem("rated_" + ratingPath, "true");
+            // Lưu flag vào LocalStorage để không cho phép đánh giá thêm
+            localStorage.setItem("hasRated", "true");
           }
         });
       }
       
-      // Gán sự kiện click cho từng ngôi sao
+      // Gán sự kiện click cho từng ngôi sao, kiểm tra LocalStorage để chỉ cho phép đánh giá 1 lần
       ratingStars.forEach(function(star, index) {
         star.addEventListener('click', function() {
-          // Nếu người dùng đã đánh giá thì không cho phép đánh giá thêm
+          // Kiểm tra nếu người dùng đã đánh giá (LocalStorage)
+          if (localStorage.getItem("hasRated") === "true") return;
+          // Nếu đã hiển thị thông báo đánh giá rồi thì không cho phép đánh giá thêm
           if (sudahRt.style.display === 'block') return;
           var ratingValue = index + 1; // Lấy giá trị từ 1 đến 5
           submitRating(ratingValue);
