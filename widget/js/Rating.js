@@ -1,12 +1,4 @@
-/* Ratings.js */
-/*<![CDATA[*/
-
-// Kiểm tra điều kiện sharedBy; nếu không đúng thì chuyển hướng
-if (typeof ghRatings === "undefined" || ghRatings.sharedBy !== "www.giahuy.net") {
-  window.location.href = "https://www.giahuy.net/p/credit.html";
-  throw new Error("Invalid credit - redirecting to credit page.");
-}
-
+// Hàm tải script động
 function loadScript(src, callback) {
   var s = document.createElement('script');
   s.src = src;
@@ -14,9 +6,10 @@ function loadScript(src, callback) {
   document.head.appendChild(s);
 }
 
-function RatingsLoad(){
-  // Tải Firebase SDK
+(function(){
+  // Tải firebase-app.js trước
   loadScript("https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js", function(){
+    // Sau đó tải firebase-database.js
     loadScript("https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js", function(){
       
       // Lấy đường dẫn rating từ container được render bởi Blogspot
@@ -28,7 +21,7 @@ function RatingsLoad(){
       
       console.log("Rating path ban đầu: " + ratingPath);
       
-      // Nếu ratingPath chưa chứa chuỗi "/ratings/", xử lý và thay thế bằng "/ghRatings/"
+      // Nếu ratingPath chưa chứa chuỗi "/ratings/", ta xử lý và thay thế bằng "/ghRatings/"
       if (ratingPath.indexOf("/ratings/") === -1) {
         var parts = ratingPath.split("/");
         if (parts.length >= 2) {
@@ -56,7 +49,7 @@ function RatingsLoad(){
       var hasilRating = document.querySelector('.hasil-rating');
       var sudahRt = document.querySelector('.sudahRt');
       
-      // Tham chiếu đến nút lưu trữ đánh giá trên Firebase với cấu trúc:
+      // Tham chiếu đến nút lưu trữ đánh giá trên Firebase với cấu trúc mong muốn:
       // BlogID_xxxxxxxxxxxx/ghRatings/PostID_xxxxxxxxxxxx
       var ratingRef = firebase.database().ref(ratingPath);
       
@@ -69,7 +62,7 @@ function RatingsLoad(){
       // Lắng nghe thay đổi dữ liệu đánh giá trên Firebase
       ratingRef.on('value', function(snapshot) {
         var data = snapshot.val();
-        if (data) {
+        if(data) {
           var totalRating = data.totalRating || 0;
           var totalVotes = data.totalVotes || 0;
           var avgRating = totalVotes ? totalRating / totalVotes : 0;
@@ -79,10 +72,10 @@ function RatingsLoad(){
         }
       });
       
-      // Hàm gửi đánh giá lên Firebase sử dụng transaction
+      // Hàm gửi đánh giá lên Firebase sử dụng giao dịch (transaction)
       function submitRating(rating) {
         ratingRef.transaction(function(currentData) {
-          if (currentData === null) {
+          if(currentData === null) {
             return {
               totalRating: rating,
               totalVotes: 1
@@ -94,12 +87,13 @@ function RatingsLoad(){
             };
           }
         }, function(error, committed, snapshot) {
-          if (error) {
+          if(error) {
             console.error('Lỗi khi cập nhật đánh giá:', error);
           } else if (!committed) {
             console.log('Giao dịch không được thực hiện.');
           } else {
             console.log('Đánh giá đã được ghi nhận.');
+            // Hiển thị thông báo rằng người dùng đã đánh giá
             sudahRt.style.display = 'block';
           }
         });
@@ -108,11 +102,13 @@ function RatingsLoad(){
       // Gán sự kiện click cho từng ngôi sao
       ratingStars.forEach(function(star, index) {
         star.addEventListener('click', function() {
+          // Nếu người dùng đã đánh giá thì không cho phép đánh giá thêm
           if (sudahRt.style.display === 'block') return;
-          var ratingValue = index + 1;
+          var ratingValue = index + 1; // Lấy giá trị từ 1 đến 5
           submitRating(ratingValue);
+          // Cập nhật giao diện các ngôi sao (active)
           ratingStars.forEach(function(s, i) {
-            if (i <= index) {
+            if(i <= index) {
               s.classList.add('active');
             } else {
               s.classList.remove('active');
@@ -123,9 +119,4 @@ function RatingsLoad(){
       
     });
   });
-}
-
-// Đưa RatingsLoad vào phạm vi toàn cục để có thể gọi từ mã inline
-window.RatingsLoad = RatingsLoad;
-
-/*]]>*/
+})();
