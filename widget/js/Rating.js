@@ -126,7 +126,7 @@ function RatingsLoad(){
   });
 }
 
-// Đưa RatingsLoad vào phạm vi toàn cục
+// Đưa RatingsLoad vào phạm vi toàn cục để mã inline có thể gọi được
 window.RatingsLoad = RatingsLoad;
 
 /*]]>*/
