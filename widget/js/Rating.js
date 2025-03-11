@@ -1,4 +1,10 @@
 /*<![CDATA[*/
+// Kiểm tra biến ghRatings và thuộc tính sharedBy
+if (typeof ghRatings === "undefined" || ghRatings.sharedBy !== "www.giahuy.net") {
+  window.location.href = "https://www.giahuy.net/p/credit.html";
+  throw new Error("Invalid credit - redirecting to credit page.");
+}
+
 // Hàm tải script động
 function loadScript(src, callback) {
   var s = document.createElement('script');
