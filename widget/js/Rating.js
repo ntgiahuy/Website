@@ -1,3 +1,4 @@
+/*<![CDATA[*/
 // Hàm tải script động
 function loadScript(src, callback) {
   var s = document.createElement('script');
@@ -120,3 +121,4 @@ function loadScript(src, callback) {
     });
   });
 })();
+/*]]>*/
