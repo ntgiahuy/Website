@@ -1,5 +1,13 @@
+/* Ratings.js */
 /*<![CDATA[*/
-// Hàm tải script động
+
+// Kiểm tra điều kiện sharedBy, nếu không đúng thì chuyển hướng
+if (typeof ghRatings === "undefined" || ghRatings.sharedBy !== "www.giahuy.net") {
+  window.location.href = "https://www.giahuy.net/p/credit.html";
+  // Dừng thực thi mã
+  throw new Error("Invalid credit - redirecting to credit page.");
+}
+
 function loadScript(src, callback) {
   var s = document.createElement('script');
   s.src = src;
@@ -7,10 +15,9 @@ function loadScript(src, callback) {
   document.head.appendChild(s);
 }
 
-(function(){
-  // Tải firebase-app.js trước
+function RatingsLoad(){
+  // Tải Firebase SDK
   loadScript("https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js", function(){
-    // Sau đó tải firebase-database.js
     loadScript("https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js", function(){
       
       // Lấy đường dẫn rating từ container được render bởi Blogspot
@@ -117,7 +124,8 @@ function loadScript(src, callback) {
           });
         });
       });
+      
     });
   });
-})();
+}
 /*]]>*/
