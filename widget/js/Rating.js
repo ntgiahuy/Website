@@ -1,7 +1,7 @@
 /* Ratings.js */
 /*<![CDATA[*/
 
-// Kiểm tra điều kiện sharedBy, nếu không đúng thì chuyển hướng
+// Kiểm tra điều kiện sharedBy; nếu không đúng thì chuyển hướng
 if (typeof ghRatings === "undefined" || ghRatings.sharedBy !== "www.giahuy.net") {
   window.location.href = "https://www.giahuy.net/p/credit.html";
   throw new Error("Invalid credit - redirecting to credit page.");
@@ -69,7 +69,7 @@ function RatingsLoad(){
       // Lắng nghe thay đổi dữ liệu đánh giá trên Firebase
       ratingRef.on('value', function(snapshot) {
         var data = snapshot.val();
-        if(data) {
+        if (data) {
           var totalRating = data.totalRating || 0;
           var totalVotes = data.totalVotes || 0;
           var avgRating = totalVotes ? totalRating / totalVotes : 0;
@@ -82,7 +82,7 @@ function RatingsLoad(){
       // Hàm gửi đánh giá lên Firebase sử dụng transaction
       function submitRating(rating) {
         ratingRef.transaction(function(currentData) {
-          if(currentData === null) {
+          if (currentData === null) {
             return {
               totalRating: rating,
               totalVotes: 1
@@ -94,13 +94,12 @@ function RatingsLoad(){
             };
           }
         }, function(error, committed, snapshot) {
-          if(error) {
+          if (error) {
             console.error('Lỗi khi cập nhật đánh giá:', error);
           } else if (!committed) {
             console.log('Giao dịch không được thực hiện.');
           } else {
             console.log('Đánh giá đã được ghi nhận.');
-            // Hiển thị thông báo rằng người dùng đã đánh giá
             sudahRt.style.display = 'block';
           }
         });
@@ -113,7 +112,7 @@ function RatingsLoad(){
           var ratingValue = index + 1;
           submitRating(ratingValue);
           ratingStars.forEach(function(s, i) {
-            if(i <= index) {
+            if (i <= index) {
               s.classList.add('active');
             } else {
               s.classList.remove('active');
@@ -126,7 +125,7 @@ function RatingsLoad(){
   });
 }
 
-// Đưa RatingsLoad vào phạm vi toàn cục để mã inline có thể gọi được
+// Đưa RatingsLoad vào phạm vi toàn cục để có thể gọi từ mã inline
 window.RatingsLoad = RatingsLoad;
 
 /*]]>*/
