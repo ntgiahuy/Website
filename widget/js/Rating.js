@@ -22,7 +22,7 @@ function loadScript(src, callback) {
       
       console.log("Rating path ban đầu: " + ratingPath);
       
-      // Nếu ratingPath chưa chứa chuỗi "/ratings/", ta xử lý và thay thế bằng "/ghRatings/"
+      // Nếu ratingPath chưa chứa chuỗi "/ratings/", xử lý và thay thế bằng "/ghRatings/"
       if (ratingPath.indexOf("/ratings/") === -1) {
         var parts = ratingPath.split("/");
         if (parts.length >= 2) {
@@ -50,7 +50,7 @@ function loadScript(src, callback) {
       var hasilRating = document.querySelector('.hasil-rating');
       var sudahRt = document.querySelector('.sudahRt');
       
-      // Tham chiếu đến nút lưu trữ đánh giá trên Firebase với cấu trúc mong muốn:
+      // Tham chiếu đến nút lưu trữ đánh giá trên Firebase với cấu trúc:
       // BlogID_xxxxxxxxxxxx/ghRatings/PostID_xxxxxxxxxxxx
       var ratingRef = firebase.database().ref(ratingPath);
       
@@ -73,6 +73,11 @@ function loadScript(src, callback) {
         }
       });
       
+      // Kiểm tra nếu người dùng đã đánh giá theo localStorage (dùng key "rated_" + ratingPath)
+      if(localStorage.getItem("rated_" + ratingPath) === "true") {
+        sudahRt.style.display = 'block';
+      }
+      
       // Hàm gửi đánh giá lên Firebase sử dụng giao dịch (transaction)
       function submitRating(rating) {
         ratingRef.transaction(function(currentData) {
@@ -94,8 +99,9 @@ function loadScript(src, callback) {
             console.log('Giao dịch không được thực hiện.');
           } else {
             console.log('Đánh giá đã được ghi nhận.');
-            // Hiển thị thông báo rằng người dùng đã đánh giá
             sudahRt.style.display = 'block';
+            // Lưu cờ "đã đánh giá" vào localStorage để không cho phép đánh giá lại
+            localStorage.setItem("rated_" + ratingPath, "true");
           }
         });
       }
