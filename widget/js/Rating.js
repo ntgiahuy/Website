@@ -4,7 +4,6 @@
 // Kiểm tra điều kiện sharedBy, nếu không đúng thì chuyển hướng
 if (typeof ghRatings === "undefined" || ghRatings.sharedBy !== "www.giahuy.net") {
   window.location.href = "https://www.giahuy.net/p/credit.html";
-  // Dừng thực thi mã
   throw new Error("Invalid credit - redirecting to credit page.");
 }
 
@@ -29,7 +28,7 @@ function RatingsLoad(){
       
       console.log("Rating path ban đầu: " + ratingPath);
       
-      // Nếu ratingPath chưa chứa chuỗi "/ratings/", ta xử lý và thay thế bằng "/ghRatings/"
+      // Nếu ratingPath chưa chứa chuỗi "/ratings/", xử lý và thay thế bằng "/ghRatings/"
       if (ratingPath.indexOf("/ratings/") === -1) {
         var parts = ratingPath.split("/");
         if (parts.length >= 2) {
@@ -57,7 +56,7 @@ function RatingsLoad(){
       var hasilRating = document.querySelector('.hasil-rating');
       var sudahRt = document.querySelector('.sudahRt');
       
-      // Tham chiếu đến nút lưu trữ đánh giá trên Firebase với cấu trúc mong muốn:
+      // Tham chiếu đến nút lưu trữ đánh giá trên Firebase với cấu trúc:
       // BlogID_xxxxxxxxxxxx/ghRatings/PostID_xxxxxxxxxxxx
       var ratingRef = firebase.database().ref(ratingPath);
       
@@ -80,7 +79,7 @@ function RatingsLoad(){
         }
       });
       
-      // Hàm gửi đánh giá lên Firebase sử dụng giao dịch (transaction)
+      // Hàm gửi đánh giá lên Firebase sử dụng transaction
       function submitRating(rating) {
         ratingRef.transaction(function(currentData) {
           if(currentData === null) {
@@ -110,11 +109,9 @@ function RatingsLoad(){
       // Gán sự kiện click cho từng ngôi sao
       ratingStars.forEach(function(star, index) {
         star.addEventListener('click', function() {
-          // Nếu người dùng đã đánh giá thì không cho phép đánh giá thêm
           if (sudahRt.style.display === 'block') return;
-          var ratingValue = index + 1; // Lấy giá trị từ 1 đến 5
+          var ratingValue = index + 1;
           submitRating(ratingValue);
-          // Cập nhật giao diện các ngôi sao (active)
           ratingStars.forEach(function(s, i) {
             if(i <= index) {
               s.classList.add('active');
@@ -128,4 +125,8 @@ function RatingsLoad(){
     });
   });
 }
+
+// Đưa RatingsLoad vào phạm vi toàn cục
+window.RatingsLoad = RatingsLoad;
+
 /*]]>*/
