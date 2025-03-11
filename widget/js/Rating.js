@@ -51,8 +51,8 @@ function loadScript(src, callback) {
       
       // Lấy các phần tử cần thiết từ HTML
       var ratingStars = document.querySelectorAll('.stars-svg');
-      var hasilRating = document.querySelector('.hasil-rating');
-      var sudahRt = document.querySelector('.sudahRt');
+      var resultRating = document.querySelector('.result-rating');
+      var alreadyRt = document.querySelector('.alreadyRt');
       
       // Tham chiếu đến nút lưu trữ đánh giá trên Firebase với cấu trúc mong muốn:
       // BlogID_xxxxxxxxxxxx/ghRatings/PostID_xxxxxxxxxxxx
@@ -60,8 +60,8 @@ function loadScript(src, callback) {
       
       // Hàm cập nhật giao diện hiển thị điểm trung bình và số lượt đánh giá
       function updateRatingDisplay(avg, votes) {
-        hasilRating.textContent = avg.toFixed(1);
-        hasilRating.setAttribute('aria-label', votes + ' lượt đánh giá');
+        resultRating.textContent = avg.toFixed(1);
+        resultRating.setAttribute('aria-label', votes + ' lượt đánh giá');
       }
       
       // Lắng nghe thay đổi dữ liệu đánh giá trên Firebase
@@ -98,7 +98,7 @@ function loadScript(src, callback) {
             console.log('Giao dịch không được thực hiện.');
           } else {
             console.log('Đánh giá đã được ghi nhận.');
-            sudahRt.style.display = 'block';
+            alreadyRt.style.display = 'block';
             // Lưu flag vào LocalStorage để không cho phép đánh giá thêm
             localStorage.setItem("hasRated", "true");
           }
@@ -111,7 +111,7 @@ function loadScript(src, callback) {
           // Kiểm tra nếu người dùng đã đánh giá (LocalStorage)
           if (localStorage.getItem("hasRated") === "true") return;
           // Nếu đã hiển thị thông báo đánh giá rồi thì không cho phép đánh giá thêm
-          if (sudahRt.style.display === 'block') return;
+          if (alreadyRt.style.display === 'block') return;
           var ratingValue = index + 1; // Lấy giá trị từ 1 đến 5
           submitRating(ratingValue);
           // Cập nhật giao diện các ngôi sao (active)
