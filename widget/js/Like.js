@@ -13,19 +13,27 @@ if (ghLikeFbase.sharedBy === 'www.giahuy.net') {
         if (value < 1000) return value;
         for (let i = thresholds.length - 1; i >= 0; i--) {
             if (value >= thresholds[i].value) {
-                return (value / thresholds[i].value).toFixed(2).replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1') + thresholds[i].suffix;
+                return (value / thresholds[i].value).toFixed(2)
+                    .replace(/\.0+$|(\.[0-9]*[1-9])0+$/, '$1') + thresholds[i].suffix;
             }
         }
     }
 
     const ghLikeBtn = document.querySelector('.gh-like-btn');
-    const ghLikePostId = ghLikeBtn.getAttribute('data-like').split('/')[1];
+    // Lấy PostID từ thuộc tính data-like
+    const rawPostId = ghLikeBtn.getAttribute('data-like').split('/')[1];
+
+    // Xây dựng đường dẫn mới theo định dạng:
+    // BlogID_xxxxxxx → ghLike → PostID_xxxxxxx → likepost
+    // Thay 'YOUR_BLOG_ID_HERE' bằng mã ID thực tế của blogspot
+    const blogId = 'BlogID_' + 'YOUR_BLOG_ID_HERE';
+    const postId = 'PostID_' + rawPostId;
+    const firebasePath = `${blogId}/ghLike/${postId}/likepost`;
 
     function getLiked() {
         const elementId = '#gh-like';
         const attribute = 'data-click';
-        const firebasePath = ghLikeBtn.getAttribute('data-like');
-
+        // Sử dụng firebasePath mới
         firebase.database().ref(firebasePath).once('value').then(snapshot => {
             let likeCount = snapshot.val() || 0;
             firebase.database().ref(firebasePath).set(likeCount);
@@ -41,16 +49,16 @@ if (ghLikeFbase.sharedBy === 'www.giahuy.net') {
     }
 
     function ghLike() {
-        const firebasePath = ghLikeBtn.getAttribute('data-like');
-
+        // Sử dụng firebasePath mới
         firebase.database().ref(firebasePath).once('value').then(snapshot => {
             let likeCount = snapshot.val() || 0;
 
-            if (localStorage.getItem(`ghLike${ghLikePostId}`) !== ghLikePostId) {
+            if (localStorage.getItem(`ghLike${rawPostId}`) !== rawPostId) {
                 likeCount++;
-                localStorage.setItem(`ghLike${ghLikePostId}`, ghLikePostId);
+                localStorage.setItem(`ghLike${rawPostId}`, rawPostId);
                 ghLikeBtn.querySelector('svg').classList.add('like');
-                document.querySelector('#gh-like').setAttribute('data-text', document.querySelector('#gh-like').getAttribute('data-after'));
+                document.querySelector('#gh-like').setAttribute('data-text', 
+                    document.querySelector('#gh-like').getAttribute('data-after'));
             }
 
             firebase.database().ref(firebasePath).set(likeCount);
@@ -72,7 +80,7 @@ if (ghLikeFbase.sharedBy === 'www.giahuy.net') {
             const dbScript = document.createElement('script');
             dbScript.src = 'https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js';
             dbScript.onload = function() {
-                // Initialize Firebase
+                // Khởi tạo Firebase với URL của database
                 firebase.initializeApp({
                     databaseURL: ghLikeFbase.firebaseUrl
                 });
@@ -85,9 +93,10 @@ if (ghLikeFbase.sharedBy === 'www.giahuy.net') {
 
     ghLikeBtn.addEventListener('click', ghLike);
 
-    if (localStorage.getItem(`ghLike${ghLikePostId}`) === ghLikePostId) {
+    if (localStorage.getItem(`ghLike${rawPostId}`) === rawPostId) {
         ghLikeBtn.querySelector('svg').classList.add('like');
-        document.querySelector('#gh-like').setAttribute('data-text', document.querySelector('#gh-like').getAttribute('data-after'));
+        document.querySelector('#gh-like').setAttribute('data-text', 
+            document.querySelector('#gh-like').getAttribute('data-after'));
     }
 
 } else {
