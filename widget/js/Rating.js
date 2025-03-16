@@ -51,7 +51,12 @@ function loadScript(src, callback) {
       
       // Khởi tạo Firebase (nếu chưa được khởi tạo)
       if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
+        if (window.firebaseConfig) {
+          firebase.initializeApp(window.firebaseConfig);
+        } else {
+          console.error("firebaseConfig is not defined. Vui lòng định nghĩa window.firebaseConfig trước khi tải Rating.js");
+          return;
+        }
       }
       
       // Lấy các phần tử cần thiết từ HTML
@@ -133,4 +138,5 @@ function loadScript(src, callback) {
     });
   });
 })();
+  
 /*]]>*/
