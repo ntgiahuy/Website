@@ -20,20 +20,18 @@ if (ghLikeFbase.sharedBy === 'www.giahuy.net') {
     }
 
     const ghLikeBtn = document.querySelector('.gh-like-btn');
-    // Lấy PostID từ thuộc tính data-like
-    const rawPostId = ghLikeBtn.getAttribute('data-like').split('/')[1];
+    // Lấy giá trị data-like được render: ví dụ "12345678/987654321/likepost"
+    const dataLike = ghLikeBtn.getAttribute('data-like').split('/');
+    const blogRealId = dataLike[0]; // Blog ID được render từ data:blog.blogId
+    const rawPostId = dataLike[1];  // Post ID được render từ data:post.id
 
-    // Xây dựng đường dẫn mới theo định dạng:
-    // BlogID_xxxxxxx → ghLike → PostID_xxxxxxx → likepost
-    // Thay 'YOUR_BLOG_ID_HERE' bằng mã ID thực tế của blogspot
-    const blogId = 'BlogID_' + 'YOUR_BLOG_ID_HERE';
-    const postId = 'PostID_' + rawPostId;
-    const firebasePath = `${blogId}/ghLike/${postId}/likepost`;
+    // Xây dựng đường dẫn Firebase theo định dạng:
+    // BlogID_<blogRealId> → ghLike → PostID_<rawPostId> → likepost
+    const firebasePath = `BlogID_${blogRealId}/ghLike/PostID_${rawPostId}/likepost`;
 
     function getLiked() {
         const elementId = '#gh-like';
         const attribute = 'data-click';
-        // Sử dụng firebasePath mới
         firebase.database().ref(firebasePath).once('value').then(snapshot => {
             let likeCount = snapshot.val() || 0;
             firebase.database().ref(firebasePath).set(likeCount);
@@ -49,7 +47,6 @@ if (ghLikeFbase.sharedBy === 'www.giahuy.net') {
     }
 
     function ghLike() {
-        // Sử dụng firebasePath mới
         firebase.database().ref(firebasePath).once('value').then(snapshot => {
             let likeCount = snapshot.val() || 0;
 
