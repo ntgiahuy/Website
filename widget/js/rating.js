@@ -1,0 +1,132 @@
+(function () {
+  'use strict';
+
+  if (typeof ghRatings === 'undefined' || typeof ghRatings.firebaseUrl === 'undefined') return;
+
+  // Bảo vệ bản quyền (chỉ cần sharedBy đúng)
+  if (typeof ghRatings.sharedBy !== 'string' || ghRatings.sharedBy !== 'www.giahuy.net') {
+    window.location.href = "https://www.giahuy.net/p/credit.html";
+    return;
+  }
+
+  const firebaseUrl = ghRatings.firebaseUrl.replace(/\/$/, '');
+  const blogId = document.getElementById('ratingContainer')?.getAttribute('data-blog-id') || 'unknown';
+  const postId = document.getElementById('ratingContainer')?.getAttribute('data-post-id') || 'unknown';
+  const fullId = blogId + '/' + postId;
+  const container = document.getElementById('ratingContainer');
+  if (!container) return;
+
+  container.innerHTML = `
+    <style>
+      .gh-stars svg{width:24px;height:24px;cursor:pointer;transition:fill 0.2s}
+      .gh-stars .filled{fill:#fbc02d}
+      .gh-stars .empty{fill:#ccc}
+      .gh-rating-info{margin-top:6px;font-size:14px;color:#666}
+    </style>
+    <div class="gh-stars" id="ghStars"></div>
+    <div class="gh-rating-info" id="ghInfo">Đang tải...</div>
+  `;
+
+  const starsWrap = container.querySelector('#ghStars');
+  const infoWrap = container.querySelector('#ghInfo');
+  let fingerprint = '', rated = false;
+
+  // Fingerprint mini: canvas + userAgent
+  function getFingerprint() {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.textBaseline = 'top';
+      ctx.font = '14px Arial';
+      ctx.fillText(navigator.userAgent, 2, 2);
+      return Promise.resolve(
+        btoa(canvas.toDataURL()).slice(0, 32)
+      );
+    } catch (e) {
+      return Promise.resolve('anonymous');
+    }
+  }
+
+  function createStar(index, filled) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("data-star", index);
+    svg.classList.add(filled ? 'filled' : 'empty');
+    svg.innerHTML = `<path d="M12 .587l3.668 7.431L24 9.423l-6 5.849 1.417 8.268L12 18.897 4.583 23.54 6 15.272 0 9.423l8.332-1.405z"/>`;
+    return svg;
+  }
+
+  function renderStars(score) {
+    starsWrap.innerHTML = '';
+    for (let i = 1; i <= 5; i++) {
+      starsWrap.appendChild(createStar(i, i <= score));
+    }
+  }
+
+  function loadRating() {
+    fetch(`${firebaseUrl}/ratings/${fullId}.json`)
+      .then(res => res.json())
+      .then(data => {
+        const count = data?.count || 0;
+        const sum = data?.sum || 0;
+        const avg = count ? (sum / count).toFixed(1) : 0;
+        if (data?.fingerprints?.[fingerprint]) {
+          renderStars(data.fingerprints[fingerprint]);
+          infoWrap.innerText = `${avg}/5 (${count} lượt)`;
+          rated = true;
+        } else {
+          renderStars(Math.round(avg));
+          infoWrap.innerText = count ? `${avg}/5 (${count} lượt)` : 'Chưa có đánh giá';
+        }
+      });
+  }
+
+  function sendRating(score) {
+    fetch(`${firebaseUrl}/ratings/${fullId}.json`)
+      .then(res => res.json())
+      .then(data => {
+        const count = data?.count || 0;
+        const sum = data?.sum || 0;
+        const fps = data?.fingerprints || {};
+        if (fps[fingerprint]) {
+          infoWrap.innerText = "Bạn đã đánh giá rồi. Xin cảm ơn!";
+          rated = true;
+          return;
+        }
+        const newData = {
+          sum: sum + score,
+          count: count + 1,
+          fingerprints: Object.assign({}, fps, { [fingerprint]: score })
+        };
+        return fetch(`${firebaseUrl}/ratings/${fullId}.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newData)
+        });
+      })
+      .then(() => {
+        renderStars(score);
+        infoWrap.innerText = "Cảm ơn bạn đã đánh giá!";
+        rated = true;
+      });
+  }
+
+  function bindEvents() {
+    starsWrap.addEventListener('click', function (e) {
+      if (e.target.closest('svg')) {
+        if (rated) {
+          infoWrap.innerText = "Bạn đã đánh giá rồi. Xin cảm ơn!";
+          return;
+        }
+        const score = parseInt(e.target.closest('svg').getAttribute('data-star'));
+        sendRating(score);
+      }
+    });
+  }
+
+  getFingerprint().then(fp => {
+    fingerprint = fp;
+    bindEvents();
+    loadRating();
+  });
+})();
