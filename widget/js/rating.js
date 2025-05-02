@@ -1,4 +1,4 @@
-// Rating.js - Đánh giá sao Blogger | Bản quyền © www.giahuy.net
+// Star rating by © giahuy.net
 (function () {
   'use strict';
 
