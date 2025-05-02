@@ -1,7 +1,4 @@
-// like.js - Like/Dislike kiểu YouTube | Bản quyền © www.giahuy.net
-
-// like.js - Like/Dislike trái tim | Bản quyền © www.giahuy.net
-
+// Like by Giahuy.net
 (function () {
   'use strict';
 
