@@ -64,7 +64,7 @@
   }
 
   function loadRating() {
-    fetch(`${firebaseUrl}/ghRatings/${fullId}.json`)
+    fetch(`${firebaseUrl}/ratings/${fullId}.json`)
       .then(res => res.json())
       .then(data => {
         const count = data?.count || 0;
@@ -82,7 +82,7 @@
   }
 
   function sendRating(score) {
-    fetch(`${firebaseUrl}/ghRatings/${fullId}.json`)
+    fetch(`${firebaseUrl}/ratings/${fullId}.json`)
       .then(res => res.json())
       .then(data => {
         const count = data?.count || 0;
@@ -99,7 +99,7 @@
           count: count + 1,
           fingerprints: Object.assign({}, fps, { [fingerprint]: score })
         };
-        return fetch(`${firebaseUrl}/ghRatings/${fullId}.json`, {
+        return fetch(`${firebaseUrl}/ratings/${fullId}.json`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newData)
