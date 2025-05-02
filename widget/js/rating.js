@@ -1,3 +1,6 @@
+
+// Rating.js - Đánh giá sao Blogger | Bản quyền © www.giahuy.net
+
 (function () {
   'use strict';
 
@@ -21,7 +24,7 @@
       .gh-stars svg{width:24px;height:24px;cursor:pointer;transition:fill 0.2s}
       .gh-stars .filled{fill:#fbc02d}
       .gh-stars .empty{fill:#ccc}
-      .gh-rating-info{margin-top:6px;font-size:14px;color:#666}
+      .gh-rating-info{margin-top:6px;font-size:14px;color:#666;text-align:center}
     </style>
     <div class="gh-stars" id="ghStars"></div>
     <div class="gh-rating-info" id="ghInfo">Đang tải...</div>
@@ -31,7 +34,6 @@
   const infoWrap = container.querySelector('#ghInfo');
   let fingerprint = '', rated = false;
 
-  // Fingerprint mini: canvas + userAgent
   function getFingerprint() {
     try {
       const canvas = document.createElement('canvas');
@@ -39,9 +41,7 @@
       ctx.textBaseline = 'top';
       ctx.font = '14px Arial';
       ctx.fillText(navigator.userAgent, 2, 2);
-      return Promise.resolve(
-        btoa(canvas.toDataURL()).slice(0, 32)
-      );
+      return Promise.resolve(btoa(canvas.toDataURL()).slice(0, 32));
     } catch (e) {
       return Promise.resolve('anonymous');
     }
@@ -91,6 +91,7 @@
         if (fps[fingerprint]) {
           infoWrap.innerText = "Bạn đã đánh giá rồi. Xin cảm ơn!";
           rated = true;
+          setTimeout(loadRating, 3000);
           return;
         }
         const newData = {
@@ -116,6 +117,7 @@
       if (e.target.closest('svg')) {
         if (rated) {
           infoWrap.innerText = "Bạn đã đánh giá rồi. Xin cảm ơn!";
+          setTimeout(loadRating, 3000);
           return;
         }
         const score = parseInt(e.target.closest('svg').getAttribute('data-star'));
