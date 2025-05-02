@@ -110,7 +110,7 @@
         };
 
         return fetch(`${firebaseUrl}/ghLikes/${fullId}.json`, {
-          method: 'PUT',
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newData)
         });
