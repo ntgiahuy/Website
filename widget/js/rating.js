@@ -1,2 +1,132 @@
 // Rating.js - Đánh giá sao Blogger | Bản quyền © www.giahuy.net
-eval(function(g,i,a,h,u,y){u=function(a){return(a<i?'':u(parseInt(a/i)))+((a=a%i)>35?String.fromCharCode(a+29):a.toString(36))};if(!''.replace(/^/,String)){while(a--)y[u(a)]=h[a]||u(a);h=[function(u){return y[u]}];u=function(){return'\\w+'};a=1};while(a--)if(h[a])g=g.replace(new RegExp('\\b'+u(a)+'\\b','g'),h[a]);return g}('y 16(e,f){M 2h=1I();A 16=y(b,c){b=b-2C;1p 1x=2h[b];1g(16[\'\\17\\F\\7\\h\\H\\B\']===3I){3J d=y(a){M 2D=\'\\o\\1c\\F\\i\\3\\l\\9\\m\\5\\U\\1h\\u\\g\\1\\j\\I\\G\\2\\4\\0\\p\\7\\6\\w\\k\\r\\L\\n\\8\\t\\1i\\17\\K\\C\\10\\T\\z\\h\\q\\B\\X\\Y\\1q\\14\\P\\V\\D\\Z\\Q\\N\\J\\H\\E\\11\\x\\W\\O\\R\\1s\\3K\\1t\\18\\1J\\19\\1K\';1p 1L=\'\',2i=\'\',2E=1L+d;20(1p 1M=13,21,1u,2j=13;1u=a[\'\\F\\m\\o\\2\\L\\0\'](2j++);~1u&&(21=1M%2k?21*3L+1u:1u,1M++%2k)?1L+=2E[\'\\F\\m\\o\\2\\8\\j\\i\\3\\L\\0\'](2j+2l)-2l!==13?3M[\'\\l\\2\\j\\g\\8\\m\\o\\2\\8\\j\\i\\3\'](3N&21>>(-1N*1M&2F)):1M:13){1u=2D[\'\\5\\1\\i\\3\\w\\X\\l\'](1u)}20(1p 22=13,2G=1L[\'\\u\\3\\1\\9\\0\\m\'];22<2G;22++){2i+=\'\\3O\'+(\'\\E\\E\'+1L[\'\\F\\m\\o\\2\\8\\j\\i\\3\\L\\0\'](22)[\'\\0\\j\\P\\0\\2\\5\\1\\9\'](3P))[\'\\4\\u\\5\\F\\3\'](-1N)}A 3Q(2i)};16[\'\\F\\r\\10\\6\\6\\1q\']=d,e=2H,16[\'\\17\\F\\7\\h\\H\\B\']=!![]}M 2I=2h[13],2m=b+2I,2n=e[2m];1g(!2n){M 1O=y(a){12[\'\\V\\1\\h\\z\\o\\5\']=a,12[\'\\q\\p\\H\\N\\B\\6\']=[1y,13,13],12[\'\\H\\Z\\14\\V\\i\\3\']=y(){A\'\\1\\3\\6\\P\\0\\o\\0\\3\'},12[\'\\Q\\k\\h\\X\\z\\u\']=\'\\23\\6\\1J\\S\\24\\23\\2o\\23\\3R\\S\\24\\1P\\23\\6\\1J\\S\\24\',12[\'\\8\\p\\1\\t\\I\\l\']=\'\\2J\\2K\\2L\\1k\\2M\\15\\1J\\2J\\2K\\2L\\1k\\2M\\1v\\3S\\S\\24\\1Q\'};1O[\'\\I\\2\\j\\0\\j\\0\\k\\I\\3\'][\'\\L\\j\\6\\C\\p\\Z\']=y(){M 2N=2O 3T(12[\'\\Q\\k\\h\\X\\z\\u\']+12[\'\\8\\p\\1\\t\\I\\l\']),2P=2N[\'\\0\\3\\4\\0\'](12[\'\\H\\Z\\14\\V\\i\\3\'][\'\\0\\j\\P\\0\\2\\5\\1\\9\']())?--12[\'\\q\\p\\H\\N\\B\\6\'][1y]:--12[\'\\q\\p\\H\\N\\B\\6\'][13];A 12[\'\\1\\j\\w\\n\\C\\k\'](2P)},1O[\'\\I\\2\\j\\0\\j\\0\\k\\I\\3\'][\'\\1\\j\\w\\n\\C\\k\']=y(a){1g(!3U(~a))A a;A 12[\'\\14\\1q\\7\\17\\17\\J\'](12[\'\\V\\1\\h\\z\\o\\5\'])},1O[\'\\I\\2\\j\\0\\j\\0\\k\\I\\3\'][\'\\14\\1q\\7\\17\\17\\J\']=y(a){20(1p 2p=13,2q=12[\'\\q\\p\\H\\N\\B\\6\'][\'\\u\\3\\1\\9\\0\\m\'];2p<2q;2p++){12[\'\\q\\p\\H\\N\\B\\6\'][\'\\I\\p\\4\\m\'](2r[\'\\2\\j\\p\\1\\i\'](2r[\'\\2\\o\\1\\i\\j\\g\']())),2q=12[\'\\q\\p\\H\\N\\B\\6\'][\'\\u\\3\\1\\9\\0\\m\']}A a(12[\'\\q\\p\\H\\N\\B\\6\'][13])},2O 1O(16)[\'\\L\\j\\6\\C\\p\\Z\'](),1x=16[\'\\F\\r\\10\\6\\6\\1q\'](1x),e[2m]=1x}2Q 1x=2n;A 1x},16(e,f)}(y(a,b){M 1d=16,1R=a();3V(!![]){2R{M 2S=1e(1d(3W))/1y*(-1e(1d(3X))/1N)+1e(1d(3Y))/3Z+1e(1d(40))/2k+1e(1d(41))/2T*(1e(1d(42))/2F)+-1e(1d(43))/44+-1e(1d(45))/46*(1e(1d(47))/48)+-1e(1d(49))/2l*(-1e(1d(4a))/4b);1g(2S===b)4c;2Q 1R[\'2U\'](1R[\'2V\']())}2W(4d){1R[\'2U\'](1R[\'2V\']())}}}(1I,4e),(y(){M s=16,v={\'\\k\\i\\u\\q\\n\':y(a,b,c){A a(b,c)},\'\\C\\u\\n\\h\\I\':y(a){A a()},\'\\14\\10\\1c\\9\\Y\':s(4f),\'\\i\\p\\Y\\4\\0\':\'\\0\\j\\I\',\'\\V\\Z\\Q\\C\\P\':\'\\11\\O\\I\\w\\S\\L\\2\\5\\o\\u\',\'\\H\\B\\14\\Q\\9\':s(4g),\'\\n\\X\\P\\5\\N\':\'\\4\\7\\9\',\'\\r\\J\\k\\U\\h\':s(4h),\'\\1c\\t\\6\\4\\q\':\'\\E\\S\\E\\S\\x\\O\\S\\x\\O\',\'\\8\\J\\J\\N\\4\':s(4i),\'\\D\\B\\0\\Y\\D\':s(4j),\'\\4\\4\\D\\U\\g\':s(4k),\'\\B\\D\\u\\17\\N\':y(a,b){A a<=b},\'\\X\\C\\0\\10\\J\':y(a,b,c){A a(b,c)},\'\\0\\q\\10\\I\\2\':y(a,b){A a(b)},\'\\D\\k\\D\\t\\I\':y(a,b){A a(b)},\'\\D\\l\\V\\B\\o\':\'\\n\\2X\\1\\S\\25\\2Y\\S\\25\\26\\1\\m\\S\\9\\5\\26\\S\\2\\4l\\5\\15\\S\\N\\5\\1\\S\\F\\2s\\g\\S\\2Z\\1\\30\',\'\\m\\0\\V\\3\\8\':y(a,b){A a+b},\'\\w\\u\\h\\0\\8\':y(a,b,c){A a(b,c)},\'\\1\\L\\N\\H\\w\':s(4m),\'\\Z\\j\\q\\T\\6\':y(a,b){A a(b)},\'\\8\\2\\J\\n\\C\':y(a,b){A a===b},\'\\K\\T\\C\\w\\l\':s(4n),\'\\q\\q\\D\\l\\V\':y(a,b){A a!==b},\'\\w\\p\\G\\1\\V\':s(4o),\'\\o\\17\\D\\1h\\q\':s(4p),\'\\o\\m\\n\\J\\L\':\'\\m\\0\\0\\I\\4\\1j\\19\\19\\6\\6\\6\\15\\9\\5\\o\\m\\p\\k\\15\\1\\3\\0\\19\\I\\19\\F\\2\\3\\i\\5\\0\\15\\m\\0\\g\\u\',\'\\Y\\D\\1i\\G\\H\':s(4q),\'\\C\\z\\10\\F\\q\':s(31),\'\\X\\Z\\7\\17\\u\':s(32),\'\\l\\j\\T\\8\\P\':\'\\i\\o\\0\\o\\1a\\I\\j\\4\\0\\1a\\5\\i\',\'\\1q\\m\\g\\3\\j\':y(a,b){A a+b},\'\\17\\G\\14\\Q\\X\':\'\\1S\\9\\m\\10\\1\\l\\j\'},33=(y(){1p 2t=!![];A y(a,b){M 34=2t?y(){M 35=16;1g(b){M 36=b[35(4r)](a,2H);A b=4s,36}}:y(){};A 2t=![],34}}());\'4t 4u\';1g(v[\'\\8\\2\\J\\n\\C\'](2u 1T,v[s(2C)])||v[s(4v)](2u 1T[s(37)],\'\\p\\1\\i\\3\\l\\5\\1\\3\\i\'))A;1g(v[s(38)](2u 1T[s(4w)],v[s(4x)])||v[s(38)](1T[\'\\4\\m\\o\\2\\3\\i\\n\\k\'],v[s(4y)])){4z[s(4A)][s(4B)]=v[s(4C)];A}M 27=1T[s(37)][s(4D)](/\\/$/,\'\'),39=1U[s(2v)](s(32))?.[s(2w)](v[s(4E)])||v[\'\\C\\z\\10\\F\\q\'],3a=1U[s(2v)](v[\'\\X\\Z\\7\\17\\u\'])?.[s(2w)](v[s(4F)])||s(31),28=v[s(4G)](39+\'\\19\',3a),1V=1U[s(2v)](v[s(4H)]);1g(!1V)A;1V[\'\\5\\1\\1\\3\\2\\C\\V\\q\\h\']=\'\\1z\\4\\0\\k\\u\\3\\1A\\15\\9\\m\\1a\\4\\0\\o\\2\\4\\S\\4\\7\\9\\1P\\6\\5\\i\\0\\m\\1j\\x\\O\\I\\w\\1v\\m\\3\\5\\9\\m\\0\\1j\\x\\O\\I\\w\\1v\\F\\p\\2\\4\\j\\2\\1j\\I\\j\\5\\1\\0\\3\\2\\1v\\0\\2\\o\\1\\4\\5\\0\\5\\j\\1\\1j\\l\\5\\u\\u\\S\\E\\15\\x\\4\\1Q\\15\\9\\m\\1a\\4\\0\\o\\2\\4\\15\\l\\5\\u\\u\\3\\i\\1P\\l\\5\\u\\u\\1j\\1S\\l\\1c\\F\\E\\x\\i\\1Q\\15\\9\\m\\1a\\4\\0\\o\\2\\4\\15\\3\\g\\I\\0\\k\\1P\\l\\5\\u\\u\\1j\\1S\\F\\F\\F\\1Q\\15\\9\\m\\1a\\2\\o\\0\\5\\1\\9\\1a\\5\\1\\l\\j\\1P\\l\\j\\1\\0\\1a\\4\\5\\r\\3\\1j\\11\\O\\I\\w\\1v\\F\\j\\u\\j\\2\\1j\\1S\\1s\\1s\\1s\\1v\\0\\3\\w\\0\\1a\\o\\u\\5\\9\\1\\1j\\F\\3\\1\\0\\3\\2\\1v\\I\\o\\i\\i\\5\\1\\9\\1j\\R\\I\\w\\S\\1t\\I\\w\\1Q\\1z\\19\\4\\0\\k\\u\\3\\1A\\1z\\i\\5\\7\\S\\F\\u\\o\\4\\4\\1K\\1k\\9\\m\\1a\\4\\0\\o\\2\\4\\1k\\5\\i\\1K\\1k\\9\\m\\P\\0\\o\\2\\4\\1k\\1A\\1z\\19\\i\\5\\7\\1A\\1z\\i\\5\\7\\S\\F\\u\\o\\4\\4\\1K\\1k\\9\\m\\1a\\2\\o\\0\\5\\1\\9\\1a\\5\\1\\l\\j\\1k\\5\\i\\1K\\1k\\9\\m\\10\\1\\l\\j\\1k\\1A\\4I\\o\\1\\9\\S\\0\\2s\\5\\15\\15\\15\\1z\\19\\i\\5\\7\\1A\';M 29=1V[\'\\G\\p\\3\\2\\k\\P\\3\\u\\3\\F\\0\\j\\2\'](\'\\1S\\9\\m\\P\\0\\o\\2\\4\'),1B=1V[s(4J)](v[s(4K)]);1p 1C=\'\',1W=![];y 3b(){M 1b=s,2a=v[1b(4L)](33,12,y(){M 1w=1b;A 2a[1w(3c)]()[\'\\4\\3\\o\\2\\F\\m\'](1w(3d))[1w(3c)]()[1w(4M)](2a)[1w(4N)](1w(3d))});v[1b(3e)](2a);2R{M 2x=1U[1b(4O)](v[1b(4P)]),2b=2x[\'\\9\\3\\0\\8\\j\\1\\0\\3\\w\\0\'](\'\\x\\i\');A 2b[1b(4Q)]=v[\'\\i\\p\\Y\\4\\0\'],2b[\'\\l\\j\\1\\0\']=v[\'\\V\\Z\\Q\\C\\P\'],2b[1b(4R)](4S[1b(4T)],1N,1N),3f[\'\\2\\3\\4\\j\\u\\7\\3\'](4U(2x[1b(4V)]())[1b(4W)](13,4X))}2W(4Y){A 3f[1b(4Z)](1b(50))}}y 3g(a,b){M 1o=s,1D=1U[\'\\F\\2\\3\\o\\0\\3\\1i\\u\\3\\g\\3\\1\\0\\B\\P\'](v[\'\\H\\B\\14\\Q\\9\'],v[\'\\n\\X\\P\\5\\N\']);A 1D[1o(3h)](v[1o(51)],v[1o(52)]),1D[1o(3h)](v[1o(53)],a),1D[\'\\F\\u\\o\\4\\4\\h\\5\\4\\0\'][1o(54)](b?v[1o(55)]:v[\'\\4\\4\\D\\U\\g\']),1D[\'\\5\\1\\1\\3\\2\\C\\V\\q\\h\']=1o(56),1D}y 2c(a){M 1E=s;29[1E(57)]=\'\';20(1p 1X=1y;v[1E(3i)](1X,2T);1X++){29[1E(58)](v[1E(59)](3g,1X,v[1E(3i)](1X,a)))}}y 2d(){M 1r=s,2e={\'\\2\\17\\1h\\K\\i\':y(a,b){A a/b},\'\\X\\1h\\i\\D\\t\':y(a,b){M 3j=16;A v[3j(5a)](a,b)},\'\\i\\T\\G\\g\\k\':1r(5b)};v[\'\\0\\q\\10\\I\\2\'](2y,27+1r(3k)+28+1r(2z))[1r(1F)](3l=>3l[1r(5c)]())[1r(1F)](1Y=>{M 1l=1r,1G=1Y?.[1l(3m)]||13,3n=1Y?.[1l(3o)]||13,2f=1G?2e[1l(5d)](3n,1G)[\'\\0\\j\\17\\5\\w\\3\\i\'](1y):13;1Y?.[1l(3p)]?.[1C]?(2c(1Y[\'\\l\\5\\1\\9\\3\\2\\I\\2\\5\\1\\0\\4\'][1C]),1B[1l(1Z)]=2f+\'\\19\\R\\2o\'+1G+1l(3q),1W=!![]):(2e[1l(5e)](2c,2r[\'\\2\\j\\p\\1\\i\'](2f)),1B[1l(1Z)]=1G?2f+\'\\19\\R\\2o\'+1G+1l(3q):2e[\'\\i\\T\\G\\g\\k\'])})}y 3r(d){M 1m=s,1H={\'\\5\\3\\Q\\q\\o\':v[\'\\D\\l\\V\\B\\o\'],\'\\l\\o\\I\\D\\q\':y(a,b,c){A a(b,c)},\'\\3\\u\\14\\N\\m\':y(a,b){M 3s=16;A v[3s(5f)](a,b)},\'\\1\\6\\w\\Q\\14\':y(a,b,c){M 3t=16;A v[3t(5g)](a,b,c)},\'\\J\\C\\o\\Q\\5\':v[1m(5h)]};v[1m(5i)](2y,27+1m(3k)+28+1m(2z))[1m(1F)](3u=>3u[\'\\U\\4\\j\\1\']())[1m(1F)](2g=>{M 1f=1m,3v=2g?.[1f(3m)]||13,3w=2g?.[1f(3o)]||13,2A=2g?.[1f(3p)]||{};1g(2A[1C]){1B[1f(1Z)]=1H[1f(5j)],1W=!![],1H[\'\\l\\o\\I\\D\\q\'](3x,2d,3y);A}M 3z={\'\\4\\p\\g\':3w+d,\'\\F\\j\\p\\1\\0\':1H[\'\\3\\u\\14\\N\\m\'](3v,1y),\'\\l\\5\\1\\9\\3\\2\\I\\2\\5\\1\\0\\4\':5k[1f(5l)]({},2A,{[1C]:d})};A 1H[1f(5m)](2y,27+\'\\19\\9\\m\\14\\o\\0\\5\\1\\9\\4\\19\'+28+1f(2z),{\'\\g\\3\\0\\m\\j\\i\':1f(5n),\'\\m\\3\\o\\i\\3\\2\\4\':{\'\\8\\j\\1\\0\\3\\1\\0\\1a\\V\\k\\I\\3\':1H[1f(5o)]},\'\\1c\\j\\i\\k\':5p[1f(5q)](3z)})})[1m(1F)](()=>{M 3A=1m;v[\'\\D\\k\\D\\t\\I\'](2c,d),1B[3A(1Z)]=\'\\8\\2s\\g\\S\\2Z\\1\\S\\1c\\2X\\1\\S\\25\\2Y\\S\\25\\26\\1\\m\\S\\9\\5\\26\\30\',1W=!![]})}y 3B(){M 2B=s;29[2B(5r)](\'\\F\\u\\5\\F\\1h\',y(a){M 1n=2B;1g(a[1n(3C)][1n(3D)](v[1n(5s)])){1g(1W){1B[1n(1Z)]=1n(5t),3x(2d,3y);A}M 3E=v[1n(5u)](1e,a[1n(3C)][1n(3D)](\'\\4\\7\\9\')[1n(2w)](v[\'\\8\\J\\J\\N\\4\']));v[\'\\D\\k\\D\\t\\I\'](3r,3E)}})}v[\'\\C\\u\\n\\h\\I\'](3b)[s(1F)](3F=>{M 3G=s;1C=3F,v[3G(3e)](3B),2d()})}()));y 1I(){M 3H=[\'\\G\\x\\T\\9\\P\\9\\3\\K\\k\\1t\\j\\H\\5\\g\\4\\2\\Q\\1s\\l\\D\\L\\F\\1c\\B\\L\\8\\j\\C\',\'\\1h\\F\\K\\X\\u\\10\\P\\Y\\1h\\J\\z\\14\\1h\\4\\P\\z\',\'\\8\\x\\7\\C\\8\\q\\1\\X\',\'\\4\\9\\N\\F\\0\\m\\o\',\'\\g\\0\\g\\J\\1\\i\\g\\J\\1\\h\\l\\1h\\4\\x\\r\\1q\\0\\Q\',\'\\7\\q\\18\\1\\4\\B\\8\',\'\\k\\w\\1c\\Q\\n\\m\\z\',\'\\t\\q\\h\\h\\t\\E\\U\\Z\\1i\\o\',\'\\r\\9\\l\\E\\k\\4\\11\\10\\n\\9\\18\\B\\u\\6\\h\\z\',\'\\2\\B\\l\\4\\7\\E\\1t\',\'\\G\\11\\h\\r\\6\\m\\g\',\'\\1i\\9\\N\\g\\t\\3\\g\',\'\\1\\H\\3\\Q\\g\\i\\7\\4\\6\\p\\l\\D\\2\\W\\k\',\'\\g\\T\\g\\J\\1\\H\\G\\R\\j\\w\\t\\2\\r\\h\\t\\i\\r\\o\',\'\\t\\9\\18\\0\\t\\m\\U\\Y\\n\\q\\8\',\'\\n\\g\\L\\Q\\O\\n\\D\\T\\t\\F\\z\',\'\\7\\w\\h\\7\\2\\m\\o\',\'\\g\\H\\G\\R\\g\\0\\G\\H\\g\\l\\l\\O\\G\\p\\C\\i\\4\\Q\',\'\\0\\E\\C\\E\\4\\7\\z\',\'\\k\\x\\l\\D\\t\\q\\l\\H\',\'\\t\\9\\l\\J\\r\\x\\7\\E\',\'\\8\\q\\7\\Q\\n\\9\\l\\T\\r\\G\',\'\\1\\p\\11\\4\\8\\z\\l\\z\\G\\K\',\'\\k\\6\\2\\z\',\'\\1i\\m\\7\\N\\n\\h\\G\',\'\\t\\3\\11\\U\\8\\m\\5\',\'\\1\\H\\3\\W\\j\\0\\g\\J\\1\\z\\7\\w\\8\\B\\l\\P\\8\\o\',\'\\1\\B\\7\\Y\\n\\h\\1\\1h\\k\\G\',\'\\t\\9\\18\\3\\k\\w\\2\\C\\7\\7\\U\\g\',\'\\k\\w\\1c\\Q\\r\\6\\R\\z\\G\\x\\C\\Y\\n\\9\\G\',\'\\k\\6\\R\\Z\\n\\B\\h\\V\\n\\W\\7\\H\',\'\\I\\m\\1c\\C\\t\\9\\K\\K\\r\\i\\E\\10\\0\\0\\3\\J\\5\\F\\O\\11\\j\\i\\t\\P\\g\\J\\O\\x\\1\\T\\K\\K\\1\\J\\O\\E\\g\\H\\l\\g\\g\\T\\G\\K\\j\\4\\O\\E\\g\\T\\1\\P\\u\\0\\k\\K\\1\\4\\O\\O\\1\\i\\z\\K\\g\\4\\O\\E\\g\\0\\8\\K\\j\\F\\O\\J\\1\\T\\C\\g\\g\\0\\5\\K\\g\\0\\K\\D\\j\\i\\z\\W\\5\\i\\G\\D\\1\\0\\K\\H\\5\\i\\5\\H\\u\\T\\p\\E\\5\\i\\k\\K\\g\\0\\p\\D\\g\\T\\8\\J\\5\\i\\o\\K\\j\\4\\O\\E\\g\\T\\1\\P\\j\\F\\O\\H\\g\\H\\5\\V\\g\\4\\O\\E\\g\\i\\7\\1s\\5\\10\\1t\\1J\',\'\\t\\6\\R\\z\\r\\6\\r\\Y\\n\\q\\7\\z\',\'\\L\\6\\R\\D\\r\\w\\U\\5\\7\\3\\11\\g\',\'\\r\\9\\l\\E\\k\\4\\11\\H\\t\\9\\l\\J\',\'\\k\\x\\18\\D\\8\\W\\2\\J\\t\\6\\1\\E\\n\\W\\5\',\'\\L\\6\\7\\w\\0\\6\\3\',\'\\2\\E\\Y\\5\\1i\\9\\k\',\'\\r\\q\\h\\P\\n\\l\\2\\h\\1i\\m\\G\',\'\\0\\h\\7\\P\\2\\h\\K\',\'\\n\\B\\t\\O\\7\\11\\5\',\'\\L\\m\\2\\p\\r\\p\\g\',\'\\r\\x\\7\\E\\G\\w\\2\\E\\8\\q\\h\\10\\t\\w\\2\\h\',\'\\6\\p\\C\\C\\7\\x\\z\',\'\\k\\6\\2\\z\\2\\w\\r\\h\\n\\B\\2\\g\\L\\w\\1\\E\\r\\6\\R\\h\\8\\K\',\'\\8\\x\\N\\Y\\k\\x\\p\',\'\\t\\w\\1\\h\\8\\z\\l\\B\\r\\6\\R\\E\',\'\\p\\z\\h\\10\\r\\11\\o\',\'\\0\\p\\11\\7\\r\\h\\G\',\'\\r\\q\\h\\J\\r\\6\\U\\C\\8\\x\\7\\7\\8\\q\\Q\',\'\\7\\p\\R\\E\\p\\l\\p\',\'\\0\\11\\r\\x\\2\\q\\Q\',\'\\G\\D\\9\\1s\\X\\6\\O\\K\\N\\U\\m\\i\\X\\J\\i\\3\\z\\8\\j\\C\\n\\q\\K\\K\\r\\x\\B\\i\\X\\4\\1c\\J\\O\\n\\D\\0\\L\\4\\O\\K\\6\\9\\h\\D\\5\\9\\I\\C\\D\\1q\\1\\V\\5\\g\\L\\C\\n\\10\\3\',\'\\p\\l\\7\\p\',\'\\8\\W\\7\\V\',\'\\L\\B\\1\\Z\\n\\K\',\'\\1\\i\\z\\H\\1\\T\\z\\J\\g\\11\\U\\T\\2\\W\\r\\4\\t\\Q\',\'\\r\\q\\h\\D\\r\\x\\7\\J\\8\\m\\U\\Y\\n\\B\\2\\H\',\'\\j\\l\\2\\r\\8\\x\\Y\\P\\6\\K\',\'\\r\\6\\11\\Q\\t\\m\\z\',\'\\p\\l\\7\\l\\8\\7\\X\',\'\\p\\6\\C\\V\\r\\6\\1t\',\'\\8\\q\\l\\E\\L\\6\\R\\B\\G\\x\\18\\D\\t\\9\\l\\Y\\n\\q\\7\\J\',\'\\0\\x\\V\\z\\7\\p\\G\',\'\\g\\T\\U\\z\\n\\p\\18\\N\\n\\B\\8\',\'\\8\\x\\7\\E\\G\\w\\2\\E\\8\\q\\h\\10\\t\\w\\2\\h\',\'\\8\\z\\r\\14\\2\\x\\G\',\'\\L\\m\\U\\h\\r\\K\',\'\\t\\W\\t\\W\\u\\q\\t\\Y\\k\\6\\C\\11\\1i\\4\\R\\D\\r\\w\\G\',\'\\8\\w\\7\\h\\8\\B\\h\\0\\r\\6\\N\\h\\k\\W\\2\\Z\\8\\K\',\'\\r\\q\\18\\1h\\G\\11\\g\',\'\\8\\W\\2\\J\\L\\6\\R\\B\',\'\\r\\x\\7\\E\\2\\6\\N\\h\\n\\6\\7\\D\\t\\3\\U\\R\\4\\6\\G\',\'\\L\\m\\2\\E\\8\\i\\X\\Z\\u\\W\\t\\W\\t\\J\\R\\W\\g\\J\\R\\Z\\8\\q\\8\\Z\\g\\T\\o\\Q\\g\\F\\18\\H\\t\\q\\8\',\'\\r\\q\\h\\P\\n\\9\\7\\z\',\'\\k\\x\\18\\11\\n\\B\\G\',\'\\1i\\h\\h\\R\\L\\z\\Q\',\'\\t\\9\\7\\O\\t\\3\\U\\C\\8\\x\\7\\P\\L\\6\\R\\h\',\'\\k\\W\\U\\h\\k\\w\\2\\h\\2\\6\\N\\h\\n\\6\\7\\D\\t\\o\',\'\\u\\x\\t\\X\\p\\q\\l\\E\\L\\6\\R\\B\\8\\J\\1t\',\'\\n\\9\\18\\T\\k\\w\\2\\Y\\n\\x\\O\',\'\\k\\x\\N\\Z\\8\\x\\7\\H\\t\\o\',\'\\k\\z\\2\\W\\8\\E\\E\',\'\\1i\\6\\2\\P\\0\\p\\5\',\'\\L\\6\\R\\D\\r\\w\\U\\p\\r\\w\\C\\E\',\'\\k\\w\\1\\H\\L\\6\\t\\D\',\'\\k\\w\\1c\\Q\\n\\9\\h\\T\\k\\w\\2\\Y\\n\\x\\O\\Z\\L\\B\\1\\Z\\n\\K\',\'\\g\\T\\p\\x\\1\\T\\3\\E\\1\\9\\2\\X\\0\\h\\h\\h\\2\\K\',\'\\8\\x\\C\\C\\8\\q\\7\\z\\G\\B\\z\',\'\\t\\6\\R\\14\\n\\q\\18\\W\\n\\K\',\'\\n\\z\\l\\k\\6\\B\\K\',\'\\G\\z\\18\\0\\L\\7\\K\',\'\\G\\W\\U\\r\\G\\z\\K\',\'\\8\\q\\7\\H\\n\\x\\N\\x\\r\\G\',\'\\8\\W\\2\\J\\L\\6\\R\\B\\L\\6\\r\\R\',\'\\t\\9\\C\\h\\n\\K\',\'\\k\\p\\r\\7\\L\\E\\E\',\'\\k\\6\\C\\F\\6\\p\\3\',\'\\u\\q\\Y\\H\\n\\x\\O\'];1I=y(){A 3H};A 1I()}',62,341,'x74|x6e|x72|x65|x73|x69|x77|x76|x43|x67|||||||x6d|x4c|x64|x6f|x79|x66|x68|x42|x61|x75|x4d|x7a|_0x121ab1|x44|x6c|_0x161b28|x78|x32|function|x4b|return|x4e|x48|x55|x30|x63|x71|x5a|x70|x59|x47|x41|const|x58|x34|x53|x57|x35|x20|x4a|x6a|x54|x33|x4f|x50|x56|x49|x31|this|0x0|x52|x2e|_0x3ef4|x46|x39|x2f|x2d|_0x2dfeca|x62|_0x22edc0|parseInt|_0x1a4053|if|x6b|x45|x3a|x22|_0xfd8564|_0x1a2152|_0x428b35|_0x47ff41|let|x51|_0x45b781|x36|x38|_0xec7608|x3b|_0xaa5014|_0x1802c2|0x1|x3c|x3e|_0x16fd33|_0x5c793b|_0x1c5657|_0xf671be|0xd2|_0x5591fc|_0x50a233|_0x1802|x2b|x3d|_0x1c0085|_0x415b9f|0x2|_0x5b9b2b|x7b|x7d|_0x2f5bc5|x23|ghRatings|document|_0x1f9178|_0x209346|_0x49947d|_0x14a01a|0xc7|for|_0x54e997|_0x38c069|x5c|x2a|u0111|u00e1|_0x520d5f|_0x3d6b71|_0x49e21e|_0x1c0aea|_0x539231|_0x235f5f|_0xdc928e|_0x4ab573|_0x27e792|_0x58cee2|_0x489a7e|_0x1bfa04|_0x4edc56|0x4|0xa|_0xacceb|_0x1bc47c|x28|_0x34c084|_0x387181|Math|u1ea3|_0xb9a78f|typeof|0xbb|0x9d|_0x127133|fetch|0xd5|_0x27ff08|_0x9bb83f|0x98|_0x17301d|_0x408854|0x6|_0x4589eb|arguments|_0x246c33|x5b|x27|x7c|x5d|_0x238f18|new|_0x2360d3|else|try|_0x48d467|0x5|push|shift|catch|u1ea1|u00e3|u01a1|x21|0xcc|0xb1|_0x27af34|_0x1906af|_0xc7cec1|_0x4a415a|0xa4|0xa3|_0x4ea211|_0x1ecaf6|_0x401f6c|0xe4|0xd7|0xd9|Promise|_0x27754e|0xb4|0x9a|_0x45fbae|0xc2|_0x1abdb9|0xbe|_0xd900fb|0xa9|0xac|0xe5|_0x314e5b|_0x5ddb7d|_0x2d41a3|_0x5998eb|_0x28bc9c|_0x328068|setTimeout|0xbb8|_0x3a872|_0x39394d|_0x3abdcc|0xea|0xc4|_0x2bf3b0|_0x428b05|_0x17d09d|_0x151039|undefined|var|x37|0x40|String|0xff|x25|0x10|decodeURIComponent|x29|x3f|RegExp|Boolean|while|0xe2|0xf1|0xe3|0x3|0xca|0xec|0xda|0xf0|0x7|0xad|0x8|0xab|0x9|0xe7|0xb3|0xb|break|_0x3a53a6|0x8614c|0xe9|0xbc|0xdd|0xf8|0xbd|0xae|u1ed3|0xc9|0xf6|0xba|0xb7|0xde|0xdc|null|use|strict|0xcf|0xcb|0xee|0xd3|window|0xc3|0xb6|0xd4|0xeb|0xaf|0xb9|0xb0|0xa6|u0110|0xb8|0xdf|0xc6|0xf9|0xd8|0xc1|0xa2|0xc0|0x99|navigator|0xa1|btoa|0xf2|0xa0|0x20|_0xc915d9|0xd0|0xf4|0xbf|0xc5|0xe0|0xed|0xa5|0xf5|0xf7|0xf3|0xe8|0xef|0xd6|0xaa|0xb5|0xb2|0x9c|0xe1|0xcd|0xdb|0xfa|Object|0xc8|0x9b|0xa8|0x9e|JSON|0xd1|0x9f|0xce|0xa7|0xe6'.split('|'),0,{}))
+(function () {
+  'use strict';
+
+  if (typeof ghRatings === 'undefined' || typeof ghRatings.firebaseUrl === 'undefined') return;
+
+  // Bảo vệ bản quyền (chỉ cần sharedBy đúng)
+  if (typeof ghRatings.sharedBy !== 'string' || ghRatings.sharedBy !== 'www.giahuy.net') {
+    window.location.href = "https://www.giahuy.net/p/credit.html";
+    return;
+  }
+
+  const firebaseUrl = ghRatings.firebaseUrl.replace(/\/$/, '');
+  const blogId = document.getElementById('ratingContainer')?.getAttribute('data-blog-id') || 'unknown';
+  const postId = document.getElementById('ratingContainer')?.getAttribute('data-post-id') || 'unknown';
+  const fullId = blogId + '/' + postId;
+  const container = document.getElementById('ratingContainer');
+  if (!container) return;
+
+  container.innerHTML = `
+    <style>
+      .gh-stars svg{width:24px;height:24px;cursor:pointer;transition:fill 0.2s}
+      .gh-stars .filled{fill:#fbc02d}
+      .gh-stars .empty{fill:#ccc}
+      .gh-rating-info{font-size:14px;color:#666;text-align:center;padding:5px 8px}
+    </style>
+    <div class="gh-stars" id="ghStars"></div>
+    <div class="gh-rating-info" id="ghInfo">Đang tải...</div>
+  `;
+
+  const starsWrap = container.querySelector('#ghStars');
+  const infoWrap = container.querySelector('#ghInfo');
+  let fingerprint = '', rated = false;
+
+  function getFingerprint() {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.textBaseline = 'top';
+      ctx.font = '14px Arial';
+      ctx.fillText(navigator.userAgent, 2, 2);
+      return Promise.resolve(btoa(canvas.toDataURL()).slice(0, 32));
+    } catch (e) {
+      return Promise.resolve('anonymous');
+    }
+  }
+
+  function createStar(index, filled) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("data-star", index);
+    svg.classList.add(filled ? 'filled' : 'empty');
+    svg.innerHTML = `<path d="M12 .587l3.668 7.431L24 9.423l-6 5.849 1.417 8.268L12 18.897 4.583 23.54 6 15.272 0 9.423l8.332-1.405z"/>`;
+    return svg;
+  }
+
+  function renderStars(score) {
+    starsWrap.innerHTML = '';
+    for (let i = 1; i <= 5; i++) {
+      starsWrap.appendChild(createStar(i, i <= score));
+    }
+  }
+
+  function loadRating() {
+    fetch(`${firebaseUrl}/ghRatings/${fullId}.json`)
+      .then(res => res.json())
+      .then(data => {
+        const count = data?.count || 0;
+        const sum = data?.sum || 0;
+        const avg = count ? (sum / count).toFixed(1) : 0;
+        if (data?.fingerprints?.[fingerprint]) {
+          renderStars(data.fingerprints[fingerprint]);
+          infoWrap.innerText = `${avg}/5 (${count} lượt)`;
+          rated = true;
+        } else {
+          renderStars(Math.round(avg));
+          infoWrap.innerText = count ? `${avg}/5 (${count} lượt)` : 'Chưa có đánh giá';
+        }
+      });
+  }
+
+  function sendRating(score) {
+    fetch(`${firebaseUrl}/ghRatings/${fullId}.json`)
+      .then(res => res.json())
+      .then(data => {
+        const count = data?.count || 0;
+        const sum = data?.sum || 0;
+        const fps = data?.fingerprints || {};
+        if (fps[fingerprint]) {
+          infoWrap.innerText = "Bạn đã đánh giá rồi. Xin cảm ơn!";
+          rated = true;
+          setTimeout(loadRating, 3000);
+          return;
+        }
+        const newData = {
+          sum: sum + score,
+          count: count + 1,
+          fingerprints: Object.assign({}, fps, { [fingerprint]: score })
+        };
+        return fetch(`${firebaseUrl}/ghRatings/${fullId}.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newData)
+        });
+      })
+      .then(() => {
+        renderStars(score);
+        infoWrap.innerText = "Cảm ơn bạn đã đánh giá!";
+        rated = true;
+      });
+  }
+
+  function bindEvents() {
+    starsWrap.addEventListener('click', function (e) {
+      if (e.target.closest('svg')) {
+        if (rated) {
+          infoWrap.innerText = "Bạn đã đánh giá rồi. Xin cảm ơn!";
+          setTimeout(loadRating, 3000);
+          return;
+        }
+        const score = parseInt(e.target.closest('svg').getAttribute('data-star'));
+        sendRating(score);
+      }
+    });
+  }
+
+  getFingerprint().then(fp => {
+    fingerprint = fp;
+    bindEvents();
+    loadRating();
+  });
+})();
