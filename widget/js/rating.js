@@ -24,7 +24,7 @@
       .gh-stars svg{width:24px;height:24px;cursor:pointer;transition:fill 0.2s}
       .gh-stars .filled{fill:#fbc02d}
       .gh-stars .empty{fill:#ccc}
-      .gh-rating-info{margin-top:6px;font-size:14px;color:#666;text-align:center}
+      .gh-rating-info{font-size:14px;color:#666;text-align:center;padding:5px 8px}
     </style>
     <div class="gh-stars" id="ghStars"></div>
     <div class="gh-rating-info" id="ghInfo">Đang tải...</div>
