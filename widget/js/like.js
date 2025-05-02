@@ -3,7 +3,6 @@
   'use strict';
 
   if (typeof ghLikes === 'undefined' || typeof ghLikes.firebaseUrl === 'undefined') return;
-
   if (typeof ghLikes.sharedBy !== 'string' || ghLikes.sharedBy !== 'www.giahuy.net') {
     window.location.href = "https://www.giahuy.net/p/credit.html";
     return;
@@ -21,8 +20,8 @@
       .gh-like-bar{display:flex;justify-content:center;gap:20px;padding:15px 0}
       .gh-button{display:flex;align-items:center;cursor:pointer;font-size:16px;color:#666}
       .gh-button svg{width:24px;height:24px;margin-right:6px;fill:#ccc;transition:fill 0.2s}
-      .gh-button.liked svg,
-      .gh-button.disliked svg{fill:#ce2c90}
+      .gh-button.liked svg,.gh-button.disliked svg{fill:#ce2c90}
+      .gh-like-status{text-align:center;color:#999;font-size:14px;margin-top:4px}
     </style>
     <div class="gh-like-bar">
       <div class="gh-button" id="likeBtn">
@@ -46,12 +45,14 @@
         <span id="dislikeCount">0</span>
       </div>
     </div>
+    <div class="gh-like-status" id="likeStatus">Đang tải trạng thái...</div>
   `;
 
   const likeBtn = document.getElementById('likeBtn');
   const dislikeBtn = document.getElementById('dislikeBtn');
   const likeCount = document.getElementById('likeCount');
   const dislikeCount = document.getElementById('dislikeCount');
+  const statusText = document.getElementById('likeStatus');
 
   let fingerprint = '';
 
@@ -73,6 +74,10 @@
     dislikeCount.innerText = data?.dislike || 0;
     likeBtn.classList.toggle('liked', state === 'like');
     dislikeBtn.classList.toggle('disliked', state === 'dislike');
+
+    if (state === 'like') statusText.innerText = 'Bạn đã thích bài viết này';
+    else if (state === 'dislike') statusText.innerText = 'Bạn đã không thích bài viết này';
+    else statusText.innerText = 'Bạn chưa phản hồi';
   }
 
   function loadLike() {
@@ -93,26 +98,30 @@
         const fps = data?.fingerprints || {};
         const current = fps[fingerprint] || null;
 
-        // Toggle: nếu đang giống -> gỡ (null), nếu khác -> chuyển đổi
-        fps[fingerprint] = current === newState ? null : newState;
+        let newLike = like, newDislike = dislike;
 
-        // Tính lại
-        let totalLike = 0, totalDislike = 0;
-        Object.values(fps).forEach(v => {
-          if (v === 'like') totalLike++;
-          if (v === 'dislike') totalDislike++;
-        });
+        if (current === newState) {
+          if (newState === 'like') newLike = Math.max(0, like - 1);
+          if (newState === 'dislike') newDislike = Math.max(0, dislike - 1);
+          fps[fingerprint] = null;
+        } else {
+          if (current === 'like') newLike = Math.max(0, like - 1);
+          if (current === 'dislike') newDislike = Math.max(0, dislike - 1);
+          if (newState === 'like') newLike++;
+          if (newState === 'dislike') newDislike++;
+          fps[fingerprint] = newState;
+        }
 
-        const newData = {
-          like: totalLike,
-          dislike: totalDislike,
-          fingerprints: fps
+        const updates = {
+          like: newLike,
+          dislike: newDislike,
+          [`fingerprints/${fingerprint}`]: fps[fingerprint]
         };
 
         return fetch(`${firebaseUrl}/ghLikes/${fullId}.json`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newData)
+          body: JSON.stringify(updates)
         });
       })
       .then(() => loadLike());
