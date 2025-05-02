@@ -16,13 +16,6 @@
   if (!container) return;
 
   container.innerHTML = `
-    <style>
-      .gh-like-bar{display:flex;justify-content:center;gap:20px;padding:15px 0}
-      .gh-button{display:flex;align-items:center;cursor:pointer;font-size:16px;color:#666}
-      .gh-button svg{width:24px;height:24px;margin-right:6px;fill:#ccc;transition:fill 0.2s}
-      .gh-button.liked svg,.gh-button.disliked svg{fill:#ce2c90}
-      .gh-like-status{text-align:center;color:#999;font-size:14px;margin-top:4px}
-    </style>
     <div class="gh-like-bar">
       <div class="gh-button" id="likeBtn">
         <svg viewBox="0 0 24 24">
