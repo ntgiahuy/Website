@@ -65,7 +65,7 @@
   }
 
   function loadLike() {
-    fetch(`${firebaseUrl}/likes/${fullId}.json`)
+    fetch(`${firebaseUrl}/ghLikes/${fullId}.json`)
       .then(res => res.json())
       .then(data => {
         const userState = data?.fingerprints?.[fingerprint] || null;
@@ -74,7 +74,7 @@
   }
 
   function updateState(newState) {
-    fetch(`${firebaseUrl}/likes/${fullId}.json`)
+    fetch(`${firebaseUrl}/ghLikes/${fullId}.json`)
       .then(res => res.json())
       .then(data => {
         const like = data?.like || 0;
@@ -105,7 +105,7 @@
           fingerprints: fps
         };
 
-        return fetch(`${firebaseUrl}/likes/${fullId}.json`, {
+        return fetch(`${firebaseUrl}/ghLikes/${fullId}.json`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newData)
