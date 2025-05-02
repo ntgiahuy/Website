@@ -1,5 +1,7 @@
 // like.js - Like/Dislike kiểu YouTube | Bản quyền © www.giahuy.net
 
+// like.js - Like/Dislike trái tim | Bản quyền © www.giahuy.net
+
 (function () {
   'use strict';
 
@@ -22,16 +24,28 @@
       .gh-like-bar{display:flex;justify-content:center;gap:20px;padding:15px 0}
       .gh-button{display:flex;align-items:center;cursor:pointer;font-size:16px;color:#666}
       .gh-button svg{width:24px;height:24px;margin-right:6px;fill:#ccc;transition:fill 0.2s}
-      .gh-button.liked svg{fill:#0f9d58}
-      .gh-button.disliked svg{fill:#e53935}
+      .gh-button.liked svg,
+      .gh-button.disliked svg{fill:#ce2c90}
     </style>
     <div class="gh-like-bar">
       <div class="gh-button" id="likeBtn">
-        <svg viewBox="0 0 24 24"><path d="M14 1H6C5.4 1 5 1.4 5 2V14C5 14.6 5.4 15 6 15H14L21 8L14 1Z"/></svg>
+        <svg viewBox="0 0 24 24">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 
+                   2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 
+                   4.5 2.09C13.09 3.81 14.76 3 16.5 3 
+                   19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 
+                   11.54L12 21.35z"/>
+        </svg>
         <span id="likeCount">0</span>
       </div>
       <div class="gh-button" id="dislikeBtn">
-        <svg viewBox="0 0 24 24"><path d="M10 23H18C18.6 23 19 22.6 19 22V10C19 9.4 18.6 9 18 9H10L3 16L10 23Z"/></svg>
+        <svg viewBox="0 0 24 24">
+          <path d="M16.5,3c-1.74,0-3.41,0.81-4.5,2.09C10.91,3.81,9.24,3,
+            7.5,3C4.42,3,2,5.42,2,8.5c0,3.78,3.4,6.86,8.55,11.54
+            L12,21.35l1.44-1.31C17.68,15.4,20,12.53,20,9
+            c0-1.1-0.3-2.13-0.83-3.02L16.5,10L14,7.5L16.5,5
+            l2.5-2.5C18.63,3.2,17.6,3,16.5,3z"/>
+        </svg>
         <span id="dislikeCount">0</span>
       </div>
     </div>
@@ -82,17 +96,10 @@
         const fps = data?.fingerprints || {};
         const current = fps[fingerprint] || null;
 
-        // Không thay đổi
-        if (current === newState) {
-          // Gỡ phản hồi
-          if (newState === 'like') fps[fingerprint] = null;
-          if (newState === 'dislike') fps[fingerprint] = null;
-        } else {
-          // Chuyển đổi hoặc chọn mới
-          fps[fingerprint] = newState;
-        }
+        // Toggle: nếu đang giống -> gỡ (null), nếu khác -> chuyển đổi
+        fps[fingerprint] = current === newState ? null : newState;
 
-        // Tính lại tổng Like/Dislike
+        // Tính lại
         let totalLike = 0, totalDislike = 0;
         Object.values(fps).forEach(v => {
           if (v === 'like') totalLike++;
