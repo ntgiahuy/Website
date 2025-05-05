@@ -1,14 +1,15 @@
 (function () {
   const section = document.querySelector('.rating-section[data-id]');
-  if (!section || typeof ghRatings === 'undefined' || ghRatings.sharedBy !== 'www.giahuy.net') {
+  if (!section || ghRatings.sharedBy !== 'www.giahuy.net') {
     location.href = 'https://www.giahuy.net/p/credit.html';
     return;
   }
 
   const firebaseUrl = ghRatings.firebaseUrl.replace(/\/$/, '');
   const postId = section.getAttribute('data-id');
-  const starsWrap = section.querySelector('#starsAverage');
+  const labels = section.querySelectorAll('.rating-widget label');
   const avgScore = section.querySelector('#avgScore');
+  const starContainer = section.querySelector('#starsAverage');
   const totalSpan = section.querySelector('.total-rating .total');
   const caption = section.querySelector('.rated-caption');
   const progressList = section.querySelectorAll('.rating-progress');
@@ -27,21 +28,23 @@
     }
   }
 
-  function renderStars(score, hover = 0) {
-    starsWrap.innerHTML = '';
+  function renderStars(score) {
+    starContainer.innerHTML = '';
     for (let i = 1; i <= 5; i++) {
+      let percent = Math.min(100, Math.max(0, (score - i + 1) * 100));
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 24 24");
-      svg.setAttribute("data-star", i);
-      svg.innerHTML = `<path d="M12 .587l3.668 7.431L24 9.423l-6 5.849
-        1.417 8.268L12 18.897 4.583 23.54 6 15.272
-        0 9.423l8.332-1.405z"/>`;
-      if (hover > 0) {
-        svg.classList.add(i <= hover ? 'hovered' : 'empty');
-      } else {
-        svg.classList.add(i <= score ? 'filled' : 'empty');
-      }
-      starsWrap.appendChild(svg);
+      svg.innerHTML = `
+        <defs>
+          <linearGradient id="grad${i}" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="${percent}%" stop-color="#e0ac33"/>
+            <stop offset="${percent}%" stop-color="#ccc"/>
+          </linearGradient>
+        </defs>
+        <path fill="url(#grad${i})" d="M12 .587l3.668 7.431L24 9.423l-6 5.849
+        1.417 8.268L12 18.897 4.583 23.54 6 15.272 0 9.423l8.332-1.405z"/>
+      `;
+      starContainer.appendChild(svg);
     }
     avgScore.textContent = `${score.toFixed(1)}/5`;
   }
@@ -72,7 +75,9 @@
 
     if (fps[fingerprint]) {
       rated = true;
-      renderStars(fps[fingerprint]);
+      const star = fps[fingerprint];
+      const input = section.querySelector(`input[value="${star}"]`);
+      if (input) input.checked = true;
       caption.classList.remove('hidden');
     }
   }
@@ -98,7 +103,7 @@
         };
         return fetch(`${firebaseUrl}/ghRatings/${postId}.json`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {'Content-Type': 'application/json'},
           body: JSON.stringify(newData)
         });
       })
@@ -109,30 +114,14 @@
       });
   }
 
-  function bindEvents() {
-    starsWrap.addEventListener('mouseover', function (e) {
+  labels.forEach(label => {
+    label.addEventListener('click', () => {
       if (rated) return;
-      const star = e.target.closest('svg');
-      if (!star) return;
-      const val = parseInt(star.getAttribute('data-star'));
-      renderStars(0, val);
+      const val = parseInt(label.getAttribute('for').replace('rate-', ''));
+      save(val);
     });
-
-    starsWrap.addEventListener('mouseout', function () {
-      if (rated) return;
-      load();
-    });
-
-    starsWrap.addEventListener('click', function (e) {
-      if (rated) return;
-      const star = e.target.closest('svg');
-      if (!star) return;
-      const score = parseInt(star.getAttribute('data-star'));
-      save(score);
-    });
-  }
+  });
 
   fingerprint = getFingerprint();
-  bindEvents();
   load();
 })();
