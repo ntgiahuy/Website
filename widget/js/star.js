@@ -1,39 +1,18 @@
-// star.js - Star Rating Widget by © giahuy.net
 (function () {
-  'use strict';
-
-  if (typeof ghRatings === 'undefined' || ghRatings.sharedBy !== 'www.giahuy.net') {
+  const section = document.querySelector('.rating-section[data-id]');
+  if (!section || typeof ghRatings === 'undefined' || ghRatings.sharedBy !== 'www.giahuy.net') {
     location.href = 'https://www.giahuy.net/p/credit.html';
     return;
   }
 
-  const container = document.getElementById('ratingContainer');
-  if (!container) return;
-
   const firebaseUrl = ghRatings.firebaseUrl.replace(/\/$/, '');
-  const postId = container.getAttribute('data-id') || 'unknown';
-  let fingerprint = '';
-  let rated = false;
-
-  container.innerHTML = `
-    <div class="gh-rating-area">
-      <div class="gh-stars" id="ghStars"></div>
-      <div class="gh-rating-info" id="ghInfo">Đang tải...</div>
-    </div>
-    <div class="gh-rating-thumbs" id="ghThumbs">
-      ${[5, 4, 3, 2, 1].map(i => `
-        <div class="gh-rating-progress" data-rate="${i}">
-          <div class="label">${i}★</div>
-          <div class="bar-container"><div class="bar-fill" style="width:0%"></div></div>
-          <div class="count">0</div>
-        </div>
-      `).join('')}
-    </div>
-  `;
-
-  const starsWrap = container.querySelector('#ghStars');
-  const infoWrap = container.querySelector('#ghInfo');
-  const thumbsWrap = container.querySelector('#ghThumbs');
+  const postId = section.getAttribute('data-id');
+  const starsWrap = section.querySelector('#starsAverage');
+  const avgScore = section.querySelector('#avgScore');
+  const totalSpan = section.querySelector('.total-rating .total');
+  const caption = section.querySelector('.rated-caption');
+  const progressList = section.querySelectorAll('.rating-progress');
+  let fingerprint = '', rated = false;
 
   function getFingerprint() {
     try {
@@ -55,8 +34,8 @@
       svg.setAttribute("viewBox", "0 0 24 24");
       svg.setAttribute("data-star", i);
       svg.innerHTML = `<path d="M12 .587l3.668 7.431L24 9.423l-6 5.849
-      1.417 8.268L12 18.897 4.583 23.54 6 15.272
-      0 9.423l8.332-1.405z"/>`;
+        1.417 8.268L12 18.897 4.583 23.54 6 15.272
+        0 9.423l8.332-1.405z"/>`;
       if (hover > 0) {
         svg.classList.add(i <= hover ? 'hovered' : 'empty');
       } else {
@@ -64,6 +43,7 @@
       }
       starsWrap.appendChild(svg);
     }
+    avgScore.textContent = `${score.toFixed(1)}/5`;
   }
 
   function render(data) {
@@ -71,32 +51,39 @@
     const sum = data?.sum || 0;
     const fps = data?.fingerprints || {};
     const avg = count ? (sum / count) : 0;
-
     renderStars(avg);
-    infoWrap.textContent = count ? `${avg.toFixed(1)}/5 từ ${count} lượt` : 'Chưa có đánh giá';
+    totalSpan.textContent = count;
 
-    // Thống kê
-    const starCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-    for (const key in fps) {
-      const v = parseInt(fps[key]);
-      if (v >= 1 && v <= 5) starCounts[v]++;
+    const starCounts = {1:0,2:0,3:0,4:0,5:0};
+    for (let key in fps) {
+      const val = parseInt(fps[key]);
+      if (val >= 1 && val <= 5) starCounts[val]++;
     }
 
-    container.querySelectorAll('.gh-rating-progress').forEach(el => {
-      const rate = parseInt(el.getAttribute('data-rate'));
-      const val = starCounts[rate] || 0;
-      const percent = count ? (val / count * 100).toFixed(1) : 0;
-      el.querySelector('.bar-fill').style.width = percent + '%';
-      el.querySelector('.count').textContent = `${val}`;
+    progressList.forEach(p => {
+      const rate = parseInt(p.getAttribute('data-rate'));
+      const votes = starCounts[rate] || 0;
+      const percent = count ? (votes / count * 100).toFixed(1) : 0;
+      const bar = p.querySelector('.progress-bar');
+      const voteEl = p.querySelector('.rating-count-detail .votes');
+      if (bar) bar.style.width = percent + '%';
+      if (voteEl) voteEl.textContent = votes;
     });
 
     if (fps[fingerprint]) {
       rated = true;
       renderStars(fps[fingerprint]);
+      caption.classList.remove('hidden');
     }
   }
 
-  function sendRating(score) {
+  function load() {
+    fetch(`${firebaseUrl}/ghRatings/${postId}.json`)
+      .then(r => r.json())
+      .then(render);
+  }
+
+  function save(score) {
     fetch(`${firebaseUrl}/ghRatings/${postId}.json`)
       .then(r => r.json())
       .then(data => {
@@ -104,13 +91,11 @@
         const sum = data?.sum || 0;
         const fps = data?.fingerprints || {};
         if (fps[fingerprint]) return;
-
         const newData = {
           sum: sum + score,
           count: count + 1,
           fingerprints: { ...fps, [fingerprint]: score }
         };
-
         return fetch(`${firebaseUrl}/ghRatings/${postId}.json`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -119,9 +104,8 @@
       })
       .then(() => {
         rated = true;
-        renderStars(score);
-        infoWrap.textContent = "Cảm ơn bạn đã đánh giá!";
-        setTimeout(load, 2000);
+        caption.classList.remove('hidden');
+        load();
       });
   }
 
@@ -136,7 +120,7 @@
 
     starsWrap.addEventListener('mouseout', function () {
       if (rated) return;
-      load(); // reset
+      load();
     });
 
     starsWrap.addEventListener('click', function (e) {
@@ -144,14 +128,8 @@
       const star = e.target.closest('svg');
       if (!star) return;
       const score = parseInt(star.getAttribute('data-star'));
-      sendRating(score);
+      save(score);
     });
-  }
-
-  function load() {
-    fetch(`${firebaseUrl}/ghRatings/${postId}.json`)
-      .then(r => r.json())
-      .then(render);
   }
 
   fingerprint = getFingerprint();
