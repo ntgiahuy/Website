@@ -1,6 +1,6 @@
 (function () {
   const section = document.querySelector('.rating-section[data-id]');
-  if (!section || ghRatings.sharedBy !== 'www.giahuy.net') {
+  if (!section || typeof ghRatings === 'undefined' || ghRatings.sharedBy !== 'www.giahuy.net') {
     location.href = 'https://www.giahuy.net/p/credit.html';
     return;
   }
@@ -12,7 +12,8 @@
   const totalSpan = section.querySelector('.total-rating .total');
   const caption = section.querySelector('.rated-caption');
   const progressList = section.querySelectorAll('.rating-progress');
-  let fingerprint = '', rated = false, currentAvg = 0;
+  let fingerprint = '';
+  let rated = false;
 
   function getFingerprint() {
     try {
@@ -27,33 +28,30 @@
     }
   }
 
-  function renderStars(score, highlight = 0) {
+  function renderStars(score) {
     starContainer.innerHTML = '';
     for (let i = 1; i <= 5; i++) {
+      let percent = Math.min(100, Math.max(0, (score - i + 1) * 100));
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 24 24");
-      svg.setAttribute("data-star", i);
-      let content = '';
-      if (highlight) {
-        const color = i <= highlight ? '#fbc02d' : '#ccc';
-        content = `<path fill="${color}" d="M12 .587l3.668 7.431L24 9.423l-6 5.849
-        1.417 8.268L12 18.897 4.583 23.54 6 15.272 0 9.423l8.332-1.405z"/>`;
-      } else {
-        const percent = Math.min(100, Math.max(0, (score - i + 1) * 100));
-        content = `
-          <defs>
-            <linearGradient id="grad${i}" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="${percent}%" stop-color="#e0ac33"/>
-              <stop offset="${percent}%" stop-color="#ccc"/>
-            </linearGradient>
-          </defs>
-          <path fill="url(#grad${i})" d="M12 .587l3.668 7.431L24 9.423l-6 5.849
-          1.417 8.268L12 18.897 4.583 23.54 6 15.272 0 9.423l8.332-1.405z"/>`;
-      }
-      svg.innerHTML = content;
+      svg.innerHTML = `
+        <defs>
+          <linearGradient id="grad${i}" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="${percent}%" stop-color="#e0ac33"/>
+            <stop offset="${percent}%" stop-color="#ccc"/>
+          </linearGradient>
+        </defs>
+        <path fill="url(#grad${i})" d="M12 .587l3.668 7.431L24 9.423l-6 5.849
+        1.417 8.268L12 18.897 4.583 23.54 6 15.272 0 9.423l8.332-1.405z"/>
+      `;
       starContainer.appendChild(svg);
+
+      svg.addEventListener('click', () => {
+        if (rated) return;
+        save(i);  // Gọi hàm save khi người dùng click vào sao
+      });
     }
-    avgScore.textContent = `${score.toFixed(1)}/5`;
+    avgScore.textContent = `${score.toFixed(1)}`;
   }
 
   function render(data) {
@@ -61,7 +59,6 @@
     const sum = data?.sum || 0;
     const fps = data?.fingerprints || {};
     const avg = count ? (sum / count) : 0;
-    currentAvg = avg;
     renderStars(avg);
     totalSpan.textContent = count;
 
@@ -83,6 +80,7 @@
 
     if (fps[fingerprint]) {
       rated = true;
+      const star = fps[fingerprint];
       caption.classList.remove('hidden');
     }
   }
@@ -118,26 +116,6 @@
         load();
       });
   }
-
-  starContainer.addEventListener('mouseover', (e) => {
-    if (rated) return;
-    const star = e.target.closest('svg');
-    if (star && star.dataset.star) {
-      const score = parseInt(star.dataset.star);
-      renderStars(currentAvg, score);
-    }
-  });
-  starContainer.addEventListener('mouseleave', () => {
-    if (!rated) renderStars(currentAvg);
-  });
-  starContainer.addEventListener('click', (e) => {
-    if (rated) return;
-    const star = e.target.closest('svg');
-    if (star && star.dataset.star) {
-      const score = parseInt(star.dataset.star);
-      save(score);
-    }
-  });
 
   fingerprint = getFingerprint();
   load();
