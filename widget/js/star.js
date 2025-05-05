@@ -1,19 +1,18 @@
 (function () {
   const section = document.querySelector('.rating-section[data-id]');
-  if (!section || ghRatings.sharedBy !== 'www.giahuy.net') {
+  if (!section || typeof ghRatings === 'undefined' || ghRatings.sharedBy !== 'www.giahuy.net') {
     location.href = 'https://www.giahuy.net/p/credit.html';
     return;
   }
 
   const firebaseUrl = ghRatings.firebaseUrl.replace(/\/$/, '');
   const postId = section.getAttribute('data-id');
-  const radios = section.querySelectorAll('.rating-widget input[type="radio"]');
   const labels = section.querySelectorAll('.rating-widget label');
   const avgText = section.querySelector('.average-text span');
   const totalText = section.querySelector('.total-rating .total');
   const caption = section.querySelector('.rated-caption');
   const progressList = section.querySelectorAll('.rating-progress');
-  const starFill = section.querySelector('.star-fill');
+  const starProgress = section.querySelector('.star-progress');
   let fingerprint = '', rated = false;
 
   function getFingerprint() {
@@ -36,15 +35,13 @@
     const avg = count ? (sum / count).toFixed(1) : '0.0';
     avgText.textContent = avg;
     totalText.textContent = count;
-
-    if (starFill) starFill.style.width = (avg / 5 * 100).toFixed(1) + '%';
+    if (starProgress) starProgress.style.setProperty('width', (avg / 5 * 100).toFixed(1) + '%');
 
     const starCounts = {1:0,2:0,3:0,4:0,5:0};
     for (let key in fps) {
       const val = parseInt(fps[key]);
       if (val >= 1 && val <= 5) starCounts[val]++;
     }
-
     progressList.forEach(p => {
       const rate = parseInt(p.getAttribute('data-rate'));
       const vote = starCounts[rate] || 0;
@@ -63,9 +60,7 @@
   }
 
   function load() {
-    fetch(`${firebaseUrl}/ghRatings/${postId}.json`)
-      .then(r => r.json())
-      .then(render);
+    fetch(`${firebaseUrl}/ghRatings/${postId}.json`).then(r => r.json()).then(render);
   }
 
   function save(score) {
@@ -75,22 +70,18 @@
         const count = data?.count || 0;
         const sum = data?.sum || 0;
         const fps = data?.fingerprints || {};
-
         if (fps[fingerprint]) return;
-
         const newData = {
           sum: sum + score,
           count: count + 1,
           fingerprints: { ...fps, [fingerprint]: score }
         };
-
         return fetch(`${firebaseUrl}/ghRatings/${postId}.json`, {
           method: 'PUT',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify(newData)
         });
-      })
-      .then(() => {
+      }).then(() => {
         rated = true;
         caption.classList.remove('hidden');
         load();
