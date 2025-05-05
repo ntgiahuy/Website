@@ -51,6 +51,8 @@
       const bar = p.querySelector('.progress-bar');
       bar.style.width = percent + '%';
       bar.setAttribute('aria-valuenow', percent);
+      const voteCount = p.querySelector('.rating-vote-count');
+      if (voteCount) voteCount.textContent = `${vote} votes`;
     });
 
     if (fps[fingerprint]) {
@@ -75,15 +77,12 @@
         const count = data?.count || 0;
         const sum = data?.sum || 0;
         const fps = data?.fingerprints || {};
-
         if (fps[fingerprint]) return;
-
         const newData = {
           sum: sum + score,
           count: count + 1,
           fingerprints: { ...fps, [fingerprint]: score }
         };
-
         return fetch(`${firebaseUrl}/ghRatings/${postId}.json`, {
           method: 'PUT',
           headers: {'Content-Type': 'application/json'},
