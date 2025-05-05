@@ -7,13 +7,12 @@
 
   const firebaseUrl = ghRatings.firebaseUrl.replace(/\/$/, '');
   const postId = section.getAttribute('data-id');
-  const labels = section.querySelectorAll('.rating-widget label');
   const avgScore = section.querySelector('#avgScore');
   const starContainer = section.querySelector('#starsAverage');
   const totalSpan = section.querySelector('.total-rating .total');
   const caption = section.querySelector('.rated-caption');
   const progressList = section.querySelectorAll('.rating-progress');
-  let fingerprint = '', rated = false;
+  let fingerprint = '', rated = false, currentAvg = 0;
 
   function getFingerprint() {
     try {
@@ -28,22 +27,30 @@
     }
   }
 
-  function renderStars(score) {
+  function renderStars(score, highlight = 0) {
     starContainer.innerHTML = '';
     for (let i = 1; i <= 5; i++) {
-      let percent = Math.min(100, Math.max(0, (score - i + 1) * 100));
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 24 24");
-      svg.innerHTML = `
-        <defs>
-          <linearGradient id="grad${i}" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="${percent}%" stop-color="#e0ac33"/>
-            <stop offset="${percent}%" stop-color="#ccc"/>
-          </linearGradient>
-        </defs>
-        <path fill="url(#grad${i})" d="M12 .587l3.668 7.431L24 9.423l-6 5.849
-        1.417 8.268L12 18.897 4.583 23.54 6 15.272 0 9.423l8.332-1.405z"/>
-      `;
+      svg.setAttribute("data-star", i);
+      let content = '';
+      if (highlight) {
+        const color = i <= highlight ? '#fbc02d' : '#ccc';
+        content = `<path fill="${color}" d="M12 .587l3.668 7.431L24 9.423l-6 5.849
+        1.417 8.268L12 18.897 4.583 23.54 6 15.272 0 9.423l8.332-1.405z"/>`;
+      } else {
+        const percent = Math.min(100, Math.max(0, (score - i + 1) * 100));
+        content = `
+          <defs>
+            <linearGradient id="grad${i}" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="${percent}%" stop-color="#e0ac33"/>
+              <stop offset="${percent}%" stop-color="#ccc"/>
+            </linearGradient>
+          </defs>
+          <path fill="url(#grad${i})" d="M12 .587l3.668 7.431L24 9.423l-6 5.849
+          1.417 8.268L12 18.897 4.583 23.54 6 15.272 0 9.423l8.332-1.405z"/>`;
+      }
+      svg.innerHTML = content;
       starContainer.appendChild(svg);
     }
     avgScore.textContent = `${score.toFixed(1)}/5`;
@@ -54,6 +61,7 @@
     const sum = data?.sum || 0;
     const fps = data?.fingerprints || {};
     const avg = count ? (sum / count) : 0;
+    currentAvg = avg;
     renderStars(avg);
     totalSpan.textContent = count;
 
@@ -75,9 +83,6 @@
 
     if (fps[fingerprint]) {
       rated = true;
-      const star = fps[fingerprint];
-      const input = section.querySelector(`input[value="${star}"]`);
-      if (input) input.checked = true;
       caption.classList.remove('hidden');
     }
   }
@@ -114,12 +119,24 @@
       });
   }
 
-  labels.forEach(label => {
-    label.addEventListener('click', () => {
-      if (rated) return;
-      const val = parseInt(label.getAttribute('for').replace('rate-', ''));
-      save(val);
-    });
+  starContainer.addEventListener('mouseover', (e) => {
+    if (rated) return;
+    const star = e.target.closest('svg');
+    if (star && star.dataset.star) {
+      const score = parseInt(star.dataset.star);
+      renderStars(currentAvg, score);
+    }
+  });
+  starContainer.addEventListener('mouseleave', () => {
+    if (!rated) renderStars(currentAvg);
+  });
+  starContainer.addEventListener('click', (e) => {
+    if (rated) return;
+    const star = e.target.closest('svg');
+    if (star && star.dataset.star) {
+      const score = parseInt(star.dataset.star);
+      save(score);
+    }
   });
 
   fingerprint = getFingerprint();
