@@ -7,13 +7,15 @@
 
   const firebaseUrl = ghRatings.firebaseUrl.replace(/\/$/, '');
   const postId = section.getAttribute('data-id');
+  const radios = section.querySelectorAll('.rating-widget input[type="radio"]');
   const labels = section.querySelectorAll('.rating-widget label');
-  const avgText = section.querySelector('.average-text span');
-  const totalText = section.querySelector('.total-rating .total');
+  const avgScore = section.querySelector('#avgScore');
+  const starContainer = section.querySelector('#starsAverage');
+  const totalSpan = section.querySelector('.total-rating .total');
   const caption = section.querySelector('.rated-caption');
   const progressList = section.querySelectorAll('.rating-progress');
-  const starProgress = section.querySelector('.star-progress');
-  let fingerprint = '', rated = false;
+  let fingerprint = '';
+  let rated = false;
 
   function getFingerprint() {
     try {
@@ -28,26 +30,51 @@
     }
   }
 
+  function renderStars(score) {
+    starContainer.innerHTML = '';
+    for (let i = 1; i <= 5; i++) {
+      let percent = Math.min(100, Math.max(0, (score - i + 1) * 100));
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.innerHTML = `
+        <defs>
+          <linearGradient id="grad${i}" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="${percent}%" stop-color="#e0ac33"/>
+            <stop offset="${percent}%" stop-color="#ccc"/>
+          </linearGradient>
+        </defs>
+        <path fill="url(#grad${i})" d="M12 .587l3.668 7.431L24 9.423l-6 5.849
+        1.417 8.268L12 18.897 4.583 23.54 6 15.272 0 9.423l8.332-1.405z"/>
+      `;
+      starContainer.appendChild(svg);
+    }
+    avgScore.textContent = `${score.toFixed(1)}/5`;
+  }
+
   function render(data) {
     const count = data?.count || 0;
     const sum = data?.sum || 0;
     const fps = data?.fingerprints || {};
-    const avg = count ? (sum / count).toFixed(1) : '0.0';
-    avgText.textContent = avg;
-    totalText.textContent = count;
-    if (starProgress) starProgress.style.setProperty('width', (avg / 5 * 100).toFixed(1) + '%');
+    const avg = count ? (sum / count) : 0;
+    renderStars(avg);
+    totalSpan.textContent = count;
 
     const starCounts = {1:0,2:0,3:0,4:0,5:0};
     for (let key in fps) {
       const val = parseInt(fps[key]);
       if (val >= 1 && val <= 5) starCounts[val]++;
     }
+
     progressList.forEach(p => {
       const rate = parseInt(p.getAttribute('data-rate'));
-      const vote = starCounts[rate] || 0;
-      const percent = count ? (vote / count * 100).toFixed(4) : 0;
-      p.querySelector('.progress-bar').style.width = percent + '%';
-      p.querySelector('.vote-count').textContent = vote;
+      const votes = starCounts[rate] || 0;
+      const percent = count ? (votes / count * 100).toFixed(1) : 0;
+      const bar = p.querySelector('.progress-bar');
+      const voteEl = p.querySelector('.rating-count-detail .votes');
+      const percentEl = p.querySelector('.rating-count-detail .percent');
+      if (bar) bar.style.width = percent + '%';
+      if (voteEl) voteEl.textContent = votes;
+      if (percentEl) percentEl.textContent = percent + '%';
     });
 
     if (fps[fingerprint]) {
@@ -60,7 +87,9 @@
   }
 
   function load() {
-    fetch(`${firebaseUrl}/ghRatings/${postId}.json`).then(r => r.json()).then(render);
+    fetch(`${firebaseUrl}/ghRatings/${postId}.json`)
+      .then(r => r.json())
+      .then(render);
   }
 
   function save(score) {
@@ -81,7 +110,8 @@
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify(newData)
         });
-      }).then(() => {
+      })
+      .then(() => {
         rated = true;
         caption.classList.remove('hidden');
         load();
