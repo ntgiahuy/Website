@@ -1,0 +1,5 @@
+# Membership private keys — never commit
+**/giahuy-membership-private-jwk.json
+**/*private-jwk*.json
+.env
+.env.*
