@@ -1,0 +1,33 @@
+{
+  "trialMinutes": 10,
+  "trialOnce": true,
+  "plans": [
+    { "id": "3m", "label": "3 tháng", "days": 90, "price": 249000 },
+    { "id": "6m", "label": "6 tháng", "days": 180, "price": 449000 },
+    { "id": "1y", "label": "1 năm", "days": 365, "price": 799000 },
+    { "id": "2y", "label": "2 năm", "days": 730, "price": 1399000 },
+    { "id": "3y", "label": "3 năm", "days": 1095, "price": 1899000 },
+    { "id": "5y", "label": "5 năm", "days": 1825, "price": 2799000 },
+    { "id": "lifetime", "label": "Vĩnh viễn", "days": 36500, "price": 4999000 }
+  ],
+  "apps": [
+    {
+      "id": "cot",
+      "name": "Shop thép cột",
+      "url": "https://cot.giahuy.net/",
+      "blurb": "Tầng · tiết diện · xuất PDF A1"
+    },
+    {
+      "id": "mong",
+      "name": "Shop thép móng",
+      "url": "https://mong.giahuy.net/",
+      "blurb": "Móng đơn · PDF / DXF"
+    },
+    {
+      "id": "dam",
+      "name": "Shop thép dầm",
+      "url": "https://dam.giahuy.net/",
+      "blurb": "Nhịp · gối · xuất PDF A2"
+    }
+  ]
+}

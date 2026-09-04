@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thành viên GiaHuy.Net — Cột · Móng · Dầm</title>
+  <meta name="description" content="Đăng ký thành viên theo thời gian để dùng Xuất PDF / CAD trên cot, mong, dam.giahuy.net" />
+  <link rel="icon" href="/app/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #0f1419;
+      --bg1: #182029;
+      --ink: #e8eef4;
+      --muted: #93a4b5;
+      --line: rgba(232, 238, 244, 0.12);
+      --amber: #e8a317;
+      --amber-dim: #b87d0d;
+      --ok: #3ecf8e;
+      --danger: #ff6b6b;
+      --max: 980px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: "Be Vietnam Pro", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 480px at 12% -10%, rgba(232, 163, 23, 0.18), transparent 55%),
+        radial-gradient(700px 420px at 90% 0%, rgba(62, 140, 180, 0.16), transparent 50%),
+        linear-gradient(180deg, var(--bg0), var(--bg1) 40%, #10161d);
+      line-height: 1.55;
+    }
+    a { color: var(--amber); }
+    .wrap { width: min(100% - 2rem, var(--max)); margin: 0 auto; }
+    .nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.1rem 0; border-bottom: 1px solid var(--line);
+    }
+    .brand {
+      display: flex; align-items: center; gap: 0.7rem; text-decoration: none; color: inherit;
+    }
+    .brand img { width: 40px; height: 40px; border-radius: 8px; }
+    .brand strong { font-size: 1.05rem; letter-spacing: -0.02em; display: block; }
+    .brand span { color: var(--muted); font-size: 0.78rem; }
+    .nav-links { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: 0.9rem; padding: 0.35rem 0.55rem;
+    }
+    .nav-links a:hover { color: var(--ink); }
+
+    .hero {
+      padding: 3.2rem 0 2.4rem;
+      min-height: min(72vh, 620px);
+      display: grid;
+      align-content: center;
+      gap: 1.1rem;
+      position: relative;
+    }
+    .hero::before {
+      content: "";
+      position: absolute; inset: 8% -8% auto auto; width: min(52vw, 420px); height: min(52vw, 420px);
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(232,238,244,0.04) 19px),
+        repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(232,238,244,0.04) 19px);
+      mask-image: radial-gradient(circle at center, #000 30%, transparent 72%);
+      pointer-events: none;
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+    @keyframes drift {
+      from { transform: translate3d(0,0,0) rotate(0deg); opacity: 0.7; }
+      to { transform: translate3d(-18px, 12px, 0) rotate(2deg); opacity: 1; }
+    }
+    .hero h1 {
+      margin: 0; font-size: clamp(2rem, 5.2vw, 3.35rem); line-height: 1.08;
+      letter-spacing: -0.035em; max-width: 14ch; position: relative;
+    }
+    .hero p {
+      margin: 0; color: var(--muted); font-size: 1.05rem; max-width: 38ch; position: relative;
+    }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.4rem; position: relative; }
+    .btn {
+      appearance: none; border: 0; cursor: pointer; text-decoration: none;
+      font: inherit; font-weight: 700; border-radius: 10px; padding: 0.85rem 1.15rem;
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+      transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--amber); color: #1a1203; }
+    .btn-primary:hover { background: #f0b531; }
+    .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    .btn-ghost:hover { border-color: rgba(232,238,244,0.28); }
+
+    section { padding: 2.4rem 0; border-top: 1px solid var(--line); }
+    section h2 {
+      margin: 0 0 0.45rem; font-size: clamp(1.35rem, 3vw, 1.8rem); letter-spacing: -0.02em;
+    }
+    section .lead { margin: 0 0 1.4rem; color: var(--muted); max-width: 52ch; }
+
+    .plans {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.85rem;
+    }
+    @media (max-width: 800px) {
+      .plans { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 520px) {
+      .plans { grid-template-columns: 1fr; }
+    }
+    .plan {
+      border: 1px solid var(--line); border-radius: 14px; padding: 1.15rem 1.1rem 1.2rem;
+      background: rgba(255,255,255,0.02);
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .plan:hover { border-color: rgba(232,163,23,0.4); background: rgba(232,163,23,0.04); }
+    .plan.featured { border-color: rgba(232,163,23,0.55); box-shadow: inset 0 0 0 1px rgba(232,163,23,0.2); }
+    .plan .name { font-weight: 700; margin: 0 0 0.35rem; }
+    .plan .price {
+      font-family: "IBM Plex Mono", monospace; font-size: 1.45rem; margin: 0 0 0.35rem; color: var(--amber);
+    }
+    .plan .hint { margin: 0 0 1rem; color: var(--muted); font-size: 0.9rem; }
+    .plan button { width: 100%; }
+
+    .apps { display: grid; gap: 0.65rem; }
+    .app-row {
+      display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+      padding: 0.85rem 0; border-bottom: 1px solid var(--line);
+    }
+    .app-row:last-child { border-bottom: 0; }
+    .app-row strong { display: block; }
+    .app-row span { color: var(--muted); font-size: 0.9rem; }
+    .pill {
+      font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--amber); border: 1px solid rgba(232,163,23,0.35); border-radius: 999px;
+      padding: 0.25rem 0.55rem; white-space: nowrap;
+    }
+
+    .panel {
+      border: 1px solid var(--line); border-radius: 14px; padding: 1.2rem;
+      background: rgba(0,0,0,0.18);
+    }
+    label { display: block; font-size: 0.88rem; color: var(--muted); margin-bottom: 0.35rem; }
+    textarea, input[type="text"], input[type="email"] {
+      width: 100%; font: inherit; color: var(--ink); background: #0c1116;
+      border: 1px solid var(--line); border-radius: 10px; padding: 0.8rem 0.9rem;
+      resize: vertical; min-height: 3rem;
+    }
+    textarea:focus, input:focus { outline: 2px solid rgba(232,163,23,0.35); border-color: var(--amber-dim); }
+    .row-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.85rem; }
+    .status {
+      margin-top: 1rem; padding: 0.85rem 0.95rem; border-radius: 10px;
+      background: rgba(255,255,255,0.03); border: 1px solid var(--line); font-size: 0.95rem;
+    }
+    .status.ok { border-color: rgba(62,207,142,0.35); color: var(--ok); }
+    .status.bad { border-color: rgba(255,107,107,0.35); color: var(--danger); }
+    .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.86rem; word-break: break-all; }
+
+    .steps { display: grid; gap: 0.9rem; counter-reset: step; }
+    .step {
+      display: grid; grid-template-columns: auto 1fr; gap: 0.8rem; align-items: start;
+    }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      width: 1.7rem; height: 1.7rem; border-radius: 999px; display: grid; place-items: center;
+      background: rgba(232,163,23,0.15); color: var(--amber); font-weight: 700; font-size: 0.85rem;
+    }
+    .step p { margin: 0.15rem 0 0; color: var(--muted); }
+    footer {
+      padding: 2rem 0 2.8rem; color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--line);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="nav">
+      <a class="brand" href="./">
+        <img src="/app/android-icon-96x96.png" alt="" width="40" height="40" />
+        <div>
+          <strong>GiaHuy.Net</strong>
+          <span>Thành viên · 3 tiện ích thép</span>
+        </div>
+      </a>
+      <nav class="nav-links">
+        <a href="#goi">Gói</a>
+        <a href="#kich-hoat">Kích hoạt</a>
+        <a href="#bao-mat">Bảo mật</a>
+        <a href="#huong-dan">Hướng dẫn</a>
+        <a href="./admin.html">Admin</a>
+      </nav>
+    </header>
+
+    <section class="hero" style="border:0;padding-top:2.6rem">
+      <h1>Một thành viên.<br />Ba tiện ích.</h1>
+      <p>Đăng ký theo tháng / quý / năm — mở khóa Xuất PDF (và CAD) trên Cột, Móng, Dầm trong thời hạn còn hiệu lực.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/hub/">Dùng thử 10 phút trên trang chủ</a>
+        <a class="btn btn-ghost" href="#goi">Chọn gói thành viên</a>
+        <a class="btn btn-ghost" href="#kich-hoat">Đã có mã · Kích hoạt</a>
+      </div>
+    </section>
+
+    <section id="goi">
+      <h2>Gói theo thời gian</h2>
+      <p class="lead">Một mã dùng chung cả ba tiện ích. Dùng thử trang chủ 10 phút / 1 lần — hết giờ thì chọn gói dưới đây.</p>
+      <div class="plans">
+        <article class="plan featured" data-plan="3m" data-days="90" data-price="249000">
+          <p class="name">3 tháng</p>
+          <p class="price">249.000đ</p>
+          <p class="hint">Theo quý</p>
+          <button type="button" class="btn btn-primary pick-plan">Chọn gói này</button>
+        </article>
+        <article class="plan" data-plan="6m" data-days="180" data-price="449000">
+          <p class="name">6 tháng</p>
+          <p class="price">449.000đ</p>
+          <p class="hint">Nửa năm</p>
+          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
+        </article>
+        <article class="plan" data-plan="1y" data-days="365" data-price="799000">
+          <p class="name">1 năm</p>
+          <p class="price">799.000đ</p>
+          <p class="hint">Cả năm</p>
+          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
+        </article>
+        <article class="plan" data-plan="2y" data-days="730" data-price="1399000">
+          <p class="name">2 năm</p>
+          <p class="price">1.399.000đ</p>
+          <p class="hint">Dài hạn</p>
+          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
+        </article>
+        <article class="plan" data-plan="3y" data-days="1095" data-price="1899000">
+          <p class="name">3 năm</p>
+          <p class="price">1.899.000đ</p>
+          <p class="hint">Văn phòng</p>
+          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
+        </article>
+        <article class="plan" data-plan="5y" data-days="1825" data-price="2799000">
+          <p class="name">5 năm</p>
+          <p class="price">2.799.000đ</p>
+          <p class="hint">Dài nhất theo năm</p>
+          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
+        </article>
+        <article class="plan" data-plan="lifetime" data-days="36500" data-price="4999000">
+          <p class="name">Vĩnh viễn</p>
+          <p class="price">4.999.000đ</p>
+          <p class="hint">Một lần · không hết hạn</p>
+          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
+        </article>
+      </div>
+    </section>
+
+    <section id="tien-ich">
+      <h2>Được mở khóa</h2>
+      <p class="lead">Trang chủ <a href="/hub/">/hub/</a> nhúng cả ba tiện ích. Thành viên còn hạn = dùng không giới hạn thời gian trên hub.</p>
+      <div class="apps">
+        <div class="app-row">
+          <div>
+            <strong>Shop thép cột</strong>
+            <span>cot.giahuy.net</span>
+          </div>
+          <a class="pill" href="/hub/">Mở trên hub</a>
+        </div>
+        <div class="app-row">
+          <div>
+            <strong>Shop thép móng</strong>
+            <span>mong.giahuy.net</span>
+          </div>
+          <a class="pill" href="/hub/">Mở trên hub</a>
+        </div>
+        <div class="app-row">
+          <div>
+            <strong>Shop thép dầm</strong>
+            <span>dam.giahuy.net</span>
+          </div>
+          <a class="pill" href="/hub/">Mở trên hub</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="huong-dan">
+      <h2>Cách đăng ký</h2>
+      <div class="steps">
+        <div class="step">
+          <div>
+            <strong>Chọn gói và chuyển khoản</strong>
+            <p id="pay-hint">Nội dung CK gợi ý: <span class="mono" id="transfer-content">GH TV 3M email@cua.ban</span>. Điền STK của bạn ở trang Admin (cấu hình).</p>
+          </div>
+        </div>
+        <div class="step">
+          <div>
+            <strong>Nhận mã thành viên</strong>
+            <p>Sau khi nhận tiền, bạn (hoặc Admin) tạo mã có hạn tại <a href="./admin.html">trang Admin</a> rồi gửi cho khách.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div>
+            <strong>Kích hoạt trên trình duyệt</strong>
+            <p>Dán mã bên dưới. Trình duyệt lưu mã — mở bất kỳ tiện ích nào cũng nhận diện trong thời hạn.</p>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:1.2rem" id="pay-box">
+        <p style="margin:0 0 0.5rem;color:var(--muted);font-size:0.9rem">Thông tin thanh toán (chỉnh trong Admin → lưu cấu hình công khai):</p>
+        <p id="pay-info" class="mono" style="margin:0;color:var(--ink)">Chưa cấu hình STK — mở Admin để điền ngân hàng / số tài khoản / chủ TK.</p>
+      </div>
+    </section>
+
+    <section id="kich-hoat">
+      <h2>Kích hoạt mã</h2>
+      <p class="lead">Mã dạng <span class="mono">GH1....</span> — ký số, có ngày hết hạn. Cùng một mã dùng cho cả 3 tiện ích trên cùng trình duyệt.</p>
+      <div class="panel">
+        <label for="license">Mã thành viên</label>
+        <textarea id="license" rows="3" placeholder="GH1.xxxxx.yyyyy" spellcheck="false"></textarea>
+        <div class="row-actions">
+          <button type="button" class="btn btn-primary" id="btn-activate">Kích hoạt</button>
+          <button type="button" class="btn btn-ghost" id="btn-check">Kiểm tra trạng thái</button>
+          <button type="button" class="btn btn-ghost" id="btn-clear">Xóa mã trên máy này</button>
+        </div>
+        <div class="status" id="status" hidden></div>
+      </div>
+    </section>
+
+    <section id="bao-mat">
+      <h2>Repo GitHub đang Public?</h2>
+      <p class="lead">Public = ai cũng tải được mã nguồn và có thể bỏ khóa phía trình duyệt. Để bắt trả phí hiệu quả:</p>
+      <div class="steps">
+        <div class="step">
+          <div>
+            <strong>Đổi cot / mong / dam sang Private</strong>
+            <p>Settings → Danger Zone → Change visibility → Private. Người khác không clone được shop thép nữa.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div>
+            <strong>Gắn khóa Xuất PDF bằng mã thành viên</strong>
+            <p>Nạp <span class="mono">membership.js</span> và gọi <span class="mono">requireActive()</span> trước khi xuất file.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div>
+            <strong>(Tuỳ chọn) Worker xác minh trên server</strong>
+            <p>Chắc hơn — xem <a href="./BAO-MAT.md">BAO-MAT.md</a>. Muốn khóa cứng: xuất PDF phải chạy trên server.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>GiaHuy.Net · Nhật Nguyễn · Thành viên khóa tính năng xuất bản vẽ theo thời hạn mã.</p>
+      <p>
+        Tích hợp: <a href="./HUONG-DAN.md">HUONG-DAN.md</a> ·
+        Bảo mật Public/Private: <a href="./BAO-MAT.md">BAO-MAT.md</a> ·
+        Tạo mã: <a href="./admin.html">admin.html</a>
+      </p>
+    </footer>
+  </div>
+
+  <script src="/js/membership.js"></script>
+  <script>
+    (function () {
+      var statusEl = document.getElementById("status");
+      var licenseEl = document.getElementById("license");
+      var payInfo = document.getElementById("pay-info");
+      var transferContent = document.getElementById("transfer-content");
+      var selected = { plan: "3m", days: 90, price: 249000 };
+
+      function showStatus(ok, html) {
+        statusEl.hidden = false;
+        statusEl.className = "status " + (ok ? "ok" : "bad");
+        statusEl.innerHTML = html;
+      }
+
+      function money(n) {
+        return Number(n).toLocaleString("vi-VN") + "đ";
+      }
+
+      function updateTransferHint() {
+        var email = "email@cua.ban";
+        transferContent.textContent =
+          "GH TV " + selected.plan.toUpperCase() + " " + email + " · " + money(selected.price);
+      }
+
+      document.querySelectorAll(".pick-plan").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var art = btn.closest(".plan");
+          selected = {
+            plan: art.getAttribute("data-plan"),
+            days: Number(art.getAttribute("data-days")),
+            price: Number(art.getAttribute("data-price")),
+          };
+          updateTransferHint();
+          document.getElementById("huong-dan").scrollIntoView({ behavior: "smooth" });
+        });
+      });
+
+      async function refreshPayConfig() {
+        try {
+          var res = await fetch("./pay-config.json", { cache: "no-cache" });
+          if (!res.ok) return;
+          var cfg = await res.json();
+          if (!cfg || !cfg.bank) return;
+          payInfo.textContent =
+            (cfg.bank || "") +
+            " · STK " +
+            (cfg.account || "") +
+            " · " +
+            (cfg.holder || "") +
+            (cfg.note ? " · " + cfg.note : "");
+        } catch (e) {
+          /* keep placeholder */
+        }
+      }
+
+      async function paintStored() {
+        var st = await GiaHuyMembership.getStatus();
+        if (st.active) {
+          showStatus(
+            true,
+            "Đang hoạt động · gói <strong>" +
+              (st.plan || "—") +
+              "</strong> · hết hạn <strong>" +
+              GiaHuyMembership.formatExpiry(st) +
+              "</strong>" +
+              (st.email ? " · " + st.email : "")
+          );
+        }
+      }
+
+      document.getElementById("btn-activate").addEventListener("click", async function () {
+        try {
+          var st = await GiaHuyMembership.activate(licenseEl.value);
+          showStatus(
+            true,
+            "Kích hoạt thành công · hết hạn <strong>" + GiaHuyMembership.formatExpiry(st) + "</strong>"
+          );
+        } catch (e) {
+          showStatus(false, (e && e.message) || "Không kích hoạt được.");
+        }
+      });
+
+      document.getElementById("btn-check").addEventListener("click", async function () {
+        var st = await GiaHuyMembership.getStatus();
+        if (st.active) {
+          showStatus(true, "Còn hạn · " + GiaHuyMembership.formatExpiry(st));
+        } else {
+          showStatus(false, "Chưa có mã hợp lệ trên trình duyệt này (" + (st.reason || "inactive") + ").");
+        }
+      });
+
+      document.getElementById("btn-clear").addEventListener("click", function () {
+        GiaHuyMembership.clear();
+        showStatus(false, "Đã xóa mã thành viên trên máy này.");
+      });
+
+      updateTransferHint();
+      refreshPayConfig();
+      paintStored();
+    })();
+  </script>
+</body>
+</html>

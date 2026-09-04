@@ -1,9 +1,27 @@
-<img alt='Giới thiệu về Gia Huy' src='https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjc9oGZQVmAguD-s0uCEmV6NlNfpOZLc75oruUa6_A9dAiWtOE9BjpcBPCZpzLfzWtUlxqNqLKcaDfWqOOsS7OZCjPNuXUqoJcge8ske8_Yk90jYn3aQqlv3nhBO795ri9bYlQtw5zV92uIvnyAg8fhyphenhyphenQrcKEiZnPu_nEWj47nMh5kI0Q/s480-d-rw/logo.png' />
-      <!--[ Author Description ]-->
-      <div class='aAdmD'>
-        <p>Xin chào!</p>
-        <p>Tôi là <b>Nhật Nguyễn</b>, là một kỹ sư xây dựng, tên website: <a href='http://www.giahuy.net' rel='nofollow' target='_blank'>www.giahuy.net</a> là tên con tôi.</p><br>
-        <p>Tôi ra trường và bắt đầu làm việc từ năm 2014. Sau những năm làm việc tôi cũng tích góp được ít nhiều kinh nghiệm thi công xây dựng. Nhưng có những kiến thức lý thuyết và thực hành tuỳ từng công trình có thể dùng đến những kiến thức khác nhau và một thời gian không dùng nên có thể quên.</p><br>
-        <p>Vì vậy sau thời gian dẫn cách xã hội tại nhà nên tôi đã tạo trang website <a href='http://www.giahuy.net'>www.giahuy.net</a> nhằm mục đích lưu trữ kiến thức lý thuyết và kinh nghiệm thi công mà tôi đã học hỏi được, để khi cần thiết lấy điện thoại ra xem và cũng muốn chia sẻ lên mạng để những ai cần chia sẻ cho nhau.</p><br>
-        <p>Nếu mọi người muốn đóng góp và chia sẻ kiến thức hay, đừng ngại hãy đóng góp cùng tôi, tôi luôn chào đón hãy liên hệ với tôi!</p><br>
-        <p>Bạn nào cần thông tin về lĩnh vực xây dựng có thể hỏi trực tiếp với tôi!</p>
+# Website CDN — GiaHuy.Net
+
+Repo phục vụ file tĩnh tại **https://xd.giahuy.net/** (GitHub Pages).
+
+## Trang chủ 3 tiện ích
+
+**https://xd.giahuy.net/hub/**
+
+- Nhúng Cột · Móng · Dầm trong một trang
+- Dùng thử **10 phút / 1 lần** mỗi trình duyệt
+- Hết giờ → đăng ký thành viên: 3 tháng, 6 tháng, 1 năm, 2 năm, 3 năm, 5 năm, vĩnh viễn
+
+## Thành viên trả phí theo thời gian
+
+| Trang | Địa chỉ |
+|-------|---------|
+| Trang chủ hub | https://xd.giahuy.net/hub/ |
+| Đăng ký / kích hoạt | https://xd.giahuy.net/thanh-vien/ |
+| Admin tạo mã | https://xd.giahuy.net/thanh-vien/admin.html |
+| Thư viện JS | https://xd.giahuy.net/js/membership.js |
+| Bảng giá gói | https://xd.giahuy.net/thanh-vien/plans.json |
+| Hướng dẫn tích hợp | [thanh-vien/HUONG-DAN.md](thanh-vien/HUONG-DAN.md) |
+| Bảo mật Public/Private | [thanh-vien/BAO-MAT.md](thanh-vien/BAO-MAT.md) |
+
+Sửa STK trong `thanh-vien/pay-config.json`. Sửa giá trong `thanh-vien/plans.json`. **Private key** chỉ giữ trên máy (Admin → Import).
+
+**Repo `cot` / `mong` / `dam` đang Public:** nên đổi sang **Private** — xem [thanh-vien/BAO-MAT.md](thanh-vien/BAO-MAT.md). Worker mẫu: `workers/license-verify/`.
