@@ -14,7 +14,18 @@
   "use strict";
 
   var STORAGE_KEY = "giahuy.membership.v1";
+  var TRIAL_KEY = "giahuy.trial.v1";
+  var TRIAL_MS = 10 * 60 * 1000; // 10 phút, dùng 1 lần / trình duyệt
   var ALL_APPS = ["cot", "mong", "dam"];
+  var PLANS = [
+    { id: "3m", label: "3 tháng", days: 90 },
+    { id: "6m", label: "6 tháng", days: 180 },
+    { id: "1y", label: "1 năm", days: 365 },
+    { id: "2y", label: "2 năm", days: 730 },
+    { id: "3y", label: "3 năm", days: 1095 },
+    { id: "5y", label: "5 năm", days: 1825 },
+    { id: "lifetime", label: "Vĩnh viễn", days: 36500 },
+  ];
   var scriptEl =
     typeof document !== "undefined" && document.currentScript ? document.currentScript : null;
   var VERIFY_URL =
@@ -293,6 +304,9 @@
 
   function formatExpiry(status) {
     if (!status || !status.active) return "Chưa kích hoạt";
+    if (status.plan === "lifetime" || (status.daysLeft && status.daysLeft > 20000)) {
+      return "Vĩnh viễn";
+    }
     try {
       return (
         new Date(status.expiresAtMs).toLocaleDateString("vi-VN") +
@@ -305,9 +319,109 @@
     }
   }
 
+  function readTrial() {
+    try {
+      var raw = localStorage.getItem(TRIAL_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeTrial(record) {
+    localStorage.setItem(TRIAL_KEY, JSON.stringify(record));
+  }
+
+  /** Trạng thái dùng thử 10 phút / 1 lần trên trình duyệt này. */
+  function getTrialStatus() {
+    var t = readTrial();
+    var now = Date.now();
+    if (!t) {
+      return {
+        started: false,
+        active: false,
+        usedUp: false,
+        remainingMs: TRIAL_MS,
+        remainingSec: Math.floor(TRIAL_MS / 1000),
+        endsAt: null,
+      };
+    }
+    var endsAt = Number(t.endsAt) || 0;
+    var remainingMs = Math.max(0, endsAt - now);
+    var active = remainingMs > 0;
+    return {
+      started: true,
+      active: active,
+      usedUp: !active,
+      remainingMs: remainingMs,
+      remainingSec: Math.ceil(remainingMs / 1000),
+      endsAt: endsAt,
+      startedAt: t.startedAt || null,
+    };
+  }
+
+  /**
+   * Bắt đầu dùng thử. Chỉ được 1 lần / trình duyệt.
+   * @returns {{ ok: boolean, status: object, error?: string }}
+   */
+  function startTrial() {
+    var existing = readTrial();
+    var now = Date.now();
+    if (existing) {
+      var st = getTrialStatus();
+      if (st.active) return { ok: true, status: st, resumed: true };
+      return {
+        ok: false,
+        status: st,
+        error: "Bạn đã dùng hết lượt dùng thử 10 phút trên trình duyệt này. Hãy đăng ký thành viên để tiếp tục.",
+      };
+    }
+    var record = { startedAt: now, endsAt: now + TRIAL_MS, version: 1 };
+    writeTrial(record);
+    return { ok: true, status: getTrialStatus(), resumed: false };
+  }
+
+  function clearTrialForDebug() {
+    try {
+      localStorage.removeItem(TRIAL_KEY);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function formatTrialClock(remainingSec) {
+    var s = Math.max(0, Number(remainingSec) || 0);
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r;
+  }
+
+  /** Thành viên còn hạn HOẶC đang trong 10 phút dùng thử. */
+  async function canUseApps(opts) {
+    opts = opts || {};
+    var member = await getStatus(opts);
+    if (member.active) {
+      return { allowed: true, mode: "member", member: member, trial: getTrialStatus() };
+    }
+    var trial = getTrialStatus();
+    if (trial.active) {
+      return { allowed: true, mode: "trial", member: member, trial: trial };
+    }
+    return {
+      allowed: false,
+      mode: trial.usedUp ? "trial_used" : "locked",
+      member: member,
+      trial: trial,
+    };
+  }
+
   global.GiaHuyMembership = {
     STORAGE_KEY: STORAGE_KEY,
+    TRIAL_KEY: TRIAL_KEY,
+    TRIAL_MS: TRIAL_MS,
     ALL_APPS: ALL_APPS,
+    PLANS: PLANS,
     ACTIVATE_URL: ACTIVATE_URL,
     VERIFY_URL: VERIFY_URL,
     activate: activate,
@@ -320,6 +434,11 @@
     verifyLicense: verifyLicense,
     verifyLicenseLocal: verifyLicenseLocal,
     verifyLicenseOnline: verifyLicenseOnline,
+    getTrialStatus: getTrialStatus,
+    startTrial: startTrial,
+    clearTrialForDebug: clearTrialForDebug,
+    formatTrialClock: formatTrialClock,
+    canUseApps: canUseApps,
     bytesToB64url: bytesToB64url,
     b64urlToBytes: b64urlToBytes,
   };

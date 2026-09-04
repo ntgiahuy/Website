@@ -100,9 +100,12 @@
     section .lead { margin: 0 0 1.4rem; color: var(--muted); max-width: 52ch; }
 
     .plans {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.85rem;
     }
     @media (max-width: 800px) {
+      .plans { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 520px) {
       .plans { grid-template-columns: 1fr; }
     }
     .plan {
@@ -191,31 +194,56 @@
       <h1>Một thành viên.<br />Ba tiện ích.</h1>
       <p>Đăng ký theo tháng / quý / năm — mở khóa Xuất PDF (và CAD) trên Cột, Móng, Dầm trong thời hạn còn hiệu lực.</p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="#goi">Chọn gói thành viên</a>
+        <a class="btn btn-primary" href="/hub/">Dùng thử 10 phút trên trang chủ</a>
+        <a class="btn btn-ghost" href="#goi">Chọn gói thành viên</a>
         <a class="btn btn-ghost" href="#kich-hoat">Đã có mã · Kích hoạt</a>
       </div>
     </section>
 
     <section id="goi">
       <h2>Gói theo thời gian</h2>
-      <p class="lead">Một mã dùng chung cho cot.giahuy.net · mong.giahuy.net · dam.giahuy.net. Giá có thể chỉnh trong Admin khi phát hành.</p>
+      <p class="lead">Một mã dùng chung cả ba tiện ích. Dùng thử trang chủ 10 phút / 1 lần — hết giờ thì chọn gói dưới đây.</p>
       <div class="plans">
-        <article class="plan" data-plan="1m" data-days="30" data-price="99000">
-          <p class="name">1 tháng</p>
-          <p class="price">99.000đ</p>
-          <p class="hint">Phù hợp dùng dự án ngắn</p>
-          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
-        </article>
         <article class="plan featured" data-plan="3m" data-days="90" data-price="249000">
           <p class="name">3 tháng</p>
           <p class="price">249.000đ</p>
-          <p class="hint">Hay dùng nhất · tiết kiệm hơn</p>
+          <p class="hint">Theo quý</p>
           <button type="button" class="btn btn-primary pick-plan">Chọn gói này</button>
         </article>
-        <article class="plan" data-plan="12m" data-days="365" data-price="799000">
-          <p class="name">12 tháng</p>
+        <article class="plan" data-plan="6m" data-days="180" data-price="449000">
+          <p class="name">6 tháng</p>
+          <p class="price">449.000đ</p>
+          <p class="hint">Nửa năm</p>
+          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
+        </article>
+        <article class="plan" data-plan="1y" data-days="365" data-price="799000">
+          <p class="name">1 năm</p>
           <p class="price">799.000đ</p>
-          <p class="hint">Cho văn phòng / dùng thường xuyên</p>
+          <p class="hint">Cả năm</p>
+          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
+        </article>
+        <article class="plan" data-plan="2y" data-days="730" data-price="1399000">
+          <p class="name">2 năm</p>
+          <p class="price">1.399.000đ</p>
+          <p class="hint">Dài hạn</p>
+          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
+        </article>
+        <article class="plan" data-plan="3y" data-days="1095" data-price="1899000">
+          <p class="name">3 năm</p>
+          <p class="price">1.899.000đ</p>
+          <p class="hint">Văn phòng</p>
+          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
+        </article>
+        <article class="plan" data-plan="5y" data-days="1825" data-price="2799000">
+          <p class="name">5 năm</p>
+          <p class="price">2.799.000đ</p>
+          <p class="hint">Dài nhất theo năm</p>
+          <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
+        </article>
+        <article class="plan" data-plan="lifetime" data-days="36500" data-price="4999000">
+          <p class="name">Vĩnh viễn</p>
+          <p class="price">4.999.000đ</p>
+          <p class="hint">Một lần · không hết hạn</p>
           <button type="button" class="btn btn-ghost pick-plan">Chọn gói này</button>
         </article>
       </div>
@@ -223,28 +251,28 @@
 
     <section id="tien-ich">
       <h2>Được mở khóa</h2>
-      <p class="lead">Xem / nhập số liệu vẫn dùng thử. Xuất bản vẽ PDF (và CAD với móng) cần thành viên còn hạn.</p>
+      <p class="lead">Trang chủ <a href="/hub/">/hub/</a> nhúng cả ba tiện ích. Thành viên còn hạn = dùng không giới hạn thời gian trên hub.</p>
       <div class="apps">
         <div class="app-row">
           <div>
             <strong>Shop thép cột</strong>
             <span>cot.giahuy.net</span>
           </div>
-          <a class="pill" href="https://cot.giahuy.net/" target="_blank" rel="noopener">Mở</a>
+          <a class="pill" href="/hub/">Mở trên hub</a>
         </div>
         <div class="app-row">
           <div>
             <strong>Shop thép móng</strong>
             <span>mong.giahuy.net</span>
           </div>
-          <a class="pill" href="https://mong.giahuy.net/" target="_blank" rel="noopener">Mở</a>
+          <a class="pill" href="/hub/">Mở trên hub</a>
         </div>
         <div class="app-row">
           <div>
             <strong>Shop thép dầm</strong>
             <span>dam.giahuy.net</span>
           </div>
-          <a class="pill" href="https://dam.giahuy.net/" target="_blank" rel="noopener">Mở</a>
+          <a class="pill" href="/hub/">Mở trên hub</a>
         </div>
       </div>
     </section>

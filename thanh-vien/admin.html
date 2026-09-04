@@ -84,9 +84,13 @@
         <div>
           <label for="plan">Gói</label>
           <select id="plan">
-            <option value="1m" data-days="30">1 tháng (30 ngày)</option>
             <option value="3m" data-days="90" selected>3 tháng (90 ngày)</option>
-            <option value="12m" data-days="365">12 tháng (365 ngày)</option>
+            <option value="6m" data-days="180">6 tháng (180 ngày)</option>
+            <option value="1y" data-days="365">1 năm (365 ngày)</option>
+            <option value="2y" data-days="730">2 năm (730 ngày)</option>
+            <option value="3y" data-days="1095">3 năm (1095 ngày)</option>
+            <option value="5y" data-days="1825">5 năm (1825 ngày)</option>
+            <option value="lifetime" data-days="36500">Vĩnh viễn</option>
             <option value="custom">Tùy chỉnh số ngày</option>
           </select>
         </div>
@@ -94,7 +98,7 @@
       <div class="grid2">
         <div>
           <label for="days">Số ngày</label>
-          <input id="days" type="number" min="1" max="3660" value="90" />
+          <input id="days" type="number" min="1" max="40000" value="90" />
         </div>
         <div>
           <label for="note">Ghi chú nội bộ (không nhúng vào mã)</label>

@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GiaHuy.Net — Cột · Móng · Dầm</title>
+  <meta name="description" content="Dùng thử 10 phút cả 3 tiện ích shop thép. Tiếp tục bằng thành viên theo quý / năm / vĩnh viễn." />
+  <link rel="icon" href="/app/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #0c1218;
+      --bg1: #15202b;
+      --ink: #eef3f8;
+      --muted: #8fa3b6;
+      --line: rgba(238, 243, 248, 0.12);
+      --amber: #e8a317;
+      --amber-2: #f0b531;
+      --ok: #3ecf8e;
+      --danger: #ff6b6b;
+      --steel: #4a6d88;
+      --bar-h: 58px;
+      --tabs-h: 48px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: "Be Vietnam Pro", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 420px at 8% -8%, rgba(232, 163, 23, 0.16), transparent 55%),
+        radial-gradient(700px 380px at 92% 0%, rgba(74, 109, 136, 0.22), transparent 50%),
+        linear-gradient(165deg, var(--bg0), var(--bg1) 45%, #0e1620);
+      overflow: hidden;
+    }
+    a { color: var(--amber); }
+    .shell {
+      height: 100%;
+      display: grid;
+      grid-template-rows: var(--bar-h) var(--tabs-h) 1fr;
+    }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+      padding: 0 1rem; border-bottom: 1px solid var(--line);
+      background: rgba(8, 12, 16, 0.55); backdrop-filter: blur(10px);
+    }
+    .brand {
+      display: flex; align-items: center; gap: 0.65rem; text-decoration: none; color: inherit; min-width: 0;
+    }
+    .brand img { width: 34px; height: 34px; border-radius: 8px; flex: none; }
+    .brand strong {
+      font-size: 1.02rem; letter-spacing: -0.02em; display: block; line-height: 1.15;
+    }
+    .brand span { color: var(--muted); font-size: 0.72rem; }
+    .top-actions { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; justify-content: flex-end; }
+    .chip {
+      font-family: "IBM Plex Mono", monospace; font-size: 0.82rem; font-weight: 600;
+      border: 1px solid var(--line); border-radius: 999px; padding: 0.35rem 0.7rem;
+      background: rgba(255,255,255,0.03); color: var(--muted); white-space: nowrap;
+    }
+    .chip.live { color: var(--amber); border-color: rgba(232,163,23,0.4); animation: pulse 1.6s ease-in-out infinite; }
+    .chip.ok { color: var(--ok); border-color: rgba(62,207,142,0.35); }
+    .chip.danger { color: var(--danger); border-color: rgba(255,107,107,0.35); }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(232,163,23,0.0); }
+      50% { box-shadow: 0 0 0 4px rgba(232,163,23,0.12); }
+    }
+    .btn {
+      appearance: none; border: 0; cursor: pointer; text-decoration: none;
+      font: inherit; font-weight: 700; border-radius: 10px; padding: 0.55rem 0.9rem;
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--amber); color: #1a1203; }
+    .btn-primary:hover { background: var(--amber-2); }
+    .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    .btn-sm { padding: 0.4rem 0.7rem; font-size: 0.88rem; }
+
+    .tabs {
+      display: flex; gap: 0.25rem; padding: 0.35rem 0.75rem;
+      border-bottom: 1px solid var(--line); background: rgba(0,0,0,0.18);
+      overflow-x: auto;
+    }
+    .tab {
+      appearance: none; border: 0; background: transparent; color: var(--muted);
+      font: inherit; font-weight: 600; padding: 0.55rem 0.95rem; border-radius: 10px;
+      cursor: pointer; white-space: nowrap;
+    }
+    .tab:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
+    .tab.active {
+      color: #1a1203; background: var(--amber);
+      animation: tabIn 0.28s ease;
+    }
+    @keyframes tabIn {
+      from { transform: translateY(3px); opacity: 0.6; }
+      to { transform: none; opacity: 1; }
+    }
+
+    .workspace { position: relative; min-height: 0; background: #070b10; }
+    .workspace iframe {
+      width: 100%; height: 100%; border: 0; background: #111;
+      display: none;
+    }
+    .workspace iframe.active { display: block; }
+
+    .gate, .paywall {
+      position: absolute; inset: 0;
+      display: grid; place-items: center;
+      padding: 1.25rem;
+      background:
+        radial-gradient(600px 320px at 50% 20%, rgba(232,163,23,0.12), transparent 60%),
+        rgba(7, 11, 16, 0.92);
+      backdrop-filter: blur(6px);
+      z-index: 5;
+      overflow: auto;
+    }
+    .gate[hidden], .paywall[hidden] { display: none !important; }
+    .card {
+      width: min(100%, 560px);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 1.5rem 1.35rem 1.35rem;
+      background: rgba(18, 26, 34, 0.95);
+      animation: rise 0.45s ease;
+    }
+    .card.wide { width: min(100%, 920px); }
+    @keyframes rise {
+      from { transform: translateY(14px); opacity: 0; }
+      to { transform: none; opacity: 1; }
+    }
+    .card h1 {
+      margin: 0 0 0.45rem; font-size: clamp(1.45rem, 3.5vw, 2rem);
+      letter-spacing: -0.03em; line-height: 1.15;
+    }
+    .card p { margin: 0; color: var(--muted); }
+    .card .cta-row { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 1.15rem; }
+    .plans {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.55rem;
+      margin-top: 1.1rem;
+    }
+    .plan {
+      border: 1px solid var(--line); border-radius: 12px; padding: 0.85rem 0.75rem;
+      background: rgba(255,255,255,0.02); cursor: pointer; text-align: left;
+      color: inherit; font: inherit;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .plan:hover, .plan.selected {
+      border-color: rgba(232,163,23,0.55);
+      background: rgba(232,163,23,0.07);
+    }
+    .plan .name { font-weight: 700; display: block; margin-bottom: 0.2rem; }
+    .plan .price {
+      font-family: "IBM Plex Mono", monospace; color: var(--amber); font-size: 0.95rem;
+    }
+    .activate-box { margin-top: 1rem; }
+    .activate-box label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.3rem; }
+    .activate-box textarea {
+      width: 100%; min-height: 4.2rem; resize: vertical; font: inherit;
+      font-family: "IBM Plex Mono", monospace; font-size: 0.8rem;
+      color: var(--ink); background: #0a0f14; border: 1px solid var(--line);
+      border-radius: 10px; padding: 0.7rem 0.8rem;
+    }
+    .msg { margin-top: 0.65rem; font-size: 0.9rem; }
+    .msg.ok { color: var(--ok); }
+    .msg.bad { color: var(--danger); }
+    .pay-note {
+      margin-top: 0.9rem; padding: 0.75rem 0.85rem; border-radius: 10px;
+      border: 1px solid var(--line); background: rgba(0,0,0,0.25);
+      font-size: 0.86rem; color: var(--muted);
+    }
+    .pay-note strong { color: var(--ink); }
+    .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; word-break: break-all; }
+
+    @media (max-width: 640px) {
+      body { overflow: auto; }
+      .shell { min-height: 100dvh; height: auto; grid-template-rows: auto auto minmax(70vh, 1fr); }
+      .brand span { display: none; }
+      .chip { font-size: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="./">
+        <img src="/app/android-icon-96x96.png" width="34" height="34" alt="" />
+        <div>
+          <strong>GiaHuy.Net</strong>
+          <span>Cột · Móng · Dầm — một trang dùng cả ba</span>
+        </div>
+      </a>
+      <div class="top-actions">
+        <span class="chip" id="status-chip">Đang kiểm tra…</span>
+        <a class="btn btn-ghost btn-sm" href="/thanh-vien/">Thành viên</a>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-open-pay" hidden>Đăng ký</button>
+      </div>
+    </header>
+
+    <nav class="tabs" id="tabs" aria-label="Chọn tiện ích"></nav>
+
+    <main class="workspace" id="workspace">
+      <div class="gate" id="gate">
+        <div class="card">
+          <h1>Dùng thử 10 phút — một lần</h1>
+          <p>Mở cả ba tiện ích shop thép trên cùng một trang. Hết 10 phút hoặc đã dùng thử rồi thì cần thành viên trả phí để tiếp tục.</p>
+          <div class="cta-row">
+            <button type="button" class="btn btn-primary" id="btn-start-trial">Bắt đầu dùng thử</button>
+            <button type="button" class="btn btn-ghost" id="btn-have-code">Đã có mã thành viên</button>
+          </div>
+          <p class="msg bad" id="gate-msg" hidden></p>
+        </div>
+      </div>
+
+      <div class="paywall" id="paywall" hidden>
+        <div class="card wide">
+          <h1 id="paywall-title">Đăng ký thành viên để tiếp tục</h1>
+          <p id="paywall-lead">Chọn gói theo thời gian. Một mã mở khóa cả Cột, Móng và Dầm.</p>
+          <div class="plans" id="plans"></div>
+          <div class="pay-note" id="pay-note">Đang tải thông tin thanh toán…</div>
+          <div class="activate-box">
+            <label for="license">Đã thanh toán · dán mã thành viên (GH1…)</label>
+            <textarea id="license" placeholder="GH1.xxxxx.yyyyy" spellcheck="false"></textarea>
+            <div class="cta-row">
+              <button type="button" class="btn btn-primary" id="btn-activate">Kích hoạt mã</button>
+              <a class="btn btn-ghost" href="/thanh-vien/admin.html" target="_blank" rel="noopener">Admin tạo mã</a>
+              <button type="button" class="btn btn-ghost" id="btn-retry-trial" hidden>Thử lại dùng thử</button>
+            </div>
+            <p class="msg" id="pay-msg" hidden></p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/membership.js"></script>
+  <script>
+    (function () {
+      var APPS = [];
+      var PLANS = GiaHuyMembership.PLANS.slice();
+      var PLAN_PRICES = {};
+      var selectedPlan = null;
+      var currentApp = "cot";
+      var tickTimer = null;
+      var frames = {};
+
+      var els = {
+        tabs: document.getElementById("tabs"),
+        workspace: document.getElementById("workspace"),
+        gate: document.getElementById("gate"),
+        paywall: document.getElementById("paywall"),
+        chip: document.getElementById("status-chip"),
+        btnPay: document.getElementById("btn-open-pay"),
+        gateMsg: document.getElementById("gate-msg"),
+        plans: document.getElementById("plans"),
+        payNote: document.getElementById("pay-note"),
+        payMsg: document.getElementById("pay-msg"),
+        license: document.getElementById("license"),
+        paywallTitle: document.getElementById("paywall-title"),
+        paywallLead: document.getElementById("paywall-lead"),
+      };
+
+      function money(n) {
+        return Number(n).toLocaleString("vi-VN") + "đ";
+      }
+
+      function showMsg(el, ok, text) {
+        el.hidden = !text;
+        el.className = "msg " + (ok ? "ok" : "bad");
+        el.textContent = text || "";
+      }
+
+      async function loadConfig() {
+        try {
+          var res = await fetch("/thanh-vien/plans.json", { cache: "no-cache" });
+          if (res.ok) {
+            var cfg = await res.json();
+            if (cfg.apps && cfg.apps.length) APPS = cfg.apps;
+            if (cfg.plans && cfg.plans.length) {
+              PLANS = cfg.plans;
+              cfg.plans.forEach(function (p) {
+                PLAN_PRICES[p.id] = p.price;
+              });
+            }
+          }
+        } catch (e) {
+          /* defaults below */
+        }
+        if (!APPS.length) {
+          APPS = [
+            { id: "cot", name: "Shop thép cột", url: "https://cot.giahuy.net/", blurb: "PDF A1" },
+            { id: "mong", name: "Shop thép móng", url: "https://mong.giahuy.net/", blurb: "PDF / DXF" },
+            { id: "dam", name: "Shop thép dầm", url: "https://dam.giahuy.net/", blurb: "PDF A2" },
+          ];
+        }
+        if (!Object.keys(PLAN_PRICES).length) {
+          PLAN_PRICES = {
+            "3m": 249000, "6m": 449000, "1y": 799000, "2y": 1399000,
+            "3y": 1899000, "5y": 2799000, lifetime: 4999000,
+          };
+        }
+      }
+
+      async function loadPayConfig() {
+        try {
+          var res = await fetch("/thanh-vien/pay-config.json", { cache: "no-cache" });
+          if (!res.ok) return;
+          var c = await res.json();
+          var plan = selectedPlan || PLANS[0];
+          var price = PLAN_PRICES[plan.id] || 0;
+          els.payNote.innerHTML =
+            "<strong>Chuyển khoản:</strong> " +
+            (c.bank || "") +
+            " · STK <span class='mono'>" +
+            (c.account || "") +
+            "</span> · " +
+            (c.holder || "") +
+            "<br/><strong>Nội dung CK:</strong> <span class='mono'>GH TV " +
+            String(plan.id).toUpperCase() +
+            " email@cua.ban</span> · " +
+            money(price) +
+            (c.note ? "<br/>" + c.note : "");
+        } catch (e) {
+          els.payNote.textContent = "Sửa thanh-vien/pay-config.json để hiện STK.";
+        }
+      }
+
+      function ensureFrames() {
+        APPS.forEach(function (app) {
+          if (frames[app.id]) return;
+          var iframe = document.createElement("iframe");
+          iframe.title = app.name;
+          iframe.loading = "lazy";
+          iframe.referrerPolicy = "no-referrer-when-downgrade";
+          iframe.allow = "download";
+          iframe.dataset.app = app.id;
+          els.workspace.appendChild(iframe);
+          frames[app.id] = iframe;
+        });
+      }
+
+      function renderTabs() {
+        els.tabs.innerHTML = "";
+        APPS.forEach(function (app) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "tab" + (app.id === currentApp ? " active" : "");
+          btn.textContent = app.name;
+          btn.addEventListener("click", function () {
+            selectApp(app.id);
+          });
+          els.tabs.appendChild(btn);
+        });
+      }
+
+      function selectApp(id) {
+        currentApp = id;
+        renderTabs();
+        Object.keys(frames).forEach(function (key) {
+          var frame = frames[key];
+          var on = key === id;
+          frame.classList.toggle("active", on);
+          if (on && !frame.src) {
+            var app = APPS.find(function (a) { return a.id === key; });
+            if (app) frame.src = app.url;
+          }
+        });
+      }
+
+      function renderPlans() {
+        els.plans.innerHTML = "";
+        PLANS.forEach(function (plan, idx) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "plan" + (selectedPlan && selectedPlan.id === plan.id ? " selected" : idx === 0 && !selectedPlan ? " selected" : "");
+          if ((idx === 0 && !selectedPlan) || (selectedPlan && selectedPlan.id === plan.id)) selectedPlan = plan;
+          btn.innerHTML =
+            "<span class='name'>" +
+            plan.label +
+            "</span><span class='price'>" +
+            money(PLAN_PRICES[plan.id] || 0) +
+            "</span>";
+          btn.addEventListener("click", function () {
+            selectedPlan = plan;
+            renderPlans();
+            loadPayConfig();
+          });
+          els.plans.appendChild(btn);
+        });
+      }
+
+      function setChip(mode, access) {
+        els.chip.className = "chip";
+        if (mode === "member") {
+          els.chip.classList.add("ok");
+          els.chip.textContent = "Thành viên · " + GiaHuyMembership.formatExpiry(access.member);
+          els.btnPay.hidden = true;
+        } else if (mode === "trial") {
+          els.chip.classList.add("live");
+          els.chip.textContent =
+            "Dùng thử · " + GiaHuyMembership.formatTrialClock(access.trial.remainingSec);
+          els.btnPay.hidden = false;
+        } else if (mode === "trial_used") {
+          els.chip.classList.add("danger");
+          els.chip.textContent = "Hết lượt dùng thử";
+          els.btnPay.hidden = false;
+        } else {
+          els.chip.classList.add("danger");
+          els.chip.textContent = "Chưa mở khóa";
+          els.btnPay.hidden = false;
+        }
+      }
+
+      function showGate(msg) {
+        els.gate.hidden = false;
+        els.paywall.hidden = true;
+        showMsg(els.gateMsg, false, msg || "");
+        Object.keys(frames).forEach(function (k) {
+          frames[k].classList.remove("active");
+        });
+      }
+
+      function showPaywall(kind) {
+        els.gate.hidden = true;
+        els.paywall.hidden = false;
+        Object.keys(frames).forEach(function (k) {
+          frames[k].classList.remove("active");
+          // unload to reduce free continued use behind overlay
+          if (frames[k].src) frames[k].src = "about:blank";
+        });
+        if (kind === "trial_used") {
+          els.paywallTitle.textContent = "Đã hết 10 phút dùng thử";
+          els.paywallLead.textContent =
+            "Lượt dùng thử chỉ một lần trên trình duyệt này. Đăng ký thành viên theo quý / năm / vĩnh viễn để tiếp tục dùng cả ba tiện ích.";
+        } else {
+          els.paywallTitle.textContent = "Đăng ký thành viên để tiếp tục";
+          els.paywallLead.textContent =
+            "Chọn gói theo thời gian. Một mã mở khóa cả Cột, Móng và Dầm.";
+        }
+        renderPlans();
+        loadPayConfig();
+      }
+
+      function showWorkspace() {
+        els.gate.hidden = true;
+        els.paywall.hidden = true;
+        ensureFrames();
+        selectApp(currentApp);
+      }
+
+      async function refresh() {
+        var access = await GiaHuyMembership.canUseApps();
+        setChip(access.mode, access);
+        if (access.allowed) {
+          showWorkspace();
+          return access;
+        }
+        if (access.mode === "trial_used") showPaywall("trial_used");
+        else showGate("");
+        return access;
+      }
+
+      function startTicker() {
+        if (tickTimer) clearInterval(tickTimer);
+        tickTimer = setInterval(async function () {
+          var access = await GiaHuyMembership.canUseApps();
+          setChip(access.mode, access);
+          if (!access.allowed) {
+            clearInterval(tickTimer);
+            tickTimer = null;
+            if (access.mode === "trial_used") showPaywall("trial_used");
+            else showGate("");
+          }
+        }, 1000);
+      }
+
+      document.getElementById("btn-start-trial").addEventListener("click", async function () {
+        var member = await GiaHuyMembership.getStatus();
+        if (member.active) {
+          await refresh();
+          startTicker();
+          return;
+        }
+        var result = GiaHuyMembership.startTrial();
+        if (!result.ok) {
+          showMsg(els.gateMsg, false, result.error);
+          showPaywall("trial_used");
+          return;
+        }
+        await refresh();
+        startTicker();
+      });
+
+      document.getElementById("btn-have-code").addEventListener("click", function () {
+        showPaywall("manual");
+      });
+      els.btnPay.addEventListener("click", function () {
+        showPaywall("manual");
+      });
+
+      document.getElementById("btn-activate").addEventListener("click", async function () {
+        try {
+          var st = await GiaHuyMembership.activate(els.license.value);
+          showMsg(els.payMsg, true, "Kích hoạt thành công · " + GiaHuyMembership.formatExpiry(st));
+          await refresh();
+          startTicker();
+        } catch (e) {
+          showMsg(els.payMsg, false, (e && e.message) || "Không kích hoạt được.");
+        }
+      });
+
+      (async function init() {
+        await loadConfig();
+        ensureFrames();
+        renderTabs();
+        renderPlans();
+        var access = await refresh();
+        if (access.allowed) startTicker();
+      })();
+    })();
+  </script>
+</body>
+</html>
