@@ -8,9 +8,9 @@ Một mã thành viên (`GH1....`) mở khóa **Xuất PDF / CAD** trên cả 3 
 | Móng | https://mong.giahuy.net/ |
 | Dầm | https://dam.giahuy.net/ |
 
-CDN (repo này): https://cdn.giahuy.net/thanh-vien/
+CDN (repo này): https://xd.giahuy.net/thanh-vien/
 
-**Trang chủ dùng cả 3 tiện ích:** https://cdn.giahuy.net/hub/  
+**Trang chủ dùng cả 3 tiện ích:** https://xd.giahuy.net/hub/  
 Dùng thử 10 phút / 1 lần → hết giờ chọn gói 3 tháng · 6 tháng · 1 năm · 2 năm · 3 năm · 5 năm · vĩnh viễn.
 
 > **Repo đang Public?** Đọc [BAO-MAT.md](./BAO-MAT.md) — phải đổi `cot` / `mong` / `dam` sang **Private**, rồi gắn khóa Xuất PDF. Chỉ để Public thì người khác tải mã và bỏ khóa được.
@@ -18,8 +18,8 @@ Dùng thử 10 phút / 1 lần → hết giờ chọn gói 3 tháng · 6 tháng 
 ## Luồng hoạt động
 
 1. Khách chọn gói → chuyển khoản (STK trong `pay-config.json`).
-2. Bạn mở https://cdn.giahuy.net/thanh-vien/admin.html → import **private JWK** → tạo mã có hạn.
-3. Khách dán mã tại https://cdn.giahuy.net/thanh-vien/#kich-hoat (hoặc trong app sau khi tích hợp).
+2. Bạn mở https://xd.giahuy.net/thanh-vien/admin.html → import **private JWK** → tạo mã có hạn.
+3. Khách dán mã tại https://xd.giahuy.net/thanh-vien/#kich-hoat (hoặc trong app sau khi tích hợp).
 4. App gọi `GiaHuyMembership.requireActive()` trước khi xuất PDF.
 
 Mã được ký ECDSA P-256; app xác minh bằng `public-jwk.json` (công khai). **Private key không được commit lên GitHub.**
@@ -31,14 +31,14 @@ Agent hiện chỉ push được repo `Website`. Với mỗi app, thêm 2 chỗ:
 ### 1. Nạp script (HTML root)
 
 ```html
-<script src="https://cdn.giahuy.net/js/membership.js"></script>
+<script src="https://xd.giahuy.net/js/membership.js"></script>
 ```
 
 Có Worker (tuỳ chọn, chắc hơn):
 
 ```html
 <script
-  src="https://cdn.giahuy.net/js/membership.js"
+  src="https://xd.giahuy.net/js/membership.js"
   data-verify-url="https://giahuy-license-verify.xxx.workers.dev/verify"
 ></script>
 ```

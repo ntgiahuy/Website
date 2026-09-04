@@ -6,7 +6,7 @@
  * Chữ ký: ECDSA P-256 + SHA-256 (Web Crypto), xác minh bằng public JWK trên CDN.
  *
  * Cách dùng trong app:
- *   <script src="https://cdn.giahuy.net/js/membership.js"></script>
+ *   <script src="https://xd.giahuy.net/js/membership.js"></script>
  *   const ok = await GiaHuyMembership.requireActive({ feature: "Xuất PDF" });
  *   if (!ok) return;
  */
@@ -57,9 +57,9 @@
 
   var DEFAULT_PUBLIC_JWK = resolveAsset(
     "../thanh-vien/public-jwk.json",
-    "https://cdn.giahuy.net/thanh-vien/public-jwk.json"
+    "https://xd.giahuy.net/thanh-vien/public-jwk.json"
   );
-  var ACTIVATE_URL = resolveAsset("../thanh-vien/", "https://cdn.giahuy.net/thanh-vien/");
+  var ACTIVATE_URL = resolveAsset("../thanh-vien/", "https://xd.giahuy.net/thanh-vien/");
 
   var cachedJwk = null;
   var cachedKey = null;

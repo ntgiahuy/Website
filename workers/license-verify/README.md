@@ -23,7 +23,7 @@ Ghi lại URL dạng `https://giahuy-license-verify.<subdomain>.workers.dev`.
 
 ```html
 <script
-  src="https://cdn.giahuy.net/js/membership.js"
+  src="https://xd.giahuy.net/js/membership.js"
   data-verify-url="https://giahuy-license-verify.<subdomain>.workers.dev/verify"
 ></script>
 ```

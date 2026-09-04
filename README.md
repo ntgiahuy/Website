@@ -1,10 +1,10 @@
 # Website CDN — GiaHuy.Net
 
-Repo phục vụ file tĩnh tại **https://cdn.giahuy.net/** (GitHub Pages).
+Repo phục vụ file tĩnh tại **https://xd.giahuy.net/** (GitHub Pages).
 
 ## Trang chủ 3 tiện ích
 
-**https://cdn.giahuy.net/hub/**
+**https://xd.giahuy.net/hub/**
 
 - Nhúng Cột · Móng · Dầm trong một trang
 - Dùng thử **10 phút / 1 lần** mỗi trình duyệt
@@ -14,11 +14,11 @@ Repo phục vụ file tĩnh tại **https://cdn.giahuy.net/** (GitHub Pages).
 
 | Trang | Địa chỉ |
 |-------|---------|
-| Trang chủ hub | https://cdn.giahuy.net/hub/ |
-| Đăng ký / kích hoạt | https://cdn.giahuy.net/thanh-vien/ |
-| Admin tạo mã | https://cdn.giahuy.net/thanh-vien/admin.html |
-| Thư viện JS | https://cdn.giahuy.net/js/membership.js |
-| Bảng giá gói | https://cdn.giahuy.net/thanh-vien/plans.json |
+| Trang chủ hub | https://xd.giahuy.net/hub/ |
+| Đăng ký / kích hoạt | https://xd.giahuy.net/thanh-vien/ |
+| Admin tạo mã | https://xd.giahuy.net/thanh-vien/admin.html |
+| Thư viện JS | https://xd.giahuy.net/js/membership.js |
+| Bảng giá gói | https://xd.giahuy.net/thanh-vien/plans.json |
 | Hướng dẫn tích hợp | [thanh-vien/HUONG-DAN.md](thanh-vien/HUONG-DAN.md) |
 | Bảo mật Public/Private | [thanh-vien/BAO-MAT.md](thanh-vien/BAO-MAT.md) |
 

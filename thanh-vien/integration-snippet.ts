@@ -2,7 +2,7 @@
  * Mẫu tích hợp — dán logic này vào handler Xuất PDF của từng app.
  * App id: "cot" | "mong" | "dam"
  *
- * HTML: <script src="https://cdn.giahuy.net/js/membership.js"></script>
+ * HTML: <script src="https://xd.giahuy.net/js/membership.js"></script>
  */
 
 declare global {

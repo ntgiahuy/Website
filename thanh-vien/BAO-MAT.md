@@ -28,11 +28,11 @@ Sau bước này: không ai clone được mã shop thép từ GitHub nữa.
 
 ## Lớp 2 — Khóa nút Xuất PDF bằng thành viên (đã dựng trên CDN)
 
-1. Merge PR thành viên trên repo Website → có `cdn.giahuy.net/thanh-vien/` + `js/membership.js`
+1. Merge PR thành viên trên repo Website → có `xd.giahuy.net/thanh-vien/` + `js/membership.js`
 2. Trong mỗi app (repo Private), thêm:
 
 ```html
-<script src="https://cdn.giahuy.net/js/membership.js"></script>
+<script src="https://xd.giahuy.net/js/membership.js"></script>
 ```
 
 ```js
