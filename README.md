@@ -18,3 +18,5 @@ Một mã thành viên mở khóa **Xuất PDF / CAD** trên cả 3 tiện ích 
 | Hướng dẫn tích hợp | [thanh-vien/HUONG-DAN.md](thanh-vien/HUONG-DAN.md) |
 
 Sửa STK trong `thanh-vien/pay-config.json`. **Private key** chỉ giữ trên máy (Admin → Import) — không commit lên GitHub.
+
+**Repo `cot` / `mong` / `dam` đang Public:** phải đổi sang **Private** rồi gắn khóa Xuất PDF — xem [thanh-vien/BAO-MAT.md](thanh-vien/BAO-MAT.md). Worker mẫu: `workers/license-verify/`.

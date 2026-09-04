@@ -15,18 +15,27 @@
 
   var STORAGE_KEY = "giahuy.membership.v1";
   var ALL_APPS = ["cot", "mong", "dam"];
+  var scriptEl =
+    typeof document !== "undefined" && document.currentScript ? document.currentScript : null;
+  var VERIFY_URL =
+    (scriptEl && scriptEl.getAttribute("data-verify-url")) ||
+    ""; // ví dụ Cloudflare Worker /verify — xem workers/license-verify
 
   function resolveAsset(pathFromJsDir, absoluteFallback) {
     try {
-      if (typeof document !== "undefined" && document.currentScript) {
-        var override = document.currentScript.getAttribute("data-jwk");
+      if (scriptEl) {
+        var override = scriptEl.getAttribute("data-jwk");
         if (override && pathFromJsDir.indexOf("public-jwk") !== -1) return override;
-        var activateOverride = document.currentScript.getAttribute("data-activate-url");
-        if (activateOverride && pathFromJsDir.indexOf("thanh-vien") !== -1 && pathFromJsDir.indexOf("public-jwk") === -1) {
+        var activateOverride = scriptEl.getAttribute("data-activate-url");
+        if (
+          activateOverride &&
+          pathFromJsDir.indexOf("thanh-vien") !== -1 &&
+          pathFromJsDir.indexOf("public-jwk") === -1
+        ) {
           return activateOverride;
         }
-        if (document.currentScript.src) {
-          return new URL(pathFromJsDir, document.currentScript.src).href;
+        if (scriptEl.src) {
+          return new URL(pathFromJsDir, scriptEl.src).href;
         }
       }
     } catch (e) {
@@ -100,7 +109,7 @@
     return cachedKey;
   }
 
-  async function verifyLicense(raw, opts) {
+  async function verifyLicenseLocal(raw, opts) {
     opts = opts || {};
     var parsed = parseLicense(raw);
     var key = await loadPublicKey(opts.jwkUrl);
@@ -119,6 +128,46 @@
       throw err;
     }
     return parsed.payload;
+  }
+
+  /** Xác minh thêm trên server (Cloudflare Worker). Bắt buộc nếu cấu hình data-verify-url. */
+  async function verifyLicenseOnline(raw, opts) {
+    opts = opts || {};
+    var url = opts.verifyUrl || VERIFY_URL;
+    if (!url) return null;
+    var res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ license: raw, app: opts.app || null }),
+    });
+    var data = await res.json().catch(function () {
+      return null;
+    });
+    if (!res.ok || !data || !data.ok) {
+      var msg = (data && data.error) || "Máy chủ từ chối mã thành viên.";
+      var err = new Error(msg);
+      if (/hết hạn/i.test(msg)) err.code = "EXPIRED";
+      throw err;
+    }
+    return {
+      v: 1,
+      email: data.email || undefined,
+      plan: data.plan || undefined,
+      iat: data.iat,
+      exp: data.exp,
+      apps: data.apps || ["*"],
+    };
+  }
+
+  async function verifyLicense(raw, opts) {
+    opts = opts || {};
+    var localPayload = await verifyLicenseLocal(raw, opts);
+    var onlineUrl = opts.verifyUrl || VERIFY_URL;
+    if (onlineUrl) {
+      // Server là nguồn quyết định khi đã cấu hình Worker
+      return await verifyLicenseOnline(raw, opts);
+    }
+    return localPayload;
   }
 
   function readStored() {
@@ -260,6 +309,7 @@
     STORAGE_KEY: STORAGE_KEY,
     ALL_APPS: ALL_APPS,
     ACTIVATE_URL: ACTIVATE_URL,
+    VERIFY_URL: VERIFY_URL,
     activate: activate,
     clear: clear,
     getStatus: getStatus,
@@ -268,6 +318,8 @@
     coversApp: coversApp,
     formatExpiry: formatExpiry,
     verifyLicense: verifyLicense,
+    verifyLicenseLocal: verifyLicenseLocal,
+    verifyLicenseOnline: verifyLicenseOnline,
     bytesToB64url: bytesToB64url,
     b64urlToBytes: b64urlToBytes,
   };

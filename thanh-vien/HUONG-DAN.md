@@ -10,6 +10,8 @@ Một mã thành viên (`GH1....`) mở khóa **Xuất PDF / CAD** trên cả 3 
 
 CDN (repo này): https://cdn.giahuy.net/thanh-vien/
 
+> **Repo đang Public?** Đọc [BAO-MAT.md](./BAO-MAT.md) — phải đổi `cot` / `mong` / `dam` sang **Private**, rồi gắn khóa Xuất PDF. Chỉ để Public thì người khác tải mã và bỏ khóa được.
+
 ## Luồng hoạt động
 
 1. Khách chọn gói → chuyển khoản (STK trong `pay-config.json`).
@@ -27,6 +29,15 @@ Agent hiện chỉ push được repo `Website`. Với mỗi app, thêm 2 chỗ:
 
 ```html
 <script src="https://cdn.giahuy.net/js/membership.js"></script>
+```
+
+Có Worker (tuỳ chọn, chắc hơn):
+
+```html
+<script
+  src="https://cdn.giahuy.net/js/membership.js"
+  data-verify-url="https://giahuy-license-verify.xxx.workers.dev/verify"
+></script>
 ```
 
 - **cot** / **mong**: `index.html` (Vite)
@@ -69,11 +80,9 @@ Sửa `thanh-vien/pay-config.json` rồi commit/push:
 }
 ```
 
-## Bảo mật (thành thật)
+## Bảo mật
 
-- Repo GitHub công khai + app static: người am hiểu vẫn có thể bypass chặn phía client.
-- Mã ký số **chống làm giả mã**; không chống crack app.
-- Đủ tốt cho bán cho kỹ sư/văn phòng xây dựng. Muốn chắc hơn: thêm server kiểm tra license (Cloudflare Worker / Supabase) và cổng thanh toán tự động (PayOS / SePay).
+Chi tiết đầy đủ: **[BAO-MAT.md](./BAO-MAT.md)** và Worker mẫu `workers/license-verify/`.
 
 ## Kiểm tra nhanh
 
