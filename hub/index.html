@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GiaHuy.Net — Cột · Móng · Dầm</title>
+  <title>GIAHUYⓒ — Cột · Móng · Dầm</title>
   <meta name="description" content="Dùng thử 10 phút cả 3 tiện ích shop thép. Tiếp tục bằng thành viên theo quý / năm / vĩnh viễn." />
   <link rel="icon" href="/app/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -21,8 +21,9 @@
       --ok: #3ecf8e;
       --danger: #ff6b6b;
       --steel: #4a6d88;
-      --bar-h: 58px;
-      --tabs-h: 48px;
+      --bar-h: auto;
+      --tabs-h: 52px;
+      --header-gap: 0.75rem;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; }
@@ -39,12 +40,14 @@
     .shell {
       height: 100%;
       display: grid;
-      grid-template-rows: var(--bar-h) var(--tabs-h) 1fr;
+      grid-template-rows: auto auto 1fr;
+      row-gap: var(--header-gap);
     }
 
     .topbar {
       display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
-      padding: 0 1rem; border-bottom: 1px solid var(--line);
+      padding: 0.7rem 1rem 0.55rem;
+      border-bottom: 1px solid var(--line);
       background: rgba(8, 12, 16, 0.55); backdrop-filter: blur(10px);
     }
     .brand {
@@ -52,7 +55,15 @@
     }
     .brand img { width: 34px; height: 34px; border-radius: 8px; flex: none; }
     .brand strong {
-      font-size: 1.02rem; letter-spacing: -0.02em; display: block; line-height: 1.15;
+      font-size: 1.08rem; letter-spacing: 0.04em; display: block; line-height: 1.05;
+      font-weight: 800;
+    }
+    .brand .mark {
+      font-size: 0.5em;
+      vertical-align: top;
+      line-height: 1;
+      margin-left: 0.06em;
+      font-weight: 700;
     }
     .brand span { color: var(--muted); font-size: 0.72rem; }
     .top-actions { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; justify-content: flex-end; }
@@ -81,8 +92,13 @@
     .btn-sm { padding: 0.4rem 0.7rem; font-size: 0.88rem; }
 
     .tabs {
-      display: flex; gap: 0.25rem; padding: 0.35rem 0.75rem;
-      border-bottom: 1px solid var(--line); background: rgba(0,0,0,0.18);
+      display: flex; gap: 0.35rem; align-items: center;
+      min-height: var(--tabs-h);
+      padding: 0.45rem 0.75rem;
+      margin: 0 0.35rem;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(0,0,0,0.22);
       overflow-x: auto;
     }
     .tab {
@@ -191,7 +207,7 @@
       <a class="brand" href="./">
         <img src="/app/android-icon-96x96.png" width="34" height="34" alt="" />
         <div>
-          <strong>GiaHuy.Net</strong>
+          <strong>GIAHUY<span class="mark">ⓒ</span></strong>
           <span>Cột · Móng · Dầm — một trang dùng cả ba</span>
         </div>
       </a>
@@ -228,7 +244,6 @@
             <textarea id="license" placeholder="GH1.xxxxx.yyyyy" spellcheck="false"></textarea>
             <div class="cta-row">
               <button type="button" class="btn btn-primary" id="btn-activate">Kích hoạt mã</button>
-              <a class="btn btn-ghost" href="/thanh-vien/admin.html" target="_blank" rel="noopener">Admin tạo mã</a>
               <button type="button" class="btn btn-ghost" id="btn-retry-trial" hidden>Thử lại dùng thử</button>
             </div>
             <p class="msg" id="pay-msg" hidden></p>
