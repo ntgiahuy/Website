@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Thành viên GiaHuy.Net — Cột · Móng · Dầm</title>
+  <title>Thành viên GIAHUY — Móng · Cột · Dầm</title>
   <meta name="description" content="Đăng ký thành viên theo thời gian để dùng Xuất PDF / CAD trên cot, mong, dam.giahuy.net" />
   <link rel="icon" href="/app/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -36,20 +36,65 @@
     a { color: var(--amber); }
     .wrap { width: min(100% - 2rem, var(--max)); margin: 0 auto; }
     .nav {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 1.1rem 0; border-bottom: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      padding: 1rem 0 1.05rem;
+      border-bottom: 1px solid var(--line);
     }
     .brand {
       display: flex; align-items: center; gap: 0.7rem; text-decoration: none; color: inherit;
+      min-width: 0;
     }
-    .brand img { width: 40px; height: 40px; border-radius: 8px; }
-    .brand strong { font-size: 1.05rem; letter-spacing: -0.02em; display: block; }
-    .brand span { color: var(--muted); font-size: 0.78rem; }
-    .nav-links { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .brand img { width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0; }
+    .brand strong {
+      font-size: 1.12rem; letter-spacing: 0.04em; display: block; line-height: 1.15;
+    }
+    .brand .mark {
+      font-size: 0.5em; vertical-align: top; margin-left: 0.08em; opacity: 0.85;
+    }
+    .brand span { color: var(--muted); font-size: 0.78rem; display: block; margin-top: 0.12rem; }
+    .nav-links {
+      display: flex;
+      gap: 0.35rem;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      margin: 0 -0.15rem;
+      padding: 0.1rem 0.15rem;
+    }
+    .nav-links::-webkit-scrollbar { display: none; }
     .nav-links a {
-      color: var(--muted); text-decoration: none; font-size: 0.9rem; padding: 0.35rem 0.55rem;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.84rem;
+      font-weight: 600;
+      padding: 0.42rem 0.72rem;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
     }
-    .nav-links a:hover { color: var(--ink); }
+    .nav-links a:hover {
+      color: var(--ink);
+      border-color: var(--line);
+      background: rgba(255,255,255,0.04);
+    }
+    @media (min-width: 720px) {
+      .nav {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.25rem;
+      }
+      .nav-links {
+        flex-wrap: wrap;
+        overflow: visible;
+        justify-content: flex-end;
+      }
+    }
 
     .hero {
       padding: 3.2rem 0 2.4rem;
@@ -174,19 +219,18 @@
 <body>
   <div class="wrap">
     <header class="nav">
-      <a class="brand" href="./">
+      <a class="brand" href="/hub/">
         <img src="/app/android-icon-96x96.png" alt="" width="40" height="40" />
         <div>
-          <strong>GiaHuy.Net</strong>
-          <span>Thành viên · 3 tiện ích thép</span>
+          <strong>GIAHUY<span class="mark">ⓒ</span></strong>
+          <span>Thành viên · Móng · Cột · Dầm</span>
         </div>
       </a>
-      <nav class="nav-links">
+      <nav class="nav-links" aria-label="Mục trang">
         <a href="#goi">Gói</a>
         <a href="#kich-hoat">Kích hoạt</a>
         <a href="#bao-mat">Bảo mật</a>
         <a href="#huong-dan">Hướng dẫn</a>
-        
       </nav>
     </header>
 
@@ -340,7 +384,7 @@
     </section>
 
     <footer>
-      <p>GiaHuy.Net · Nhật Nguyễn · Thành viên khóa tính năng xuất bản vẽ theo thời hạn mã.</p>
+      <p>GIAHUY · Nhật Nguyễn · Thành viên khóa tính năng xuất bản vẽ theo thời hạn mã.</p>
       <p>
         Tích hợp: <a href="./HUONG-DAN.md">HUONG-DAN.md</a> ·
         Bảo mật Public/Private: <a href="./BAO-MAT.md">BAO-MAT.md</a> ·
