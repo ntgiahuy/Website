@@ -157,7 +157,12 @@
       }
 
       async function importPriv(jwk) {
-        if (!jwk || jwk.kty !== "EC" || !jwk.d) throw new Error("Private JWK không hợp lệ (cần trường d).");
+        if (!jwk || jwk.kty !== "EC") throw new Error("Private JWK không hợp lệ (cần kty=EC).");
+        if (!jwk.d) {
+          throw new Error(
+            "Đây là public key (thiếu trường d). Hãy dán private JWK — file có trường \"d\", không dùng public-jwk.json."
+          );
+        }
         privateCryptoKey = await crypto.subtle.importKey(
           "jwk",
           jwk,
