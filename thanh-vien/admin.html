@@ -70,6 +70,8 @@
         <button type="button" class="btn ghost" id="btn-import">Import &amp; lưu local</button>
         <button type="button" class="btn ghost" id="btn-check-cdn">Đối chiếu CDN</button>
         <button type="button" class="btn ghost" id="btn-gen-keypair">Tạo cặp khóa mới</button>
+        <button type="button" class="btn ghost" id="btn-dl-private" hidden>Tải file private</button>
+        <button type="button" class="btn ghost" id="btn-dl-public" hidden>Tải file public (cập nhật server)</button>
         <button type="button" class="btn ghost" id="btn-clear-priv">Xóa private trên máy</button>
       </div>
       <p class="msg" id="key-msg"></p>
@@ -182,11 +184,22 @@
         return cdn;
       }
 
-      async function importPriv(jwk) {
+      var lastPublicJwk = null;
+
+      function showDownloadButtons(show) {
+        document.getElementById("btn-dl-private").hidden = !show;
+        document.getElementById("btn-dl-public").hidden = !show;
+      }
+
+      async function importPriv(jwk, opts) {
+        opts = opts || {};
         if (!jwk || jwk.kty !== "EC") throw new Error("Private JWK không hợp lệ (cần kty=EC).");
         if (!jwk.d) {
           throw new Error(
-            "Đây là public key (thiếu trường d). Hãy dán private JWK — file có trường \"d\", không dùng public-jwk.json."
+            "Đây là PUBLIC key (thiếu trường \"d\").\n" +
+              "• Nếu vừa «Tạo cặp khóa mới»: đừng chọn file public — private đã được nạp sẵn trong ô.\n" +
+              "• File đúng tên thường có chữ private và bên trong có \"d\".\n" +
+              "• Không dùng public-jwk.json / file public."
           );
         }
         privateCryptoKey = await crypto.subtle.importKey(
@@ -197,16 +210,28 @@
           ["sign"]
         );
         importedPrivJwk = jwk;
+        lastPublicJwk = publicFromPrivate(jwk);
         localStorage.setItem(PRIV_STORE, JSON.stringify(jwk));
         privEl.value = JSON.stringify(jwk);
-        var pub = publicFromPrivate(jwk);
         pubPreview.hidden = false;
-        pubPreview.textContent = "Public suy ra từ private (phải trùng public-jwk.json):\n" + JSON.stringify(pub);
+        pubPreview.textContent =
+          "Public suy ra từ private (phải trùng thanh-vien/public-jwk.json trên server):\n" +
+          JSON.stringify(lastPublicJwk, null, 2);
+        showDownloadButtons(true);
+        if (opts.skipCdnCheck) {
+          setKeyMsg(
+            true,
+            "Đã nạp PRIVATE key mới vào máy này.\n" +
+              "Bước tiếp: bấm «Tải file public» → thay nội dung thanh-vien/public-jwk.json trên GitHub → deploy.\n" +
+              "Sau đó bấm «Đối chiếu CDN». Chỉ tạo mã khi đã khớp CDN."
+          );
+          return;
+        }
         try {
           await assertMatchesCdn(jwk);
-          setKeyMsg(true, "Đã import private key · khớp public-jwk.json trên CDN.");
+          setKeyMsg(true, "Đã import private key · khớp public-jwk.json trên CDN · có thể Tạo mã.");
         } catch (err) {
-          setKeyMsg(false, "Đã import private, nhưng " + err.message);
+          setKeyMsg(false, "Đã import private, nhưng chưa tạo mã được:\n" + err.message);
         }
       }
 
@@ -214,7 +239,16 @@
         var f = e.target.files && e.target.files[0];
         if (!f) return;
         try {
-          await importPriv(JSON.parse(await f.text()));
+          var name = (f.name || "").toLowerCase();
+          var text = await f.text();
+          var jwk = JSON.parse(text);
+          if (!jwk.d || /public/.test(name)) {
+            throw new Error(
+              "Bạn đang chọn file PUBLIC (thiếu \"d\" hoặc tên có chữ public).\n" +
+                "Hãy chọn file private, hoặc bấm «Tạo cặp khóa mới» để hệ thống tự nạp private."
+            );
+          }
+          await importPriv(jwk);
         } catch (err) {
           setKeyMsg(false, err.message || "Không đọc được file.");
         }
@@ -242,23 +276,47 @@
         localStorage.removeItem(PRIV_STORE);
         privateCryptoKey = null;
         importedPrivJwk = null;
+        lastPublicJwk = null;
         privEl.value = "";
         pubPreview.hidden = true;
+        showDownloadButtons(false);
         setKeyMsg(false, "Đã xóa private key khỏi máy này.");
       });
 
       document.getElementById("btn-gen-keypair").addEventListener("click", async function () {
         var ok = confirm(
-          "Tạo cặp khóa MỚI sẽ làm mã cũ hết hiệu lực nếu bạn thay public-jwk.json trên server.\n\n" +
-            "Sau khi tải file, bạn PHẢI commit public mới lên thanh-vien/public-jwk.json rồi deploy.\n\nTiếp tục?"
+          "Tạo cặp khóa MỚI:\n" +
+            "1) Private được nạp sẵn trên máy (không cần chọn file).\n" +
+            "2) Bạn phải cập nhật public-jwk.json trên server, nếu không sẽ lỗi chữ ký.\n" +
+            "3) Mã cũ sẽ hết hiệu lực sau khi đổi public trên server.\n\nTiếp tục?"
         );
         if (!ok) return;
         var kp = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
         var priv = await crypto.subtle.exportKey("jwk", kp.privateKey);
         var pub = await crypto.subtle.exportKey("jwk", kp.publicKey);
-        downloadJson("giahuy-membership-private-jwk.json", priv);
-        downloadJson("giahuy-membership-public-jwk.json", pub);
-        await importPriv(priv);
+        if (!priv || !priv.d) {
+          setKeyMsg(false, "Trình duyệt không xuất được private key (thiếu d). Thử trình duyệt khác hoặc Safari bản mới.");
+          return;
+        }
+        lastPublicJwk = {
+          key_ops: ["verify"],
+          ext: true,
+          kty: pub.kty,
+          x: pub.x,
+          y: pub.y,
+          crv: pub.crv,
+        };
+        // Chỉ nạp private vào form — không tự tải 2 file (trên mobile dễ chọn nhầm public)
+        await importPriv(priv, { skipCdnCheck: true });
+      });
+
+      document.getElementById("btn-dl-private").addEventListener("click", function () {
+        if (!importedPrivJwk) return;
+        downloadJson("giahuy-membership-private-jwk.json", importedPrivJwk);
+      });
+      document.getElementById("btn-dl-public").addEventListener("click", function () {
+        if (!lastPublicJwk) return;
+        downloadJson("public-jwk.json", lastPublicJwk);
       });
 
       document.getElementById("plan").addEventListener("change", function () {
