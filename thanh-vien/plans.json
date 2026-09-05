@@ -7,7 +7,6 @@
     { "id": "1y", "label": "1 năm", "days": 365, "price": 799000 },
     { "id": "2y", "label": "2 năm", "days": 730, "price": 1399000 },
     { "id": "3y", "label": "3 năm", "days": 1095, "price": 1899000 },
-    { "id": "5y", "label": "5 năm", "days": 1825, "price": 2799000 },
     { "id": "lifetime", "label": "Vĩnh viễn", "days": 36500, "price": 4999000 }
   ],
   "apps": [

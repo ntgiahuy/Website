@@ -74,9 +74,9 @@ Sửa `thanh-vien/pay-config.json` rồi commit/push:
 
 ```json
 {
-  "bank": "Vietcombank",
-  "account": "0123456789",
-  "holder": "NGUYEN NHAT",
+  "bank": "Sacombank",
+  "account": "0362118138",
+  "holder": "NGUYEN THANH NHAT",
   "note": "Nội dung CK: GH TV + gói + email",
   "email": "nhatxd@icloud.com",
   "zalo": ""

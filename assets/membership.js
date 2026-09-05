@@ -23,7 +23,6 @@
     { id: "1y", label: "1 năm", days: 365 },
     { id: "2y", label: "2 năm", days: 730 },
     { id: "3y", label: "3 năm", days: 1095 },
-    { id: "5y", label: "5 năm", days: 1825 },
     { id: "lifetime", label: "Vĩnh viễn", days: 36500 },
   ];
   var scriptEl =
