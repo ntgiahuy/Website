@@ -110,11 +110,16 @@
       </div>
       <div class="row">
         <button type="button" class="btn" id="btn-issue">Tạo mã</button>
+        <button type="button" class="btn ghost" id="btn-send">Gửi mã</button>
         <button type="button" class="btn ghost" id="btn-copy">Copy mã</button>
       </div>
       <label for="out">Mã thành viên</label>
       <textarea id="out" readonly placeholder="GH1...."></textarea>
       <p class="msg" id="issue-msg"></p>
+      <p class="lead" style="margin:0.55rem 0 0;font-size:0.85rem">
+        <strong>Gửi mã:</strong> nhập email khách → Tạo mã → Gửi mã (mở app Mail trên máy, bạn bấm Send).
+        Muốn gửi tự động không mở Mail cần dịch vụ email (EmailJS / Cloudflare Worker).
+      </p>
     </section>
 
     <section class="panel">
@@ -385,6 +390,66 @@
         if (!outEl.value) return;
         await navigator.clipboard.writeText(outEl.value);
         setIssueMsg(true, "Đã copy mã vào clipboard.");
+      });
+
+      document.getElementById("btn-send").addEventListener("click", function () {
+        var email = document.getElementById("email").value.trim();
+        var license = outEl.value.trim();
+        var planEl = document.getElementById("plan");
+        var planLabel = planEl.selectedOptions[0]
+          ? planEl.selectedOptions[0].textContent
+          : planEl.value;
+        if (!email) {
+          setIssueMsg(false, "Nhập email khách trước khi gửi.");
+          document.getElementById("email").focus();
+          return;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          setIssueMsg(false, "Email khách không hợp lệ.");
+          document.getElementById("email").focus();
+          return;
+        }
+        if (!license) {
+          setIssueMsg(false, "Chưa có mã — bấm Tạo mã trước.");
+          return;
+        }
+        var expText = "";
+        try {
+          var mid = license.split(".")[1];
+          if (mid) {
+            var json = JSON.parse(
+              new TextDecoder().decode(GiaHuyMembership.b64urlToBytes(mid))
+            );
+            if (json && json.exp) {
+              expText = new Date(json.exp * 1000).toLocaleString("vi-VN");
+            }
+          }
+        } catch (e) {
+          /* optional */
+        }
+        var subject = "Mã thành viên GIAHUY — " + planLabel;
+        var body =
+          "Xin chào,\n\n" +
+          "Mã thành viên GIAHUY của bạn:\n\n" +
+          license +
+          "\n\n" +
+          "Gói: " +
+          planLabel +
+          (expText ? "\nHết hạn: " + expText : "") +
+          "\n\nCách kích hoạt:\n" +
+          "1) Mở https://xd.giahuy.net/thanh-vien/#kich-hoat\n" +
+          "2) Dán mã → bấm Kích hoạt\n" +
+          "3) Vào https://xd.giahuy.net/hub/ để dùng Móng / Cột / Dầm\n\n" +
+          "Trân trọng,\nGIAHUY";
+        var href =
+          "mailto:" +
+          encodeURIComponent(email) +
+          "?subject=" +
+          encodeURIComponent(subject) +
+          "&body=" +
+          encodeURIComponent(body);
+        window.location.href = href;
+        setIssueMsg(true, "Đã mở app Mail tới " + email + " — kiểm tra rồi bấm Gửi.");
       });
 
       try {
