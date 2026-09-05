@@ -38,7 +38,7 @@
       border-radius: 10px; padding: 0.7rem 1rem; background: var(--amber); color: #1a1203;
     }
     .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
-    .msg { margin-top: 0.75rem; font-size: 0.9rem; }
+    .msg { margin-top: 0.75rem; font-size: 0.9rem; white-space: pre-wrap; }
     .msg.ok { color: var(--ok); }
     .msg.bad { color: var(--danger); }
     .mono { font-family: "IBM Plex Mono", monospace; word-break: break-all; font-size: 0.82rem; }
@@ -53,20 +53,22 @@
   <div class="wrap">
     <p><a href="./">← Trang thành viên</a></p>
     <h1>Admin · Tạo mã thành viên</h1>
-    <p class="lead">Khóa riêng (private JWK) chỉ lưu trên máy bạn — không đưa lên GitHub. Khóa công khai đã nằm trong <span class="mono">public-jwk.json</span>.</p>
+    <p class="lead">Private JWK chỉ lưu trên máy bạn. Public key trên server: <span class="mono">thanh-vien/public-jwk.json</span> — phải khớp nhau.</p>
 
     <div class="warn">
-      Lần đầu: tải file private JWK do hệ thống cấp (hoặc tạo cặp khóa mới), rồi <strong>Import</strong> vào đây.
-      Giữ file private offline. Ai có private key đều tạo được mã thành viên.
+      <strong>Lỗi “Chữ ký không hợp lệ”</strong> thường do private trên máy <em>không khớp</em> public-jwk.json trên CDN
+      (ví dụ đã bấm “Tạo cặp khóa mới” nhưng chưa cập nhật public lên server).
+      Hãy <strong>Xóa private</strong> → dán lại private gốc → Import, rồi tạo mã.
     </div>
 
     <section class="panel">
       <h2>1. Private key</h2>
-      <label for="priv">Dán nội dung private JWK hoặc chọn file</label>
+      <label for="priv">Dán private JWK (có trường "d") — không dán public-jwk.json</label>
       <textarea id="priv" placeholder='{"kty":"EC","crv":"P-256","d":"...","x":"...","y":"..."}'></textarea>
       <div class="row">
         <input type="file" id="priv-file" accept="application/json,.json" />
         <button type="button" class="btn ghost" id="btn-import">Import &amp; lưu local</button>
+        <button type="button" class="btn ghost" id="btn-check-cdn">Đối chiếu CDN</button>
         <button type="button" class="btn ghost" id="btn-gen-keypair">Tạo cặp khóa mới</button>
         <button type="button" class="btn ghost" id="btn-clear-priv">Xóa private trên máy</button>
       </div>
@@ -102,7 +104,7 @@
         </div>
         <div>
           <label for="note">Ghi chú nội bộ (không nhúng vào mã)</label>
-          <input id="note" type="text" placeholder="Đã CK 249k · 04/09" />
+          <input id="note" type="text" placeholder="Da CK 249k - 04/09" />
         </div>
       </div>
       <div class="row">
@@ -116,13 +118,13 @@
 
     <section class="panel">
       <h2>3. Cấu hình thanh toán công khai</h2>
-      <p class="lead" style="margin-top:0">Sửa <span class="mono">pay-config.json</span> trên repo rồi commit — trang thành viên sẽ hiển thị STK.</p>
+      <p class="lead" style="margin-top:0">Sửa <span class="mono">pay-config.json</span> trên repo rồi commit.</p>
       <pre class="mono" style="white-space:pre-wrap;margin:0">{
   "bank": "Vietcombank",
   "account": "…",
   "holder": "NGUYEN NHAT",
-  "note": "Nội dung CK: GH TV + gói + email",
-  "email": "nhatxd@icloud.com"
+  "note": "Noi dung CK: GH TV + goi + email",
+  "email": "nhatxd (at) icloud.com"
 }</pre>
     </section>
   </div>
@@ -131,12 +133,14 @@
   <script>
     (function () {
       var PRIV_STORE = "giahuy.membership.admin.privateJwk";
+      var CDN_PUB = "/thanh-vien/public-jwk.json";
       var privEl = document.getElementById("priv");
       var outEl = document.getElementById("out");
       var keyMsg = document.getElementById("key-msg");
       var issueMsg = document.getElementById("issue-msg");
       var pubPreview = document.getElementById("pub-preview");
       var privateCryptoKey = null;
+      var importedPrivJwk = null;
 
       function setKeyMsg(ok, text) {
         keyMsg.className = "msg " + (ok ? "ok" : "bad");
@@ -147,6 +151,10 @@
         issueMsg.textContent = text;
       }
 
+      function publicFromPrivate(jwk) {
+        return { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, ext: true, key_ops: ["verify"] };
+      }
+
       function downloadJson(filename, obj) {
         var blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
         var a = document.createElement("a");
@@ -154,6 +162,24 @@
         a.download = filename;
         a.click();
         URL.revokeObjectURL(a.href);
+      }
+
+      async function fetchCdnPublic() {
+        var res = await fetch(CDN_PUB, { cache: "no-store" });
+        if (!res.ok) throw new Error("Không tải được " + CDN_PUB + " từ server.");
+        return res.json();
+      }
+
+      async function assertMatchesCdn(jwk) {
+        var cdn = await fetchCdnPublic();
+        if (cdn.x !== jwk.x || cdn.y !== jwk.y || (cdn.crv || "P-256") !== (jwk.crv || "P-256")) {
+          throw new Error(
+            "Private trên máy KHÔNG KHỚP public-jwk.json trên server.\n" +
+              "→ Bấm «Xóa private trên máy», dán lại private gốc rồi Import.\n" +
+              "→ Hoặc nếu cố ý dùng cặp khóa mới: commit public mới vào thanh-vien/public-jwk.json rồi deploy."
+          );
+        }
+        return cdn;
       }
 
       async function importPriv(jwk) {
@@ -170,20 +196,25 @@
           false,
           ["sign"]
         );
+        importedPrivJwk = jwk;
         localStorage.setItem(PRIV_STORE, JSON.stringify(jwk));
         privEl.value = JSON.stringify(jwk);
-        var pub = { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y, ext: true, key_ops: ["verify"] };
+        var pub = publicFromPrivate(jwk);
         pubPreview.hidden = false;
-        pubPreview.textContent = "Public JWK (đối chiếu với public-jwk.json trên CDN):\n" + JSON.stringify(pub);
-        setKeyMsg(true, "Đã import private key trên máy này.");
+        pubPreview.textContent = "Public suy ra từ private (phải trùng public-jwk.json):\n" + JSON.stringify(pub);
+        try {
+          await assertMatchesCdn(jwk);
+          setKeyMsg(true, "Đã import private key · khớp public-jwk.json trên CDN.");
+        } catch (err) {
+          setKeyMsg(false, "Đã import private, nhưng " + err.message);
+        }
       }
 
       document.getElementById("priv-file").addEventListener("change", async function (e) {
         var f = e.target.files && e.target.files[0];
         if (!f) return;
         try {
-          var text = await f.text();
-          await importPriv(JSON.parse(text));
+          await importPriv(JSON.parse(await f.text()));
         } catch (err) {
           setKeyMsg(false, err.message || "Không đọc được file.");
         }
@@ -197,9 +228,20 @@
         }
       });
 
+      document.getElementById("btn-check-cdn").addEventListener("click", async function () {
+        try {
+          if (!importedPrivJwk) throw new Error("Chưa import private key.");
+          await assertMatchesCdn(importedPrivJwk);
+          setKeyMsg(true, "Khớp CDN · có thể tạo mã.");
+        } catch (err) {
+          setKeyMsg(false, err.message || "Đối chiếu thất bại.");
+        }
+      });
+
       document.getElementById("btn-clear-priv").addEventListener("click", function () {
         localStorage.removeItem(PRIV_STORE);
         privateCryptoKey = null;
+        importedPrivJwk = null;
         privEl.value = "";
         pubPreview.hidden = true;
         setKeyMsg(false, "Đã xóa private key khỏi máy này.");
@@ -207,7 +249,8 @@
 
       document.getElementById("btn-gen-keypair").addEventListener("click", async function () {
         var ok = confirm(
-          "Tạo cặp khóa MỚI sẽ làm các mã cũ (ký bằng khóa cũ) hết hiệu lực xác minh nếu bạn thay public-jwk.json.\n\nTiếp tục?"
+          "Tạo cặp khóa MỚI sẽ làm mã cũ hết hiệu lực nếu bạn thay public-jwk.json trên server.\n\n" +
+            "Sau khi tải file, bạn PHẢI commit public mới lên thanh-vien/public-jwk.json rồi deploy.\n\nTiếp tục?"
         );
         if (!ok) return;
         var kp = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
@@ -216,10 +259,6 @@
         downloadJson("giahuy-membership-private-jwk.json", priv);
         downloadJson("giahuy-membership-public-jwk.json", pub);
         await importPriv(priv);
-        setKeyMsg(
-          true,
-          "Đã tải private + public. Hãy commit file public vào thanh-vien/public-jwk.json rồi deploy CDN."
-        );
       });
 
       document.getElementById("plan").addEventListener("change", function () {
@@ -229,7 +268,9 @@
 
       document.getElementById("btn-issue").addEventListener("click", async function () {
         try {
-          if (!privateCryptoKey) throw new Error("Chưa import private key.");
+          if (!privateCryptoKey || !importedPrivJwk) throw new Error("Chưa import private key.");
+          await assertMatchesCdn(importedPrivJwk);
+
           var days = Number(document.getElementById("days").value);
           if (!days || days < 1) throw new Error("Số ngày không hợp lệ.");
           var now = Math.floor(Date.now() / 1000);
@@ -244,20 +285,39 @@
           var payloadB64 = GiaHuyMembership.bytesToB64url(
             new TextEncoder().encode(JSON.stringify(payload))
           );
-          var sig = await crypto.subtle.sign(
+          var sigBuf = await crypto.subtle.sign(
             { name: "ECDSA", hash: "SHA-256" },
             privateCryptoKey,
             new TextEncoder().encode(payloadB64)
           );
-          var license = "GH1." + payloadB64 + "." + GiaHuyMembership.bytesToB64url(new Uint8Array(sig));
-          // self-check
+          var sigBytes = new Uint8Array(sigBuf);
+          var license = "GH1." + payloadB64 + "." + GiaHuyMembership.bytesToB64url(sigBytes);
+
+          // Self-check với public suy ra từ private (không phụ thuộc CDN)
+          var localPub = await crypto.subtle.importKey(
+            "jwk",
+            publicFromPrivate(importedPrivJwk),
+            { name: "ECDSA", namedCurve: "P-256" },
+            false,
+            ["verify"]
+          );
+          var localOk = await crypto.subtle.verify(
+            { name: "ECDSA", hash: "SHA-256" },
+            localPub,
+            sigBytes,
+            new TextEncoder().encode(payloadB64)
+          );
+          if (!localOk) throw new Error("Ký local thất bại — private JWK có thể hỏng.");
+
+          // Kiểm tra đường xác minh thật (CDN public)
           await GiaHuyMembership.verifyLicense(license);
+
           outEl.value = license;
           setIssueMsg(
             true,
             "Đã tạo mã · hết hạn " +
               new Date(payload.exp * 1000).toLocaleString("vi-VN") +
-              " · đã tự kiểm tra chữ ký OK"
+              " · chữ ký OK"
           );
         } catch (err) {
           setIssueMsg(false, err.message || "Không tạo được mã.");
@@ -270,7 +330,6 @@
         setIssueMsg(true, "Đã copy mã vào clipboard.");
       });
 
-      // restore
       try {
         var saved = localStorage.getItem(PRIV_STORE);
         if (saved) importPriv(JSON.parse(saved));
