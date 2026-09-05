@@ -12,22 +12,36 @@
   ],
   "apps": [
     {
-      "id": "cot",
-      "name": "Shop thép cột",
-      "url": "https://cot.giahuy.net/",
-      "blurb": "Tầng · tiết diện · xuất PDF A1"
-    },
-    {
       "id": "mong",
       "name": "Shop thép móng",
       "url": "https://mong.giahuy.net/",
       "blurb": "Móng đơn · PDF / DXF"
     },
     {
+      "id": "cot",
+      "name": "Shop thép cột",
+      "url": "https://cot.giahuy.net/",
+      "blurb": "Tầng · tiết diện · xuất PDF A1"
+    },
+    {
       "id": "dam",
       "name": "Shop thép dầm",
       "url": "https://dam.giahuy.net/",
       "blurb": "Nhịp · gối · xuất PDF A2"
+    },
+    {
+      "id": "san",
+      "name": "Shop thép sàn",
+      "url": "",
+      "blurb": "Sắp ra mắt",
+      "comingSoon": true
+    },
+    {
+      "id": "vach",
+      "name": "Shop thép vách",
+      "url": "",
+      "blurb": "Sắp ra mắt",
+      "comingSoon": true
     }
   ]
 }

@@ -121,12 +121,40 @@
       color: #1a1203; background: var(--amber);
       animation: tabIn 0.28s ease;
     }
+    .tab.soon {
+      opacity: 0.72;
+    }
+    .tab.soon .soon-tag {
+      margin-left: 0.35rem;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: inherit;
+      opacity: 0.85;
+    }
+    .tab.active.soon .soon-tag { opacity: 0.75; }
     @keyframes tabIn {
       from { transform: translateY(3px); opacity: 0.6; }
       to { transform: none; opacity: 1; }
     }
 
     .workspace { position: relative; min-height: 0; background: #070b10; }
+    .soon-panel {
+      display: none;
+      height: 100%;
+      place-items: center;
+      padding: 1.5rem;
+      text-align: center;
+      color: var(--muted);
+      background:
+        radial-gradient(520px 280px at 50% 30%, rgba(232,163,23,0.08), transparent 65%),
+        #070b10;
+    }
+    .soon-panel.active { display: grid; }
+    .soon-panel h2 {
+      margin: 0 0 0.45rem; color: var(--ink); font-size: 1.35rem; letter-spacing: -0.02em;
+    }
+    .soon-panel p { margin: 0; max-width: 28ch; }
     .workspace iframe {
       width: 100%; height: 100%; border: 0; background: #111;
       display: none;
@@ -221,7 +249,7 @@
           <img src="/app/android-icon-96x96.png" width="34" height="34" alt="" />
           <div>
             <strong>GIAHUY<span class="mark">ⓒ</span></strong>
-            <span>Cột · Móng · Dầm — một trang dùng cả ba</span>
+            <span>Móng · Cột · Dầm · Sàn · Vách</span>
           </div>
         </a>
         <span class="chip" id="status-chip">Đang kiểm tra…</span>
@@ -237,6 +265,12 @@
     <nav class="tabs" id="tabs" aria-label="Chọn tiện ích"></nav>
 
     <main class="workspace" id="workspace">
+      <div class="soon-panel" id="soon-panel" aria-live="polite">
+        <div>
+          <h2 id="soon-title">Sắp ra mắt</h2>
+          <p id="soon-blurb">Tiện ích này đang được bổ sung. Hiện dùng được Móng, Cột và Dầm.</p>
+        </div>
+      </div>
       <div class="gate" id="gate">
         <div class="card">
           <h1>Dùng thử 10 phút — một lần</h1>
@@ -276,7 +310,7 @@
       var PLANS = GiaHuyMembership.PLANS.slice();
       var PLAN_PRICES = {};
       var selectedPlan = null;
-      var currentApp = "cot";
+      var currentApp = "mong";
       var tickTimer = null;
       var frames = {};
 
@@ -324,9 +358,11 @@
         }
         if (!APPS.length) {
           APPS = [
-            { id: "cot", name: "Shop thép cột", url: "https://cot.giahuy.net/", blurb: "PDF A1" },
             { id: "mong", name: "Shop thép móng", url: "https://mong.giahuy.net/", blurb: "PDF / DXF" },
+            { id: "cot", name: "Shop thép cột", url: "https://cot.giahuy.net/", blurb: "PDF A1" },
             { id: "dam", name: "Shop thép dầm", url: "https://dam.giahuy.net/", blurb: "PDF A2" },
+            { id: "san", name: "Shop thép sàn", url: "", blurb: "Sắp ra mắt", comingSoon: true },
+            { id: "vach", name: "Shop thép vách", url: "", blurb: "Sắp ra mắt", comingSoon: true },
           ];
         }
         if (!Object.keys(PLAN_PRICES).length) {
@@ -363,7 +399,7 @@
 
       function ensureFrames() {
         APPS.forEach(function (app) {
-          if (frames[app.id]) return;
+          if (app.comingSoon || frames[app.id]) return;
           var iframe = document.createElement("iframe");
           iframe.title = app.name;
           iframe.loading = "lazy";
@@ -380,8 +416,13 @@
         APPS.forEach(function (app) {
           var btn = document.createElement("button");
           btn.type = "button";
-          btn.className = "tab" + (app.id === currentApp ? " active" : "");
-          btn.textContent = app.name;
+          btn.className =
+            "tab" +
+            (app.id === currentApp ? " active" : "") +
+            (app.comingSoon ? " soon" : "");
+          btn.innerHTML = app.comingSoon
+            ? app.name + '<span class="soon-tag">sắp có</span>'
+            : app.name;
           btn.addEventListener("click", function () {
             selectApp(app.id);
           });
@@ -392,14 +433,26 @@
       function selectApp(id) {
         currentApp = id;
         renderTabs();
+        var app = APPS.find(function (a) { return a.id === id; });
+        var soonPanel = document.getElementById("soon-panel");
+        var soonTitle = document.getElementById("soon-title");
+        var soonBlurb = document.getElementById("soon-blurb");
+        Object.keys(frames).forEach(function (key) {
+          frames[key].classList.toggle("active", false);
+        });
+        if (app && app.comingSoon) {
+          if (soonPanel) soonPanel.classList.add("active");
+          if (soonTitle) soonTitle.textContent = app.name;
+          if (soonBlurb) soonBlurb.textContent = (app.blurb || "Sắp ra mắt") + " — trang sẽ được bổ sung sau.";
+          return;
+        }
+        if (soonPanel) soonPanel.classList.remove("active");
+        ensureFrames();
         Object.keys(frames).forEach(function (key) {
           var frame = frames[key];
           var on = key === id;
           frame.classList.toggle("active", on);
-          if (on && !frame.src) {
-            var app = APPS.find(function (a) { return a.id === key; });
-            if (app) frame.src = app.url;
-          }
+          if (on && !frame.src && app && app.url) frame.src = app.url;
         });
       }
 
