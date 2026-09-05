@@ -310,7 +310,13 @@
       var PLANS = GiaHuyMembership.PLANS.slice();
       var PLAN_PRICES = {};
       var selectedPlan = null;
-      var currentApp = "mong";
+      var currentApp = (function () {
+        try {
+          var q = new URLSearchParams(location.search).get("app");
+          if (q && /^(mong|cot|dam)$/.test(q)) return q;
+        } catch (e) {}
+        return "mong";
+      })();
       var tickTimer = null;
       var frames = {};
 
@@ -431,7 +437,13 @@
       }
 
       function selectApp(id) {
+        if (!APPS.some(function (a) { return a.id === id; }) && !/^(mong|cot|dam)$/.test(id)) return;
         currentApp = id;
+        try {
+          var url = new URL(location.href);
+          url.searchParams.set("app", id);
+          history.replaceState(null, "", url.pathname + url.search + url.hash);
+        } catch (e) {}
         renderTabs();
         var app = APPS.find(function (a) { return a.id === id; });
         var soonPanel = document.getElementById("soon-panel");
