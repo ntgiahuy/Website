@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GIAHUYⓒ — Móng · Cột · Dầm · Sàn · Vách</title>
   <meta name="description" content="Shop thép móng, cột, dầm (sàn & vách sắp có). Dùng thử 10 phút, tiếp tục bằng thành viên theo quý / năm / vĩnh viễn." />
-  <link rel="icon" href="/app/favicon.ico" />
+  <link rel="icon" href="/home/app/favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
@@ -246,7 +246,7 @@
     <header class="topbar">
       <div class="topbar-row brand-row">
         <a class="brand" href="./">
-          <img src="/app/android-icon-96x96.png" width="34" height="34" alt="" />
+          <img src="/home/app/android-icon-96x96.png" width="34" height="34" alt="" />
           <div>
             <strong>GIAHUY<span class="mark">ⓒ</span></strong>
             <span>Móng · Cột · Dầm · Sàn · Vách</span>
@@ -256,7 +256,7 @@
       </div>
       <div class="topbar-row actions-row">
         <div class="top-actions">
-          <a class="btn btn-ghost btn-sm" href="/thanh-vien/">Thành viên</a>
+          <a class="btn btn-ghost btn-sm" href="/home/thanh-vien/">Thành viên</a>
           <button type="button" class="btn btn-primary btn-sm" id="btn-open-pay" hidden>Đăng ký</button>
         </div>
       </div>
@@ -303,7 +303,7 @@
     </main>
   </div>
 
-  <script src="/assets/membership.js"></script>
+  <script src="/home/assets/membership.js"></script>
   <script>
     (function () {
       var APPS = [];
@@ -348,7 +348,7 @@
 
       async function loadConfig() {
         try {
-          var res = await fetch("/thanh-vien/plans.json", { cache: "no-cache" });
+          var res = await fetch("/home/thanh-vien/plans.json", { cache: "no-cache" });
           if (res.ok) {
             var cfg = await res.json();
             if (cfg.apps && cfg.apps.length) APPS = cfg.apps;
@@ -381,7 +381,7 @@
 
       async function loadPayConfig() {
         try {
-          var res = await fetch("/thanh-vien/pay-config.json", { cache: "no-cache" });
+          var res = await fetch("/home/thanh-vien/pay-config.json", { cache: "no-cache" });
           if (!res.ok) return;
           var c = await res.json();
           var plan = selectedPlan || PLANS[0];
@@ -437,13 +437,7 @@
       }
 
       function selectApp(id) {
-        if (!APPS.some(function (a) { return a.id === id; }) && !/^(mong|cot|dam)$/.test(id)) return;
         currentApp = id;
-        try {
-          var url = new URL(location.href);
-          url.searchParams.set("app", id);
-          history.replaceState(null, "", url.pathname + url.search + url.hash);
-        } catch (e) {}
         renderTabs();
         var app = APPS.find(function (a) { return a.id === id; });
         var soonPanel = document.getElementById("soon-panel");

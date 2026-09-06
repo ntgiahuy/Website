@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin · Tạo mã thành viên GiaHuy</title>
-  <link rel="icon" href="/app/favicon.ico" />
+  <link rel="icon" href="/home/app/favicon.ico" />
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
   <style>
     :root {
@@ -135,11 +135,11 @@
     </section>
   </div>
 
-  <script src="/assets/membership.js"></script>
+  <script src="/home/assets/membership.js"></script>
   <script>
     (function () {
       var PRIV_STORE = "giahuy.membership.admin.privateJwk";
-      var CDN_PUB = "/thanh-vien/public-jwk.json";
+      var CDN_PUB = "/home/thanh-vien/public-jwk.json";
       var privEl = document.getElementById("priv");
       var outEl = document.getElementById("out");
       var keyMsg = document.getElementById("key-msg");
@@ -437,9 +437,9 @@
           planLabel +
           (expText ? "\nHết hạn: " + expText : "") +
           "\n\nCách kích hoạt:\n" +
-          "1) Mở https://xd.giahuy.net/thanh-vien/#kich-hoat\n" +
+          "1) Mở https://ntgiahuy.github.io/home/thanh-vien/#kich-hoat\n" +
           "2) Dán mã → bấm Kích hoạt\n" +
-          "3) Vào https://xd.giahuy.net/hub/ để dùng Móng / Cột / Dầm\n\n" +
+          "3) Vào https://ntgiahuy.github.io/home/hub/ để dùng Móng / Cột / Dầm\n\n" +
           "Trân trọng,\nGIAHUY";
         var href =
           "mailto:" +

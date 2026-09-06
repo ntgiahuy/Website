@@ -1,10 +1,10 @@
 # Website CDN — GiaHuy.Net
 
-Repo phục vụ file tĩnh tại **https://xd.giahuy.net/** (GitHub Pages).
+Repo phục vụ file tĩnh tại **https://ntgiahuy.github.io/home/** (GitHub Pages).
 
 ## Trang chủ 3 tiện ích
 
-**https://xd.giahuy.net/hub/**
+**https://ntgiahuy.github.io/home/hub/**
 
 - Nhúng Cột · Móng · Dầm trong một trang
 - Dùng thử **10 phút / 1 lần** mỗi trình duyệt
@@ -14,11 +14,11 @@ Repo phục vụ file tĩnh tại **https://xd.giahuy.net/** (GitHub Pages).
 
 | Trang | Địa chỉ |
 |-------|---------|
-| Trang chủ hub | https://xd.giahuy.net/hub/ |
-| Đăng ký / kích hoạt | https://xd.giahuy.net/thanh-vien/ |
-| Admin tạo mã | https://xd.giahuy.net/thanh-vien/admin.html |
-| Thư viện JS | https://xd.giahuy.net/js/membership.js |
-| Bảng giá gói | https://xd.giahuy.net/thanh-vien/plans.json |
+| Trang chủ hub | https://ntgiahuy.github.io/home/hub/ |
+| Đăng ký / kích hoạt | https://ntgiahuy.github.io/home/thanh-vien/ |
+| Admin tạo mã | https://ntgiahuy.github.io/home/thanh-vien/admin.html |
+| Thư viện JS | https://ntgiahuy.github.io/home/js/membership.js |
+| Bảng giá gói | https://ntgiahuy.github.io/home/thanh-vien/plans.json |
 | Hướng dẫn tích hợp | [thanh-vien/HUONG-DAN.md](thanh-vien/HUONG-DAN.md) |
 | Bảo mật Public/Private | [thanh-vien/BAO-MAT.md](thanh-vien/BAO-MAT.md) |
 
