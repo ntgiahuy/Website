@@ -31,8 +31,9 @@
     {
       "id": "san",
       "name": "Shop thép sàn",
-      "url": "https://ntgiahuy.github.io/san/",
-      "blurb": "Mặt bằng · PDF A2"
+      "url": "",
+      "blurb": "Sắp ra mắt",
+      "comingSoon": true
     },
     {
       "id": "vach",

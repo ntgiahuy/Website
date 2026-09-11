@@ -52,7 +52,7 @@ Có Worker (tuỳ chọn, chắc hơn):
 async function onExportPdf() {
   const ok = await window.GiaHuyMembership.requireActive({
     feature: "Xuất PDF",
-    app: "cot", // hoặc "mong" | "dam" | "san"
+    app: "cot", // hoặc "mong" | "dam"
   });
   if (!ok) return;
   // ... logic xuất PDF hiện có

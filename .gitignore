@@ -3,4 +3,3 @@
 **/*private-jwk*.json
 .env
 .env.*
-artifacts/
