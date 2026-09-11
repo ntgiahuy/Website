@@ -1,5 +1,4 @@
-# Membership private keys — never commit
-**/giahuy-membership-private-jwk.json
-**/*private-jwk*.json
+.DS_Store
 .env
 .env.*
+node_modules/
