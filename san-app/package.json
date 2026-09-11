@@ -1,0 +1,44 @@
+{
+  "name": "shop-thep-san",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "pages": "next build",
+    "test:pdf": "tsx scripts/render-pdf.ts"
+  },
+  "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
+    "@radix-ui/react-checkbox": "^1.3.11",
+    "@radix-ui/react-label": "^2.1.15",
+    "@radix-ui/react-radio-group": "^1.4.7",
+    "@radix-ui/react-select": "^2.3.7",
+    "@radix-ui/react-separator": "^1.1.15",
+    "@radix-ui/react-slot": "^1.3.3",
+    "@radix-ui/react-tabs": "^1.1.21",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.39.0",
+    "next": "16.3.4",
+    "pdf-lib": "^1.17.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.13",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5"
+  },
+  "description": "Shop drawing th\u00e9p s\u00e0n \u2014 xu\u1ea5t PDF"
+}

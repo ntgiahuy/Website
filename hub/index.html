@@ -313,7 +313,7 @@
       var currentApp = (function () {
         try {
           var q = new URLSearchParams(location.search).get("app");
-          if (q && /^(mong|cot|dam)$/.test(q)) return q;
+          if (q && /^(mong|cot|dam|san)$/.test(q)) return q;
         } catch (e) {}
         return "mong";
       })();
@@ -367,7 +367,7 @@
             { id: "mong", name: "Shop thép móng", url: "https://mong.giahuy.net/", blurb: "PDF / DXF" },
             { id: "cot", name: "Shop thép cột", url: "https://cot.giahuy.net/", blurb: "PDF A1" },
             { id: "dam", name: "Shop thép dầm", url: "https://dam.giahuy.net/", blurb: "PDF A2" },
-            { id: "san", name: "Shop thép sàn", url: "", blurb: "Sắp ra mắt", comingSoon: true },
+            { id: "san", name: "Shop thép sàn", url: "https://ntgiahuy.github.io/home/san/", blurb: "PDF A2" },
             { id: "vach", name: "Shop thép vách", url: "", blurb: "Sắp ra mắt", comingSoon: true },
           ];
         }

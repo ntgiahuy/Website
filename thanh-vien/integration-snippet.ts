@@ -1,6 +1,6 @@
 /**
  * Mẫu tích hợp — dán logic này vào handler Xuất PDF của từng app.
- * App id: "cot" | "mong" | "dam"
+ * App id: "cot" | "mong" | "dam" | "san"
  *
  * HTML: <script src="https://xd.giahuy.net/js/membership.js"></script>
  */
@@ -19,7 +19,7 @@ declare global {
   }
 }
 
-export async function ensureMember(app: "cot" | "mong" | "dam", feature = "Xuất PDF") {
+export async function ensureMember(app: "cot" | "mong" | "dam" | "san", feature = "Xuất PDF") {
   const api = window.GiaHuyMembership;
   if (!api) {
     console.warn("Chưa nạp membership.js từ CDN");
