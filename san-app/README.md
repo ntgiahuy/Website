@@ -13,7 +13,7 @@ Tham chiếu kiến trúc / PDF từ [Shop drawing thép dầm](https://github.c
 
 ## Địa chỉ
 
-- Trên CDN: [https://ntgiahuy.github.io/home/san/](https://ntgiahuy.github.io/home/san/)
+- Trên web: [https://ntgiahuy.github.io/san/](https://ntgiahuy.github.io/san/)
 - Hub: [https://ntgiahuy.github.io/home/hub/?app=san](https://ntgiahuy.github.io/home/hub/?app=san)
 
 ## Chạy local

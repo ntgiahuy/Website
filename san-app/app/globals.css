@@ -2,13 +2,13 @@
 
 @font-face {
   font-family: "Be Vietnam Pro";
-  src: url("/home/san/fonts/BeVietnamPro-Regular.ttf") format("truetype");
+  src: url("/san/fonts/BeVietnamPro-Regular.ttf") format("truetype");
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
   font-family: "Be Vietnam Pro";
-  src: url("/home/san/fonts/BeVietnamPro-Bold.ttf") format("truetype");
+  src: url("/san/fonts/BeVietnamPro-Bold.ttf") format("truetype");
   font-weight: 700;
   font-display: swap;
 }

@@ -3,8 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "export",
-  /** Served under Website CDN / GitHub Pages: https://ntgiahuy.github.io/home/san/ */
-  basePath: "/home/san",
+  /** GitHub Pages: https://ntgiahuy.github.io/san/ */
+  basePath: "/san",
   images: { unoptimized: true },
   trailingSlash: true,
 };

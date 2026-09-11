@@ -1,5 +1,5 @@
-/** GitHub Pages path under Website CDN: https://ntgiahuy.github.io/home/san/ */
-export const BASE_PATH = "/home/san";
+/** GitHub Pages: https://ntgiahuy.github.io/san/ */
+export const BASE_PATH = "/san";
 
 export function withBasePath(path: string) {
   const p = path.startsWith("/") ? path : `/${path}`;
