@@ -91,6 +91,8 @@
       cursor: pointer; white-space: nowrap;
     }
     .tab:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
+    .tab.soon { opacity: 0.85; }
+    .soon-tag { font-size: 0.7em; opacity: 0.8; margin-left: 0.25rem; }
     .tab.active {
       color: #1a1203; background: var(--amber);
       animation: tabIn 0.28s ease;
@@ -293,9 +295,11 @@
         }
         if (!APPS.length) {
           APPS = [
-            { id: "cot", name: "Shop thép cột", url: "https://cot.giahuy.net/", blurb: "PDF A1" },
-            { id: "mong", name: "Shop thép móng", url: "https://mong.giahuy.net/", blurb: "PDF / DXF" },
-            { id: "dam", name: "Shop thép dầm", url: "https://dam.giahuy.net/", blurb: "PDF A2" },
+            { id: "mong", name: "Shop thép móng", url: "https://ntgiahuy.github.io/mong/", blurb: "PDF / DXF" },
+            { id: "cot", name: "Shop thép cột", url: "https://ntgiahuy.github.io/cot/", blurb: "PDF A1" },
+            { id: "dam", name: "Shop thép dầm", url: "https://ntgiahuy.github.io/dam/", blurb: "PDF A2" },
+            { id: "san", name: "Shop thép sàn", url: "https://ntgiahuy.github.io/san/", blurb: "Shop drawing sàn" },
+            { id: "vach", name: "Shop thép vách", url: "", blurb: "Sắp ra mắt", comingSoon: true },
           ];
         }
         if (!Object.keys(PLAN_PRICES).length) {
@@ -332,7 +336,7 @@
 
       function ensureFrames() {
         APPS.forEach(function (app) {
-          if (frames[app.id]) return;
+          if (app.comingSoon || frames[app.id]) return;
           var iframe = document.createElement("iframe");
           iframe.title = app.name;
           iframe.loading = "lazy";
@@ -349,8 +353,13 @@
         APPS.forEach(function (app) {
           var btn = document.createElement("button");
           btn.type = "button";
-          btn.className = "tab" + (app.id === currentApp ? " active" : "");
-          btn.textContent = app.name;
+          btn.className =
+            "tab" +
+            (app.id === currentApp ? " active" : "") +
+            (app.comingSoon ? " soon" : "");
+          btn.innerHTML = app.comingSoon
+            ? app.name + ' <span class="soon-tag">sắp có</span>'
+            : app.name;
           btn.addEventListener("click", function () {
             selectApp(app.id);
           });
@@ -361,13 +370,34 @@
       function selectApp(id) {
         currentApp = id;
         renderTabs();
+        var app = APPS.find(function (a) { return a.id === id; });
+        Object.keys(frames).forEach(function (key) {
+          frames[key].classList.toggle("active", false);
+        });
+        if (app && app.comingSoon) {
+          if (!document.getElementById("soon-note")) {
+            var note = document.createElement("div");
+            note.id = "soon-note";
+            note.style.cssText = "padding:2rem;color:var(--muted);text-align:center";
+            note.textContent = (app.name || "Tiện ích") + " — sắp ra mắt.";
+            els.workspace.appendChild(note);
+          } else {
+            document.getElementById("soon-note").hidden = false;
+            document.getElementById("soon-note").textContent =
+              (app.name || "Tiện ích") + " — sắp ra mắt.";
+          }
+          return;
+        }
+        var soon = document.getElementById("soon-note");
+        if (soon) soon.hidden = true;
+        ensureFrames();
         Object.keys(frames).forEach(function (key) {
           var frame = frames[key];
           var on = key === id;
           frame.classList.toggle("active", on);
           if (on && !frame.src) {
-            var app = APPS.find(function (a) { return a.id === key; });
-            if (app) frame.src = app.url;
+            var a = APPS.find(function (x) { return x.id === key; });
+            if (a && a.url) frame.src = a.url;
           }
         });
       }
