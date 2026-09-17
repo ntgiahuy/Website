@@ -1,0 +1,42 @@
+From 9dd8c046d8f8862a92b239d0ba3d83dd0d6bb2f0 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 17 Sep 2026 08:44:58 +0000
+Subject: [PATCH] =?UTF-8?q?chore:=20b=E1=BB=8F=20n=C3=BAt=20V=E1=BA=BD=20t?=
+ =?UTF-8?q?h=C3=A9p=20s=C3=A0n=20(PDF)=20v=C3=A0=20Th=E1=BB=91ng=20k=C3=AA?=
+ =?UTF-8?q?=20th=C3=A9p=20s=C3=A0n=20=E1=BB=9F=20tab=204?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Xuất PDF vẫn dùng nút Xuất PDF trên header.
+---
+ components/slab/SlabApp.tsx | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/components/slab/SlabApp.tsx b/components/slab/SlabApp.tsx
+index 2408132..aeed395 100644
+--- a/components/slab/SlabApp.tsx
++++ b/components/slab/SlabApp.tsx
+@@ -1310,9 +1310,6 @@ export function SlabApp() {
+                   <Button size="sm" variant="danger" onClick={delZone} disabled={!selectedZoneId}>
+                     <Trash2 /> Xóa
+                   </Button>
+-                  <Button size="sm" className="bg-amber-600 text-white hover:bg-amber-500" onClick={() => void exportPdf()}>
+-                    Vẽ thép sàn (PDF)
+-                  </Button>
+                   <Button
+                     size="sm"
+                     variant="secondary"
+@@ -1341,9 +1338,6 @@ export function SlabApp() {
+                   >
+                     Sàn thường
+                   </Button>
+-                  <Button size="sm" variant="secondary" className="text-amber-300" onClick={() => setStatus(`Thống kê: ${model.schedule.length} số hiệu · ${model.totalWeight.toFixed(1)} kg`)}>
+-                    Thống kê thép sàn
+-                  </Button>
+                 </div>
+                 <p className="mt-1.5 text-[11px] text-zinc-500">
+                   Chọn ô sàn → chọn loại: <b className="text-zinc-400">Sàn thường</b> / <b className="text-zinc-400">Ô thủng</b> /{" "}
+-- 
+2.43.0
+
