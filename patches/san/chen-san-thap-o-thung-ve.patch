@@ -1,0 +1,455 @@
+From e74fa9b5c1207995b92cf48ccb1491173b92d947 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 17 Sep 2026 08:20:01 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20k=C3=BD=20hi=E1=BB=87u=20s=C3=A0n=20th?=
+ =?UTF-8?q?=E1=BA=A5p=20(g=E1=BA=A1ch=20ch=C3=A9o)=20v=C3=A0=20=C3=B4=20th?=
+ =?UTF-8?q?=E1=BB=A7ng=20(X=20n=C3=A9t=20=C4=91=E1=BB=A9t)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Chọn ô sàn rồi chèn: sàn thấp = nét chéo; ô thủng = hai đường đứt góc.
+Vẽ trên preview + PDF; bỏ thép sàn trong ô thủng.
+---
+ components/slab/SlabApp.tsx     |  71 +++++++++++++++++-----
+ components/slab/SlabPreview.tsx | 102 ++++++++++++++++++++++++++++++++
+ lib/grid.ts                     |  82 +++++++++++++++++++++++++
+ lib/pdf/generate.ts             |  40 +++++++++++--
+ 4 files changed, 273 insertions(+), 22 deletions(-)
+
+diff --git a/components/slab/SlabApp.tsx b/components/slab/SlabApp.tsx
+index 29eb7ea..8848c67 100644
+--- a/components/slab/SlabApp.tsx
++++ b/components/slab/SlabApp.tsx
+@@ -29,10 +29,12 @@ import {
+   applyBeamCounts,
+   applyBeamDimsToAll,
+   axisSpan,
++  baySlabExtent,
+   beamSegments,
+   equalizeAxisSpans,
+   patchBeam,
+   patchBeamOnAxis,
++  rectNearlyEquals,
+   removeAxis,
+   removeBeam,
+   renameAxis,
+@@ -561,40 +563,74 @@ export function SlabApp() {
+   }
+ 
+   function insertOpening() {
++    if (planSelection?.kind !== "bay") {
++      setStatus("Chọn một ô sàn trên bản vẽ rồi bấm Chèn Ô thủng.");
++      setTab("draw");
++      return;
++    }
++    const xs = sortAxes(project.axesX);
++    const ys = sortAxes(project.axesY);
++    const { x0, x1, y0, y1 } = baySlabExtent(project, xs, ys, planSelection.ix, planSelection.iy);
++    const x = Math.min(x0, x1);
++    const y = Math.min(y0, y1);
++    const w = Math.abs(x1 - x0);
++    const h = Math.abs(y1 - y0);
++    const openings = (project.openings ?? []).filter((o) => !rectNearlyEquals(o, x0, y0, x1, y1));
++    const lowSlabs = (project.lowSlabs ?? []).filter((o) => !rectNearlyEquals(o, x0, y0, x1, y1));
+     persist({
+       ...project,
+       openings: [
+-        ...project.openings,
++        ...openings,
+         {
+           id: uid("op"),
+-          name: `Ô${project.openings.length + 1}`,
+-          x: project.planWidth / 2 - 400,
+-          y: project.planHeight / 2 - 400,
+-          w: 800,
+-          h: 800,
++          name: `Ô${openings.length + 1}`,
++          x,
++          y,
++          w,
++          h,
+         },
+       ],
++      lowSlabs,
+     });
+-    setStatus("Đã chèn ô thủng.");
++    setTab("draw");
++    setStatus(`Đã chèn ô thủng tại ô ${xs[planSelection.ix]?.name}-${ys[planSelection.iy]?.name}.`);
+   }
+ 
+   function insertLowSlab() {
++    if (planSelection?.kind !== "bay") {
++      setStatus("Chọn một ô sàn trên bản vẽ rồi bấm Chèn Sàn thấp.");
++      setTab("draw");
++      return;
++    }
++    const xs = sortAxes(project.axesX);
++    const ys = sortAxes(project.axesY);
++    const { x0, x1, y0, y1 } = baySlabExtent(project, xs, ys, planSelection.ix, planSelection.iy);
++    const x = Math.min(x0, x1);
++    const y = Math.min(y0, y1);
++    const w = Math.abs(x1 - x0);
++    const h = Math.abs(y1 - y0);
++    const openings = (project.openings ?? []).filter((o) => !rectNearlyEquals(o, x0, y0, x1, y1));
++    const lowSlabs = (project.lowSlabs ?? []).filter((o) => !rectNearlyEquals(o, x0, y0, x1, y1));
+     persist({
+       ...project,
++      openings,
+       lowSlabs: [
+-        ...project.lowSlabs,
++        ...lowSlabs,
+         {
+           id: uid("low"),
+-          name: `ST${project.lowSlabs.length + 1}`,
+-          x: 200,
+-          y: 200,
+-          w: 1500,
+-          h: 1500,
++          name: `ST${lowSlabs.length + 1}`,
++          x,
++          y,
++          w,
++          h,
+           drop: project.info.lowSlabDrop,
+         },
+       ],
+     });
+-    setStatus("Đã chèn sàn thấp.");
++    setTab("draw");
++    setStatus(
++      `Đã chèn sàn thấp (hạ ${project.info.lowSlabDrop ?? 0} mm) tại ô ${xs[planSelection.ix]?.name}-${ys[planSelection.iy]?.name}.`,
++    );
+   }
+ 
+   return (
+@@ -1273,16 +1309,19 @@ export function SlabApp() {
+                   <Button size="sm" className="bg-amber-600 text-white hover:bg-amber-500" onClick={() => void exportPdf()}>
+                     Vẽ thép sàn (PDF)
+                   </Button>
+-                  <Button size="sm" variant="secondary" onClick={insertOpening}>
++                  <Button size="sm" variant="secondary" onClick={insertOpening} title="Chọn ô sàn rồi chèn — đánh dấu X nét đứt">
+                     Chèn Ô thủng
+                   </Button>
+-                  <Button size="sm" variant="secondary" onClick={insertLowSlab}>
++                  <Button size="sm" variant="secondary" onClick={insertLowSlab} title="Chọn ô sàn rồi chèn — gạch chéo sàn thấp">
+                     Chèn Sàn thấp
+                   </Button>
+                   <Button size="sm" variant="secondary" className="text-amber-300" onClick={() => setStatus(`Thống kê: ${model.schedule.length} số hiệu · ${model.totalWeight.toFixed(1)} kg`)}>
+                     Thống kê thép sàn
+                   </Button>
+                 </div>
++                <p className="mt-1.5 text-[11px] text-zinc-500">
++                  Chọn ô sàn trên bản vẽ rồi bấm Chèn Ô thủng (X nét đứt) hoặc Chèn Sàn thấp (gạch chéo).
++                </p>
+               </Panel>
+               <Panel title="Danh sách vùng thép" className="min-w-0 w-full">
+                 <ul className="max-h-48 space-y-1 overflow-auto text-xs">
+diff --git a/components/slab/SlabPreview.tsx b/components/slab/SlabPreview.tsx
+index 3aadd4e..8d7e81c 100644
+--- a/components/slab/SlabPreview.tsx
++++ b/components/slab/SlabPreview.tsx
+@@ -10,6 +10,9 @@ import {
+   beamDrawRange,
+   beamSegments,
+   planBeamBleed,
++  rectDiagonalHatchSegments,
++  rectNearlyEquals,
++  rectOpeningDiagonals,
+   sortAxes,
+   SLAB_REBAR_HOOK_MM,
+ } from "@/lib/grid";
+@@ -212,6 +215,98 @@ export function SlabPreview({
+     }
+   }
+ 
++  const lowSlabNodes: ReactNode[] = (project.lowSlabs ?? []).map((ls) => {
++    const x0 = ls.x;
++    const y0 = ls.y;
++    const x1 = ls.x + ls.w;
++    const y1 = ls.y + ls.h;
++    const segs = rectDiagonalHatchSegments(x0, y0, x1, y1, 200);
++    return (
++      <g key={`low-${ls.id}`} pointerEvents="none">
++        <rect
++          x={X(x0)}
++          y={Y(y1)}
++          width={ls.w * s}
++          height={ls.h * s}
++          fill="rgba(161,161,170,0.06)"
++          stroke="#a1a1aa"
++          strokeWidth={0.8}
++        />
++        {segs.map((seg, i) => (
++          <line
++            key={`low-hatch-${ls.id}-${i}`}
++            x1={X(seg.xA)}
++            y1={Y(seg.yA)}
++            x2={X(seg.xB)}
++            y2={Y(seg.yB)}
++            stroke="#c4c4c8"
++            strokeWidth={0.9}
++            opacity={0.95}
++          />
++        ))}
++        <text
++          x={X((x0 + x1) / 2)}
++          y={Y((y0 + y1) / 2) + 4}
++          textAnchor="middle"
++          fill="#d4d4d8"
++          fontSize="10"
++          fontWeight="600"
++        >
++          {ls.name || "ST"}
++        </text>
++      </g>
++    );
++  });
++
++  const openingNodes: ReactNode[] = (project.openings ?? []).map((op) => {
++    const x0 = op.x;
++    const y0 = op.y;
++    const x1 = op.x + op.w;
++    const y1 = op.y + op.h;
++    const [d1, d2] = rectOpeningDiagonals(x0, y0, x1, y1);
++    return (
++      <g key={`op-${op.id}`} pointerEvents="none">
++        <rect
++          x={X(x0)}
++          y={Y(y1)}
++          width={op.w * s}
++          height={op.h * s}
++          fill="rgba(24,24,27,0.55)"
++          stroke="#e4e4e7"
++          strokeWidth={1}
++        />
++        <line
++          x1={X(d1.xA)}
++          y1={Y(d1.yA)}
++          x2={X(d1.xB)}
++          y2={Y(d1.yB)}
++          stroke="#e4e4e7"
++          strokeWidth={1.2}
++          strokeDasharray="6 4"
++        />
++        <line
++          x1={X(d2.xA)}
++          y1={Y(d2.yA)}
++          x2={X(d2.xB)}
++          y2={Y(d2.yB)}
++          stroke="#e4e4e7"
++          strokeWidth={1.2}
++          strokeDasharray="6 4"
++        />
++        <text
++          x={X((x0 + x1) / 2)}
++          y={Y((y0 + y1) / 2) + 4}
++          textAnchor="middle"
++          fill="#fafafa"
++          fontSize="10"
++          fontWeight="700"
++        >
++          {op.name || "Ô"}
++        </text>
++      </g>
++    );
++  });
++
+   const beamNodes: ReactNode[] = [];
+   for (const beam of project.beams ?? []) {
+     const { b: bw } = parseBeamSize(beam.size);
+@@ -399,6 +494,8 @@ export function SlabPreview({
+               pointerEvents="none"
+             />
+             {bayNodes}
++            {lowSlabNodes}
++            {openingNodes}
+             {axesX.map((ax) => {
+               const active = selection?.kind === "axis" && selection.dir === "X" && selection.axisId === ax.id;
+               const cx = X(ax.pos);
+@@ -506,6 +603,11 @@ export function SlabPreview({
+             {beamNodes}
+             {axesX.slice(0, -1).flatMap((_, ix) =>
+               axesY.slice(0, -1).map((_, iy) => {
++                const extent = baySlabExtent(project, axesX, axesY, ix, iy);
++                const isOpening = (project.openings ?? []).some((o) =>
++                  rectNearlyEquals(o, extent.x0, extent.y0, extent.x1, extent.y1),
++                );
++                if (isOpening) return null;
+                 const { x0, x1, y0, y1, mx, my } = bayRebarExtent(project, axesX, axesY, ix, iy);
+                 const hook = SLAB_REBAR_HOOK_MM;
+                 const stroke = "#ef4444";
+diff --git a/lib/grid.ts b/lib/grid.ts
+index 2261e1a..1a7c854 100644
+--- a/lib/grid.ts
++++ b/lib/grid.ts
+@@ -315,6 +315,88 @@ export function baySlabExtent(
+   };
+ }
+ 
++/** Đoạn chéo trong hình chữ nhật (clip) theo hằng số x−y = c — nét sàn thấp /. */
++export function rectDiagonalHatchSegments(
++  x0: number,
++  y0: number,
++  x1: number,
++  y1: number,
++  spacingMm = 220,
++): Array<{ xA: number; yA: number; xB: number; yB: number }> {
++  const loX = Math.min(x0, x1);
++  const hiX = Math.max(x0, x1);
++  const loY = Math.min(y0, y1);
++  const hiY = Math.max(y0, y1);
++  const w = hiX - loX;
++  const h = hiY - loY;
++  if (w < 1 || h < 1) return [];
++  const step = Math.max(40, spacingMm);
++  const out: Array<{ xA: number; yA: number; xB: number; yB: number }> = [];
++  // Đường x − y = c, hướng (1,1): góc dưới-trái → trên-phải trên bản vẽ
++  const cMin = loX - hiY;
++  const cMax = hiX - loY;
++  for (let c = cMin; c <= cMax + 0.5; c += step) {
++    // Giao với 4 cạnh
++    const pts: Array<{ x: number; y: number }> = [];
++    const push = (x: number, y: number) => {
++      if (x >= loX - 0.5 && x <= hiX + 0.5 && y >= loY - 0.5 && y <= hiY + 0.5) {
++        pts.push({ x: Math.min(hiX, Math.max(loX, x)), y: Math.min(hiY, Math.max(loY, y)) });
++      }
++    };
++    // cạnh trái x=loX → y = loX - c
++    push(loX, loX - c);
++    // cạnh phải x=hiX → y = hiX - c
++    push(hiX, hiX - c);
++    // cạnh dưới y=loY → x = c + loY
++    push(c + loY, loY);
++    // cạnh trên y=hiY → x = c + hiY
++    push(c + hiY, hiY);
++    // Khử trùng
++    const uniq: Array<{ x: number; y: number }> = [];
++    for (const p of pts) {
++      if (!uniq.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < 0.5)) uniq.push(p);
++    }
++    if (uniq.length >= 2) {
++      out.push({ xA: uniq[0].x, yA: uniq[0].y, xB: uniq[1].x, yB: uniq[1].y });
++    }
++  }
++  return out;
++}
++
++/** Hai đường chéo góc ô — ký hiệu ô thủng. */
++export function rectOpeningDiagonals(
++  x0: number,
++  y0: number,
++  x1: number,
++  y1: number,
++): [{ xA: number; yA: number; xB: number; yB: number }, { xA: number; yA: number; xB: number; yB: number }] {
++  const loX = Math.min(x0, x1);
++  const hiX = Math.max(x0, x1);
++  const loY = Math.min(y0, y1);
++  const hiY = Math.max(y0, y1);
++  return [
++    { xA: loX, yA: loY, xB: hiX, yB: hiY },
++    { xA: loX, yA: hiY, xB: hiX, yB: loY },
++  ];
++}
++
++/** Ô (ix,iy) có hình chữ nhật gần trùng với rect (mm). */
++export function rectNearlyEquals(
++  a: { x: number; y: number; w: number; h: number },
++  x0: number,
++  y0: number,
++  x1: number,
++  y1: number,
++  tol = 50,
++): boolean {
++  return (
++    Math.abs(a.x - Math.min(x0, x1)) < tol &&
++    Math.abs(a.y - Math.min(y0, y1)) < tol &&
++    Math.abs(a.w - Math.abs(x1 - x0)) < tol &&
++    Math.abs(a.h - Math.abs(y1 - y0)) < tol
++  );
++}
++
+ /** Chiều dài móc thép sàn trên mặt bằng (mm). */
+ export const SLAB_REBAR_HOOK_MM = 50;
+ 
+diff --git a/lib/pdf/generate.ts b/lib/pdf/generate.ts
+index ae0ed84..f230e7b 100644
+--- a/lib/pdf/generate.ts
++++ b/lib/pdf/generate.ts
+@@ -12,8 +12,12 @@ import {
+   axisInteriorSegmentsX,
+   axisInteriorSegmentsY,
+   bayRebarExtent,
++  baySlabExtent,
+   beamDrawRange,
+   planBeamBleed,
++  rectDiagonalHatchSegments,
++  rectNearlyEquals,
++  rectOpeningDiagonals,
+   sortAxes,
+   SLAB_REBAR_HOOK_MM,
+ } from "../grid";
+@@ -49,12 +53,14 @@ function line(
+   y2: number,
+   w = 0.7,
+   color = BLACK,
++  dashArray?: number[],
+ ) {
+   ctx.page.drawLine({
+     start: { x: x1, y: ty(y1) },
+     end: { x: x2, y: ty(y2) },
+     thickness: w,
+     color,
++    ...(dashArray ? { dashArray } : {}),
+   });
+ }
+ 
+@@ -215,17 +221,39 @@ function drawPlan(
+     drawBeam(ctx, b, toX, toY, s);
+   }
+ 
+-  for (const o of project.openings) {
+-    const x = toX(o.x);
+-    const y = toY(o.y + o.h);
+-    rect(ctx, x, y, o.w * s, o.h * s, 0.7);
+-    textSimple(ctx, o.name || "Ô", x + (o.w * s) / 2, y + (o.h * s) / 2, 6, false, "center");
++  for (const ls of project.lowSlabs ?? []) {
++    const x0 = ls.x;
++    const y0 = ls.y;
++    const x1 = ls.x + ls.w;
++    const y1 = ls.y + ls.h;
++    rect(ctx, toX(x0), toY(y1), ls.w * s, ls.h * s, 0.6);
++    for (const seg of rectDiagonalHatchSegments(x0, y0, x1, y1, 200)) {
++      line(ctx, toX(seg.xA), toY(seg.yA), toX(seg.xB), toY(seg.yB), 0.45);
++    }
++    textSimple(ctx, ls.name || "ST", toX((x0 + x1) / 2), toY((y0 + y1) / 2), 6, false, "center");
++  }
++
++  for (const o of project.openings ?? []) {
++    const x0 = o.x;
++    const y0 = o.y;
++    const x1 = o.x + o.w;
++    const y1 = o.y + o.h;
++    rect(ctx, toX(x0), toY(y1), o.w * s, o.h * s, 0.7);
++    const [d1, d2] = rectOpeningDiagonals(x0, y0, x1, y1);
++    line(ctx, toX(d1.xA), toY(d1.yA), toX(d1.xB), toY(d1.yB), 0.7, BLACK, [5, 3]);
++    line(ctx, toX(d2.xA), toY(d2.yA), toX(d2.xB), toY(d2.yB), 0.7, BLACK, [5, 3]);
++    textSimple(ctx, o.name || "Ô", toX((x0 + x1) / 2), toY((y0 + y1) / 2), 6, false, "center");
+   }
+ 
+-  // Mỗi ô sàn: 1 cây X + 1 cây Y qua tim ô; đỏ, móc 50mm hai đầu; không xuyên thân dầm
++  // Mỗi ô sàn: 1 cây X + 1 cây Y qua tim ô; đỏ, móc 50mm hai đầu; không xuyên thân dầm / ô thủng
+   const hook = SLAB_REBAR_HOOK_MM;
+   for (let ix = 0; ix < axesX.length - 1; ix++) {
+     for (let iy = 0; iy < axesY.length - 1; iy++) {
++      const extent = baySlabExtent(project, axesX, axesY, ix, iy);
++      const isOpening = (project.openings ?? []).some((o) =>
++        rectNearlyEquals(o, extent.x0, extent.y0, extent.x1, extent.y1),
++      );
++      if (isOpening) continue;
+       const { x0, x1, y0, y1, mx, my } = bayRebarExtent(project, axesX, axesY, ix, iy);
+       line(ctx, toX(x0), toY(my), toX(x1), toY(my), 0.7, REBAR_RED);
+       line(ctx, toX(x0), toY(my), toX(x0), toY(my - hook), 0.7, REBAR_RED);
+-- 
+2.43.0
+
