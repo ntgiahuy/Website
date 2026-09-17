@@ -1,0 +1,48 @@
+From c7abff68761f21387b693cc8c237271218e12808 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 17 Sep 2026 08:02:42 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20chuy=E1=BB=83n=20Ch=C3=A8n=20=C3=94=20t?=
+ =?UTF-8?q?h=E1=BB=A7ng=20/=20S=C3=A0n=20th=E1=BA=A5p=20sang=20tab=20V?=
+ =?UTF-8?q?=E1=BA=BD=20th=C3=A9p=20s=C3=A0n?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Đặt hai nút kề Vẽ thép sàn (PDF); bỏ khỏi tab Số liệu dầm.
+---
+ components/slab/SlabApp.tsx | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/components/slab/SlabApp.tsx b/components/slab/SlabApp.tsx
+index 3ce4fb4..29eb7ea 100644
+--- a/components/slab/SlabApp.tsx
++++ b/components/slab/SlabApp.tsx
+@@ -1094,12 +1094,6 @@ export function SlabApp() {
+                   <Button variant="secondary" size="sm" className="text-amber-300" onClick={assignAllBeams}>
+                     Gán toàn bộ dầm theo trục…
+                   </Button>
+-                  <Button variant="secondary" size="sm" onClick={insertOpening}>
+-                    Chèn Ô thủng
+-                  </Button>
+-                  <Button variant="secondary" size="sm" onClick={insertLowSlab}>
+-                    Chèn Sàn thấp
+-                  </Button>
+                   <Button
+                     variant="secondary"
+                     size="sm"
+@@ -1279,6 +1273,12 @@ export function SlabApp() {
+                   <Button size="sm" className="bg-amber-600 text-white hover:bg-amber-500" onClick={() => void exportPdf()}>
+                     Vẽ thép sàn (PDF)
+                   </Button>
++                  <Button size="sm" variant="secondary" onClick={insertOpening}>
++                    Chèn Ô thủng
++                  </Button>
++                  <Button size="sm" variant="secondary" onClick={insertLowSlab}>
++                    Chèn Sàn thấp
++                  </Button>
+                   <Button size="sm" variant="secondary" className="text-amber-300" onClick={() => setStatus(`Thống kê: ${model.schedule.length} số hiệu · ${model.totalWeight.toFixed(1)} kg`)}>
+                     Thống kê thép sàn
+                   </Button>
+-- 
+2.43.0
+
