@@ -1,0 +1,157 @@
+From 0f561f99832fab822de61d457b3121e354f2a00d Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 17 Sep 2026 09:01:18 +0000
+Subject: [PATCH] =?UTF-8?q?fix:=20kh=C3=B4ng=20b=E1=BB=91=20tr=C3=AD=20th?=
+ =?UTF-8?q?=C3=A9p=20tr=C3=AAn=20d=E1=BA=A7m=20ti=E1=BA=BFp=20gi=C3=A1p=20?=
+ =?UTF-8?q?=C3=B4=20th=E1=BB=A7ng=20/=20s=C3=A0n=20th=E1=BA=A5p?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Dầm độc lập = có ít nhất một bên là ô đặc biệt; cắt thân dầm và
+loại đoạn thép nằm trên thân dầm.
+---
+ lib/grid.ts | 88 +++++++++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 69 insertions(+), 19 deletions(-)
+
+diff --git a/lib/grid.ts b/lib/grid.ts
+index bc599cd..e3e8553 100644
+--- a/lib/grid.ts
++++ b/lib/grid.ts
+@@ -297,8 +297,8 @@ export function bayKindAt(
+ }
+ 
+ /**
+- * Thân dầm độc lập trên một hàng/cột: hai bên không phải sàn thường
+- * (ô thủng / sàn thấp) → không bố trí thép sàn trên thân dầm đó.
++ * Khe thân dầm trên một hàng/cột mà ít nhất một bên là ô thủng / sàn thấp
++ * → dầm độc lập đối với thép sàn: không bố trí thép trên thân dầm.
+  */
+ export function independentBeamGaps(
+   project: SlabProject,
+@@ -313,7 +313,8 @@ export function independentBeamGaps(
+     for (let ix = 0; ix < axesX.length - 2; ix++) {
+       const left = bayKindAt(project, axesX, axesY, ix, iy);
+       const right = bayKindAt(project, axesX, axesY, ix + 1, iy);
+-      if (left === "normal" || right === "normal") continue;
++      // Chỉ đi xuyên dầm khi cả hai bên đều là sàn thường
++      if (left === "normal" && right === "normal") continue;
+       const a = baySlabExtent(project, axesX, axesY, ix, iy);
+       const b = baySlabExtent(project, axesX, axesY, ix + 1, iy);
+       if (b.x0 > a.x1 + 0.5) gaps.push({ lo: a.x1, hi: b.x0 });
+@@ -323,7 +324,7 @@ export function independentBeamGaps(
+     for (let iy = 0; iy < axesY.length - 2; iy++) {
+       const below = bayKindAt(project, axesX, axesY, ix, iy);
+       const above = bayKindAt(project, axesX, axesY, ix, iy + 1);
+-      if (below === "normal" || above === "normal") continue;
++      if (below === "normal" && above === "normal") continue;
+       const a = baySlabExtent(project, axesX, axesY, ix, iy);
+       const b = baySlabExtent(project, axesX, axesY, ix, iy + 1);
+       if (b.y0 > a.y1 + 0.5) gaps.push({ lo: a.y1, hi: b.y0 });
+@@ -332,11 +333,53 @@ export function independentBeamGaps(
+   return gaps;
+ }
+ 
++/** Mọi khe thân dầm trung gian trên hàng/cột (để loại đoạn thép chỉ nằm trên thân dầm). */
++export function allIntermediateBeamGaps(
++  project: SlabProject,
++  axesX: GridAxis[],
++  axesY: GridAxis[],
++  along: "X" | "Y",
++  stripIndex: number,
++): Array<{ lo: number; hi: number }> {
++  const gaps: Array<{ lo: number; hi: number }> = [];
++  if (along === "X") {
++    const iy = stripIndex;
++    for (let ix = 0; ix < axesX.length - 2; ix++) {
++      const a = baySlabExtent(project, axesX, axesY, ix, iy);
++      const b = baySlabExtent(project, axesX, axesY, ix + 1, iy);
++      if (b.x0 > a.x1 + 0.5) gaps.push({ lo: a.x1, hi: b.x0 });
++    }
++  } else {
++    const ix = stripIndex;
++    for (let iy = 0; iy < axesY.length - 2; iy++) {
++      const a = baySlabExtent(project, axesX, axesY, ix, iy);
++      const b = baySlabExtent(project, axesX, axesY, ix, iy + 1);
++      if (b.y0 > a.y1 + 0.5) gaps.push({ lo: a.y1, hi: b.y0 });
++    }
++  }
++  return gaps;
++}
++
++/** Bỏ các đoạn nằm trọn trong thân dầm (không kéo thép “trên” dầm độc lập / khe dầm). */
++export function dropSegmentsInsideGaps(
++  segs: Array<{ lo: number; hi: number }>,
++  gaps: Array<{ lo: number; hi: number }>,
++): Array<{ lo: number; hi: number }> {
++  return segs.filter((s) => {
++    const mid = (s.lo + s.hi) / 2;
++    // Đoạn ngắn nằm gọn trong một khe dầm
++    if (gaps.some((g) => s.lo >= g.lo - 1 && s.hi <= g.hi + 1)) return false;
++    // Đoạn chủ yếu nằm trên thân dầm (trung điểm trong khe và dài ≤ bề rộng dầm + cover)
++    if (gaps.some((g) => mid > g.lo && mid < g.hi && s.hi - s.lo <= g.hi - g.lo + 2)) return false;
++    return true;
++  });
++}
++
+ /**
+  * Thép liên tục từ dầm biên đầu → dầm biên cuối:
+  * điểm đầu/cuối = da dầm ngoài ± lớp bảo vệ (cover).
+  * Cắt tại ô thủng / sàn thấp; không bố trí thép trên dầm độc lập
+- * (dầm kẹp giữa hai ô không phải sàn thường).
++ * (dầm tiếp giáp ô thủng / sàn thấp — một hoặc hai bên).
+  */
+ export function stripRebarBarSegments(
+   project: SlabProject,
+@@ -371,13 +414,17 @@ export function stripRebarBarSegments(
+       }
+       if (!(yHi > yLo)) continue;
+       const my = (yLo + yHi) / 2;
+-      const hCuts = [
+-        ...cuts
+-          .filter((r) => my > Math.min(r.y0, r.y1) + 0.5 && my < Math.max(r.y0, r.y1) - 0.5)
+-          .map((r) => ({ lo: Math.min(r.x0, r.x1), hi: Math.max(r.x0, r.x1) })),
+-        ...independentBeamGaps(project, axesX, axesY, "X", iy),
+-      ];
+-      for (const s of subtract1D(xBarLo, xBarHi, hCuts)) {
++      // Cắt mọi vùng thủng/thấp giao với hàng (không chỉ đúng điểm my — tránh lệch mép)
++      const bandLo = yLo + 1;
++      const bandHi = yHi - 1;
++      const obstacleCuts = cuts
++        .filter((r) => Math.min(r.y1, r.y0) < bandHi && Math.max(r.y1, r.y0) > bandLo)
++        .map((r) => ({ lo: Math.min(r.x0, r.x1), hi: Math.max(r.x0, r.x1) }));
++      const indep = independentBeamGaps(project, axesX, axesY, "X", iy);
++      const allGaps = allIntermediateBeamGaps(project, axesX, axesY, "X", iy);
++      const hCuts = [...obstacleCuts, ...indep];
++      const segs = dropSegmentsInsideGaps(subtract1D(xBarLo, xBarHi, hCuts), [...indep, ...allGaps]);
++      for (const s of segs) {
+         out.push({ dir: "X", x0: s.lo, x1: s.hi, y: my });
+       }
+     }
+@@ -397,13 +444,16 @@ export function stripRebarBarSegments(
+       }
+       if (!(xHi > xLo)) continue;
+       const mx = (xLo + xHi) / 2;
+-      const vCuts = [
+-        ...cuts
+-          .filter((r) => mx > Math.min(r.x0, r.x1) + 0.5 && mx < Math.max(r.x0, r.x1) - 0.5)
+-          .map((r) => ({ lo: Math.min(r.y0, r.y1), hi: Math.max(r.y0, r.y1) })),
+-        ...independentBeamGaps(project, axesX, axesY, "Y", ix),
+-      ];
+-      for (const s of subtract1D(yBarLo, yBarHi, vCuts)) {
++      const bandLo = xLo + 1;
++      const bandHi = xHi - 1;
++      const obstacleCuts = cuts
++        .filter((r) => Math.min(r.x1, r.x0) < bandHi && Math.max(r.x1, r.x0) > bandLo)
++        .map((r) => ({ lo: Math.min(r.y0, r.y1), hi: Math.max(r.y0, r.y1) }));
++      const indep = independentBeamGaps(project, axesX, axesY, "Y", ix);
++      const allGaps = allIntermediateBeamGaps(project, axesX, axesY, "Y", ix);
++      const vCuts = [...obstacleCuts, ...indep];
++      const segs = dropSegmentsInsideGaps(subtract1D(yBarLo, yBarHi, vCuts), [...indep, ...allGaps]);
++      for (const s of segs) {
+         out.push({ dir: "Y", y0: s.lo, y1: s.hi, x: mx });
+       }
+     }
+-- 
+2.43.0
+
