@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Box,
   Check,
@@ -29,9 +29,8 @@ import {
   applyBeamCounts,
   applyBeamDimsToAll,
   axisSpan,
+  beamSegments,
   equalizeAxisSpans,
-  insertSlabBayX,
-  insertSlabBayY,
   patchBeam,
   patchBeamOnAxis,
   removeAxis,
@@ -41,6 +40,7 @@ import {
   setPlanSize,
   sortAxes,
   syncBeamInfo,
+  syncBeamsToAxes,
 } from "@/lib/grid";
 import { withBasePath } from "@/lib/base-path";
 import { downloadPdf, generateSlabPdf } from "@/lib/pdf/generate";
@@ -74,8 +74,8 @@ function draftZone(mark = "MC 1-1"): RebarZone {
     direction: "X",
     dia: 10,
     spacing: 200,
-    leftHook: 60,
-    rightHook: 60,
+    leftHook: 50,
+    rightHook: 50,
     x1: 110,
     y1: 110,
     x2: 5890,
@@ -95,7 +95,10 @@ export function SlabApp() {
   const [zoneForm, setZoneForm] = useState<RebarZone>(() => draftZone());
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [planSelection, setPlanSelection] = useState<PlanSelection | null>(null);
+  const [axisDirTab, setAxisDirTab] = useState<"X" | "Y">("X");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const selectedBeamPanelRef = useRef<HTMLDivElement>(null);
+  const selectedBayPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -167,14 +170,19 @@ export function SlabApp() {
     if (planSelection?.kind !== "beam") return null;
     const beam = project.beams.find((b) => b.id === planSelection.beamId);
     if (!beam) return null;
+    const segs = beamSegments(project, beam);
+    const seg = segs[planSelection.segIndex];
+    if (!seg) return null;
     const parsed = parseBeamSize(beam.size);
     return {
       id: beam.id,
-      name: `${beam.name} · ${beam.direction === "Y" ? "đứng" : "ngang"}`,
-      length: Math.abs(beam.end - beam.start),
+      name: `${beam.name} · ${seg.a0.name}–${seg.a1.name} · ${beam.direction === "Y" ? "đứng" : "ngang"}`,
+      length: seg.span,
       axis: beam.axis,
-      start: Math.min(beam.start, beam.end),
-      end: Math.max(beam.start, beam.end),
+      start: seg.lo,
+      end: seg.hi,
+      segIndex: seg.index,
+      spanAxisIndex: seg.spanAxisIndex,
       B: parsed.b,
       H: parsed.h,
       B1: Number.isFinite(beam.offset) ? (beam.offset as number) : Math.round(parsed.b / 2),
@@ -192,13 +200,17 @@ export function SlabApp() {
     }
   }
 
+  /** Đổi chiều dài đoạn dầm = đổi nhịp trục giữa hai đầu đoạn. */
   function patchSelectedBeamLength(value: number) {
     if (planSelection?.kind !== "beam") return;
+    const info = selectedBeamInfo();
+    if (!info) return;
     const v = Math.max(500, Math.round(value) || 500);
-    const beam = project.beams.find((b) => b.id === planSelection.beamId);
-    if (!beam) return;
-    const lo = Math.min(beam.start, beam.end);
-    persist(patchBeam(project, beam.id, { start: lo, end: lo + v }));
+    if (info.direction === "Y") {
+      persist(applyAxesToProject({ ...project, axesY: setAxisSpan(project.axesY, info.spanAxisIndex, v) }));
+    } else {
+      persist(applyAxesToProject({ ...project, axesX: setAxisSpan(project.axesX, info.spanAxisIndex, v) }));
+    }
   }
 
 
@@ -209,21 +221,49 @@ export function SlabApp() {
     const parsed = parseBeamSize(beam.size);
     const B = dims.beamB ?? parsed.b;
     const H = dims.beamH ?? parsed.h;
-    const B1 = dims.beamB1 ?? (Number.isFinite(beam.offset) ? beam.offset : Math.round(B / 2));
-    persist(
-      patchBeam(project, beam.id, {
-        size: `${Math.round(B)}x${Math.round(H)}`,
-        offset: B1 as number,
-      }),
-    );
+    const patched = patchBeam(project, beam.id, {
+      size: `${Math.round(B)}x${Math.round(H)}`,
+      ...(dims.beamB1 !== undefined
+        ? { offset: dims.beamB1 }
+        : {}),
+    });
+    // Đổi B (không sửa B1 tay) → tính lại B1 biên/giữa theo lưới trục
+    if (dims.beamB !== undefined && dims.beamB1 === undefined) {
+      persist(syncBeamsToAxes(patched));
+    } else {
+      persist(patched);
+    }
   }
 
 
-  /** Danh sách dầm theo thứ tự trái → phải. */
+  /** Danh sách đoạn dầm theo thứ tự trái → phải, dưới → trên. */
   function listBeamsLeftToRight(): PlanSelection[] {
-    return [...(project.beams ?? [])]
-      .sort((a, b) => a.axis - b.axis || a.name.localeCompare(b.name))
-      .map((b) => ({ kind: "beam" as const, beamId: b.id }));
+    type BeamSel = Extract<PlanSelection, { kind: "beam" }>;
+    const list: BeamSel[] = [];
+    const beams = [...(project.beams ?? [])].sort(
+      (a, b) => a.axis - b.axis || a.name.localeCompare(b.name),
+    );
+    for (const b of beams) {
+      const segs = beamSegments(project, b);
+      for (const seg of segs) {
+        list.push({ kind: "beam", beamId: b.id, segIndex: seg.index });
+      }
+    }
+    return list.sort((sa, sb) => {
+      const ba = project.beams.find((b) => b.id === sa.beamId)!;
+      const bb = project.beams.find((b) => b.id === sb.beamId)!;
+      const sega = beamSegments(project, ba)[sa.segIndex];
+      const segb = beamSegments(project, bb)[sb.segIndex];
+      if (!sega || !segb) return 0;
+      if (ba.direction === "Y" && bb.direction === "Y") {
+        return ba.axis - bb.axis || sega.lo - segb.lo;
+      }
+      if (ba.direction === "X" && bb.direction === "X") {
+        return sega.lo - segb.lo || ba.axis - bb.axis;
+      }
+      if (ba.direction !== bb.direction) return ba.direction === "Y" ? -1 : 1;
+      return 0;
+    });
   }
 
   /** Danh sách ô sàn theo thứ tự trái → phải, dưới → trên. */
@@ -243,7 +283,7 @@ export function SlabApp() {
     if (a.kind !== b.kind) return false;
     if (a.kind === "bay" && b.kind === "bay") return a.ix === b.ix && a.iy === b.iy;
     if (a.kind === "beam" && b.kind === "beam") {
-      return a.beamId === b.beamId;
+      return a.beamId === b.beamId && a.segIndex === b.segIndex;
     }
     if (a.kind === "axis" && b.kind === "axis") {
       return a.dir === b.dir && a.axisId === b.axisId;
@@ -297,128 +337,30 @@ export function SlabApp() {
     }
   }
 
-  function planEditPanel() {
-    if (!planSelection) return null;
-
-    const shell = (title: string, subtitle: string, accent: string, body: ReactNode) => (
-      <div className="space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className={`text-[11px] font-semibold ${accent}`}>{title}</div>
-            <div className="truncate text-[10px] text-zinc-400">{subtitle}</div>
-          </div>
-          <button
-            type="button"
-            className="rounded px-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-            onClick={() => setPlanSelection(null)}
-            aria-label="Đóng"
-          >
-            ×
-          </button>
-        </div>
-        <div className="space-y-1.5">{body}</div>
-      </div>
-    );
-
-    const row = (label: string, input: ReactNode) => (
-      <label className="flex items-center justify-between gap-2 text-[11px] text-zinc-300">
-        <span className="shrink-0 text-zinc-400">{label}</span>
-        <div className="w-[7.5rem]">{input}</div>
-      </label>
-    );
-
-    if (planSelection.kind === "bay" && selectedBaySpans()) {
-      const spans = selectedBaySpans()!;
-      return shell(
-        "Ô sàn",
-        spans.name,
-        "text-sky-300",
-        <>
-          {row(
-            "Lx (mm)",
-            <Input
-              type="number"
-              value={Math.round(spans.lx)}
-              onChange={(e) => patchSelectedBaySpan("lx", Number(e.target.value))}
-            />,
-          )}
-          {row(
-            "Ly (mm)",
-            <Input
-              type="number"
-              value={Math.round(spans.ly)}
-              onChange={(e) => patchSelectedBaySpan("ly", Number(e.target.value))}
-            />,
-          )}
-        </>,
-      );
-    }
-    if (planSelection.kind === "beam" && selectedBeamInfo()) {
-      const info = selectedBeamInfo()!;
-      return shell(
-        "Dầm",
-        info.name,
-        "text-emerald-300",
-        <>
-          {row(
-            "L (mm)",
-            <Input
-              type="number"
-              value={Math.round(info.length)}
-              onChange={(e) => patchSelectedBeamLength(Number(e.target.value))}
-            />,
-          )}
-          {row(
-            "B (mm)",
-            <Input
-              type="number"
-              value={info.B}
-              onChange={(e) => patchSelectedBeamDims({ beamB: Number(e.target.value) || 0 })}
-            />,
-          )}
-          {row(
-            "H (mm)",
-            <Input
-              type="number"
-              value={info.H}
-              onChange={(e) => patchSelectedBeamDims({ beamH: Number(e.target.value) || 0 })}
-            />,
-          )}
-          {row(
-            "B1 (mm)",
-            <Input
-              type="number"
-              value={info.B1}
-              onChange={(e) => patchSelectedBeamDims({ beamB1: Number(e.target.value) || 0 })}
-            />,
-          )}
-        </>,
-      );
-    }
-    if (planSelection.kind === "axis" && selectedAxisInfo()) {
-      const info = selectedAxisInfo()!;
-      return shell(
-        `Trục ${info.dir}`,
-        info.spanLabel,
-        "text-amber-300",
-        <>
-          {row(
-            "Số hiệu",
-            <Input value={info.name} onChange={(e) => patchSelectedAxisName(e.target.value)} />,
-          )}
-          {row(
-            info.index === 0 ? "Vị trí (mm)" : "Nhịp (mm)",
-            <Input
-              type="number"
-              value={Math.round(info.span)}
-              onChange={(e) => patchSelectedAxisSpan(Number(e.target.value))}
-            />,
-          )}
-        </>,
-      );
-    }
-    return null;
+  function handlePlanSelect(sel: PlanSelection | null) {
+    setPlanSelection(sel);
+    if (!sel) return;
+    if (sel.kind === "beam") {
+      setTab("beams");
+    } else if (sel.kind === "bay") setTab("draw");
+    else if (sel.kind === "axis") setTab("axes");
   }
+
+  useEffect(() => {
+    if (tab !== "beams" || planSelection?.kind !== "beam") return;
+    const id = window.setTimeout(() => {
+      selectedBeamPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [tab, planSelection]);
+
+  useEffect(() => {
+    if (tab !== "draw" || planSelection?.kind !== "bay") return;
+    const id = window.setTimeout(() => {
+      selectedBayPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [tab, planSelection]);
 
   /** Tiếp theo: dịch chọn dầm/ô sàn từ trái sang phải (lặp lại). */
   function selectNextPlanItem() {
@@ -429,13 +371,13 @@ export function SlabApp() {
       return;
     }
     if (!planSelection) {
-      setPlanSelection(list[0]);
+      handlePlanSelect(list[0]);
       setStatus("Đã chọn phần tử đầu tiên (trái → phải).");
       return;
     }
     const idx = list.findIndex((item) => sameSelection(item, planSelection));
     const next = list[(idx < 0 ? 0 : idx + 1) % list.length];
-    setPlanSelection(next);
+    handlePlanSelect(next);
     setStatus(
       next.kind === "beam"
         ? `Đã chuyển sang đoạn dầm tiếp theo (${(idx < 0 ? 0 : idx + 1) % list.length + 1}/${list.length}).`
@@ -616,16 +558,6 @@ export function SlabApp() {
 
   function updateAxesY(nextAxes: typeof project.axesY) {
     persist(applyAxesToProject({ ...project, axesY: nextAxes }));
-  }
-
-  function addSlabBayX() {
-    persist(insertSlabBayX(project, 3000));
-    setStatus("Đã chèn thêm ô sàn theo phương X (trục mới).");
-  }
-
-  function addSlabBayY() {
-    persist(insertSlabBayY(project, 3000));
-    setStatus("Đã chèn thêm ô sàn theo phương Y (trục mới).");
   }
 
   function insertOpening() {
@@ -842,80 +774,10 @@ export function SlabApp() {
                 </div>
 
                 <div className="mt-3 border-t border-zinc-700 pt-3">
-                  {!planSelection && (
-                    <div className="mb-1.5 text-[11px] text-zinc-500">
-                      Nhấp ô sàn / đoạn dầm trên bản vẽ, hoặc bấm{" "}
-                      <b className="text-emerald-400">Tiếp theo</b> để chọn lần lượt từ trái sang phải.
-                    </div>
-                  )}
-                  {planSelection && (
-                    <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <div className="text-xs font-semibold text-sky-300">
-                        {planSelection.kind === "bay"
-                          ? "Ô sàn đang chọn trên bản vẽ"
-                          : "Dầm đang chọn trên bản vẽ"}
-                      </div>
-                      <Button size="sm" variant="secondary" onClick={() => setPlanSelection(null)}>
-                        Bỏ chọn
-                      </Button>
-                    </div>
-                  )}
-                  {planSelection?.kind === "bay" && selectedBaySpans() && (
-                    <div className="mb-2 flex flex-col gap-2.5">
-                      <div className="basis-full text-[11px] text-zinc-400">
-                        {selectedBaySpans()!.name}
-                      </div>
-                      <Field label="Khoảng cách Lx" unit="mm">
-                        <Input
-                          type="number"
-                          value={Math.round(selectedBaySpans()!.lx)}
-                          onChange={(e) => patchSelectedBaySpan("lx", Number(e.target.value))}
-                        />
-                      </Field>
-                      <Field label="Khoảng cách Ly" unit="mm">
-                        <Input
-                          type="number"
-                          value={Math.round(selectedBaySpans()!.ly)}
-                          onChange={(e) => patchSelectedBaySpan("ly", Number(e.target.value))}
-                        />
-                      </Field>
-                    </div>
-                  )}
-                  {planSelection?.kind === "beam" && selectedBeamInfo() && (
-                    <div className="mb-2 flex flex-col gap-2.5">
-                      <div className="basis-full text-[11px] text-zinc-400">
-                        {selectedBeamInfo()!.name}
-                      </div>
-                      <Field label="Khoảng cách L" unit="mm">
-                        <Input
-                          type="number"
-                          value={Math.round(selectedBeamInfo()!.length)}
-                          onChange={(e) => patchSelectedBeamLength(Number(e.target.value))}
-                        />
-                      </Field>
-                      <Field label="H" unit="mm">
-                        <Input
-                          type="number"
-                          value={selectedBeamInfo()!.H}
-                          onChange={(e) => patchSelectedBeamDims({ beamH: Number(e.target.value) || 0 })}
-                        />
-                      </Field>
-                      <Field label="B" unit="mm">
-                        <Input
-                          type="number"
-                          value={selectedBeamInfo()!.B}
-                          onChange={(e) => patchSelectedBeamDims({ beamB: Number(e.target.value) || 0 })}
-                        />
-                      </Field>
-                      <Field label="B1" unit="mm">
-                        <Input
-                          type="number"
-                          value={selectedBeamInfo()!.B1}
-                          onChange={(e) => patchSelectedBeamDims({ beamB1: Number(e.target.value) || 0 })}
-                        />
-                      </Field>
-                    </div>
-                  )}
+                  <div className="mb-1.5 text-[11px] text-zinc-500">
+                    Nhấp ô sàn trên bản vẽ để mở <b className="text-sky-300">4. Vẽ thép sàn</b>; nhấp đoạn dầm để mở{" "}
+                    <b className="text-emerald-400">3. Số liệu dầm</b>.
+                  </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="success"
@@ -942,19 +804,41 @@ export function SlabApp() {
           {tab === "axes" && (
             <div className="flex flex-col gap-3">
               <Panel title="2. Số liệu trục" className="min-w-0 w-full">
-                <div className="flex flex-col gap-3">
+                <div className="mb-2 flex gap-0.5 border-b border-zinc-700">
+                  {(
+                    [
+                      { id: "X" as const, label: "Trục phương X" },
+                      { id: "Y" as const, label: "Trục phương Y" },
+                    ] as const
+                  ).map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setAxisDirTab(t.id)}
+                      className={`shrink-0 rounded-t px-2.5 py-1.5 text-[12px] ${
+                        axisDirTab === t.id
+                          ? "bg-zinc-800 font-semibold text-sky-300"
+                          : "text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+
+                {axisDirTab === "X" ? (
                   <div className="rounded border border-zinc-700 bg-zinc-950/60 p-2">
-                    <div className="mb-2 text-xs font-semibold text-sky-300">Trục phương X</div>
                     <div className="space-y-1.5">
                       {sortAxes(project.axesX ?? []).map((ax, i) => (
-                        <div key={ax.id} className="flex flex-wrap items-center gap-1.5">
+                        <div key={ax.id} className="flex min-w-0 flex-nowrap items-center gap-1.5">
                           <Input
-                            className="w-14"
+                            className="w-12 max-w-12 shrink-0"
                             value={ax.name}
                             onChange={(e) => updateAxesX(renameAxis(project.axesX, ax.id, e.target.value))}
                           />
                           <Input
                             type="number"
+                            className="min-w-0 w-auto flex-1"
                             title={i === 0 ? "Vị trí gốc (mm)" : "Khoảng cách từ trục trước (mm)"}
                             value={axisSpan(project.axesX, i)}
                             onChange={(e) => {
@@ -968,11 +852,11 @@ export function SlabApp() {
                               }
                             }}
                           />
-                          <span className="text-[11px] text-zinc-500">mm</span>
+                          <span className="shrink-0 text-[11px] text-zinc-500">mm</span>
                           <Button
                             variant="danger"
                             size="sm"
-                            className="px-1"
+                            className="shrink-0 px-1.5"
                             disabled={(project.axesX?.length ?? 0) <= 2}
                             onClick={() => updateAxesX(removeAxis(project.axesX, ax.id))}
                           >
@@ -981,22 +865,31 @@ export function SlabApp() {
                         </div>
                       ))}
                     </div>
-                    <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={addSlabBayX}>
-                      <Plus /> Thêm trục X (không thêm dầm)
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="mt-2 w-full"
+                      onClick={() => {
+                        patchAxisCount("X", (project.axesX?.length ?? 2) + 1);
+                        setStatus("Đã thêm trục phương X (kèm dầm).");
+                      }}
+                    >
+                      <Plus /> Thêm Trục phương X
                     </Button>
                   </div>
+                ) : (
                   <div className="rounded border border-zinc-700 bg-zinc-950/60 p-2">
-                    <div className="mb-2 text-xs font-semibold text-sky-300">Trục phương Y</div>
                     <div className="space-y-1.5">
                       {sortAxes(project.axesY ?? []).map((ay, i) => (
-                        <div key={ay.id} className="flex flex-wrap items-center gap-1.5">
+                        <div key={ay.id} className="flex min-w-0 flex-nowrap items-center gap-1.5">
                           <Input
-                            className="w-14"
+                            className="w-12 max-w-12 shrink-0"
                             value={ay.name}
                             onChange={(e) => updateAxesY(renameAxis(project.axesY, ay.id, e.target.value))}
                           />
                           <Input
                             type="number"
+                            className="min-w-0 w-auto flex-1"
                             title={i === 0 ? "Vị trí gốc (mm)" : "Khoảng cách từ trục trước (mm)"}
                             value={axisSpan(project.axesY, i)}
                             onChange={(e) => {
@@ -1010,11 +903,11 @@ export function SlabApp() {
                               }
                             }}
                           />
-                          <span className="text-[11px] text-zinc-500">mm</span>
+                          <span className="shrink-0 text-[11px] text-zinc-500">mm</span>
                           <Button
                             variant="danger"
                             size="sm"
-                            className="px-1"
+                            className="shrink-0 px-1.5"
                             disabled={(project.axesY?.length ?? 0) <= 2}
                             onClick={() => updateAxesY(removeAxis(project.axesY, ay.id))}
                           >
@@ -1023,11 +916,19 @@ export function SlabApp() {
                         </div>
                       ))}
                     </div>
-                    <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={addSlabBayY}>
-                      <Plus /> Thêm trục Y (không thêm dầm)
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="mt-2 w-full"
+                      onClick={() => {
+                        patchAxisCount("Y", (project.axesY?.length ?? 2) + 1);
+                        setStatus("Đã thêm trục phương Y (kèm dầm).");
+                      }}
+                    >
+                      <Plus /> Thêm Trục phương Y
                     </Button>
                   </div>
-                </div>
+                )}
               </Panel>
             </div>
           )}
@@ -1085,8 +986,9 @@ export function SlabApp() {
                     </Field>
                   </div>
                   <p className="mt-1.5 text-[11px] text-zinc-500">
-                    B1: từ mép trái dầm đến tim dầm. Dầm và trục độc lập — thêm/bớt trục không đổi dầm và ngược lại.
-                    Kích thước: {project.info.beamSizeX || `${project.info.beamB}x${project.info.beamH}`}.
+                    B1 tự động: trục biên = da dầm ngoài (B1=0 hoặc B); trục giữa = tâm dầm (B1=B/2).
+                    Đổi khoảng cách tim trục thì dầm theo tim. Kích thước:{" "}
+                    {project.info.beamSizeX || `${project.info.beamB}x${project.info.beamH}`}.
                   </p>
                 </div>
                 <div className="mt-3 rounded border border-zinc-700 bg-zinc-950/60 p-2">
@@ -1105,130 +1007,78 @@ export function SlabApp() {
                     {(project.beams ?? []).length === 0 && (
                       <p className="text-[11px] text-zinc-500">Chưa có dầm. Thêm dầm hoặc nhập số lượng ở trên.</p>
                     )}
-                    {(project.beams ?? []).map((b) => (
-                      <div
-                        key={b.id}
-                        className={`flex flex-wrap items-center gap-1.5 rounded border px-1.5 py-1 ${
-                          planSelection?.kind === "beam" && planSelection.beamId === b.id
-                            ? "border-emerald-600 bg-emerald-950/40"
-                            : "border-zinc-700"
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          className="min-w-0 flex-1 text-left text-xs text-zinc-200 hover:text-sky-300"
-                          onClick={() => setPlanSelection({ kind: "beam", beamId: b.id })}
-                        >
-                          {b.name} · {b.direction === "Y" ? "đứng" : "ngang"} · tim={Math.round(b.axis)} · L=
-                          {Math.round(Math.abs(b.end - b.start))}
-                        </button>
-                        <Input
-                          type="number"
-                          className="w-20"
-                          title="Vị trí tim dầm (mm)"
-                          value={Math.round(b.axis)}
-                          onChange={(e) =>
-                            persist(patchBeam(project, b.id, { axis: Number(e.target.value) || 0 }))
-                          }
-                        />
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          className="px-1"
-                          onClick={() => {
-                            if (planSelection?.kind === "beam" && planSelection.beamId === b.id) {
-                              setPlanSelection(null);
-                            }
-                            persist(removeBeam(project, b.id));
-                          }}
-                        >
-                          <Trash2 />
-                        </Button>
-                      </div>
-                    ))}
+                    {(project.beams ?? []).flatMap((b) => {
+                      const segs = beamSegments(project, b);
+                      if (segs.length === 0) {
+                        return [
+                          <div
+                            key={b.id}
+                            className="flex flex-wrap items-center gap-1.5 rounded border border-zinc-700 px-1.5 py-1"
+                          >
+                            <span className="min-w-0 flex-1 text-xs text-zinc-400">
+                              {b.name} · {b.direction === "Y" ? "đứng" : "ngang"} · chưa có đoạn
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              className="px-1"
+                              onClick={() => persist(removeBeam(project, b.id))}
+                            >
+                              <Trash2 />
+                            </Button>
+                          </div>,
+                        ];
+                      }
+                      return segs.map((seg) => {
+                        const selected =
+                          planSelection?.kind === "beam" &&
+                          planSelection.beamId === b.id &&
+                          planSelection.segIndex === seg.index;
+                        return (
+                          <div
+                            key={`${b.id}-s${seg.index}`}
+                            className={`flex flex-wrap items-center gap-1.5 rounded border px-1.5 py-1 ${
+                              selected ? "border-emerald-600 bg-emerald-950/40" : "border-zinc-700"
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              className="min-w-0 flex-1 text-left text-xs text-zinc-200 hover:text-sky-300"
+                              onClick={() =>
+                                handlePlanSelect({ kind: "beam", beamId: b.id, segIndex: seg.index })
+                              }
+                            >
+                              {b.name} · {seg.a0.name}–{seg.a1.name} · {b.direction === "Y" ? "đứng" : "ngang"} · L=
+                              {Math.round(seg.span)}
+                            </button>
+                            <Input
+                              type="number"
+                              className="w-20"
+                              title="Vị trí tim dầm (mm)"
+                              value={Math.round(b.axis)}
+                              onChange={(e) =>
+                                persist(patchBeam(project, b.id, { axis: Number(e.target.value) || 0 }))
+                              }
+                            />
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              className="px-1"
+                              onClick={() => {
+                                if (planSelection?.kind === "beam" && planSelection.beamId === b.id) {
+                                  setPlanSelection(null);
+                                }
+                                persist(removeBeam(project, b.id));
+                              }}
+                            >
+                              <Trash2 />
+                            </Button>
+                          </div>
+                        );
+                      });
+                    })}
                   </div>
                 </div>
-                {(planSelection?.kind === "bay" || planSelection?.kind === "beam") && (
-                  <div className="mt-3 rounded border border-sky-700/60 bg-sky-950/30 p-2">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <div className="text-xs font-semibold text-sky-300">
-                        {planSelection.kind === "bay" ? "Ô sàn đang chọn" : "Dầm đang chọn"}
-                      </div>
-                      <Button size="sm" variant="secondary" onClick={() => setPlanSelection(null)}>
-                        Bỏ chọn
-                      </Button>
-                    </div>
-                    {planSelection.kind === "bay" && selectedBaySpans() && (
-                      <>
-                        <p className="mb-2 text-[11px] text-zinc-400">{selectedBaySpans()!.name}</p>
-                        <div className="flex flex-col gap-2.5">
-                          <Field label="Khoảng cách Lx" unit="mm">
-                            <Input
-                              type="number"
-                              value={Math.round(selectedBaySpans()!.lx)}
-                              onChange={(e) => patchSelectedBaySpan("lx", Number(e.target.value))}
-                            />
-                          </Field>
-                          <Field label="Khoảng cách Ly" unit="mm">
-                            <Input
-                              type="number"
-                              value={Math.round(selectedBaySpans()!.ly)}
-                              onChange={(e) => patchSelectedBaySpan("ly", Number(e.target.value))}
-                            />
-                          </Field>
-                        </div>
-                      </>
-                    )}
-                    {planSelection.kind === "beam" && selectedBeamInfo() && (
-                      <>
-                        <p className="mb-2 text-[11px] text-zinc-400">{selectedBeamInfo()!.name}</p>
-                        <div className="flex flex-col gap-2.5">
-                          <Field label="Khoảng cách L" unit="mm">
-                            <Input
-                              type="number"
-                              value={Math.round(selectedBeamInfo()!.length)}
-                              onChange={(e) => patchSelectedBeamLength(Number(e.target.value))}
-                            />
-                          </Field>
-                          <Field label="Chiều cao H" unit="mm">
-                            <Input
-                              type="number"
-                              value={selectedBeamInfo()!.H}
-                              onChange={(e) => patchSelectedBeamDims({ beamH: Number(e.target.value) || 0 })}
-                            />
-                          </Field>
-                          <Field label="Chiều rộng B" unit="mm">
-                            <Input
-                              type="number"
-                              value={selectedBeamInfo()!.B}
-                              onChange={(e) => patchSelectedBeamDims({ beamB: Number(e.target.value) || 0 })}
-                            />
-                          </Field>
-                          <Field label="Lệch trục B1" unit="mm">
-                            <Input
-                              type="number"
-                              value={selectedBeamInfo()!.B1}
-                              onChange={(e) => patchSelectedBeamDims({ beamB1: Number(e.target.value) || 0 })}
-                            />
-                          </Field>
-                        </div>
-                      </>
-                    )}
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <Button
-                        variant="success"
-                        size="sm"
-                        title="Chọn đoạn dầm / ô sàn tiếp theo (trái → phải)"
-                        onClick={selectNextPlanItem}
-                      >
-                        <ChevronRight /> Tiếp theo
-                      </Button>
-                      <Button variant="success" size="sm" onClick={applySelectionToAllSpans}>
-                        <Check /> Áp dụng cho các nhịp
-                      </Button>
-                    </div>
-                  </div>
-                )}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     variant="success"
@@ -1259,6 +1109,64 @@ export function SlabApp() {
                     Thống kê Dầm ({project.beams.length})
                   </Button>
                 </div>
+
+                {planSelection?.kind === "beam" && selectedBeamInfo() && (
+                  <div
+                    ref={selectedBeamPanelRef}
+                    className="mt-3 rounded border border-sky-700/60 bg-sky-950/30 p-2"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="text-xs font-semibold text-sky-300">Dầm đang chọn</div>
+                      <Button size="sm" variant="secondary" onClick={() => setPlanSelection(null)}>
+                        Bỏ chọn
+                      </Button>
+                    </div>
+                    <p className="mb-2 text-[11px] text-zinc-400">{selectedBeamInfo()!.name}</p>
+                    <div className="flex flex-col gap-2.5">
+                      <Field label="Khoảng cách L" unit="mm">
+                        <Input
+                          type="number"
+                          value={Math.round(selectedBeamInfo()!.length)}
+                          onChange={(e) => patchSelectedBeamLength(Number(e.target.value))}
+                        />
+                      </Field>
+                      <Field label="Chiều cao H" unit="mm">
+                        <Input
+                          type="number"
+                          value={selectedBeamInfo()!.H}
+                          onChange={(e) => patchSelectedBeamDims({ beamH: Number(e.target.value) || 0 })}
+                        />
+                      </Field>
+                      <Field label="Chiều rộng B" unit="mm">
+                        <Input
+                          type="number"
+                          value={selectedBeamInfo()!.B}
+                          onChange={(e) => patchSelectedBeamDims({ beamB: Number(e.target.value) || 0 })}
+                        />
+                      </Field>
+                      <Field label="Lệch trục B1" unit="mm">
+                        <Input
+                          type="number"
+                          value={selectedBeamInfo()!.B1}
+                          onChange={(e) => patchSelectedBeamDims({ beamB1: Number(e.target.value) || 0 })}
+                        />
+                      </Field>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="success"
+                        size="sm"
+                        title="Chọn đoạn dầm tiếp theo (trái → phải)"
+                        onClick={selectNextPlanItem}
+                      >
+                        <ChevronRight /> Tiếp theo
+                      </Button>
+                      <Button variant="success" size="sm" onClick={applySelectionToAllSpans}>
+                        <Check /> Áp dụng cho các nhịp
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
               </Panel>
             </div>
@@ -1376,7 +1284,7 @@ export function SlabApp() {
                   </Button>
                 </div>
               </Panel>
-              <Panel title="Danh sách vùng thép" className="w-56">
+              <Panel title="Danh sách vùng thép" className="min-w-0 w-full">
                 <ul className="max-h-48 space-y-1 overflow-auto text-xs">
                   {(project.layoutPreset === "manual" ? project.zones : zones).map((z) => (
                     <li key={z.id}>
@@ -1397,6 +1305,50 @@ export function SlabApp() {
                   ))}
                 </ul>
               </Panel>
+
+              {planSelection?.kind === "bay" && selectedBaySpans() && (
+                <div
+                  ref={selectedBayPanelRef}
+                  className="rounded border border-sky-700/60 bg-sky-950/30 p-2"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="text-xs font-semibold text-sky-300">Ô sàn đang chọn trên bản vẽ</div>
+                    <Button size="sm" variant="secondary" onClick={() => setPlanSelection(null)}>
+                      Bỏ chọn
+                    </Button>
+                  </div>
+                  <p className="mb-2 text-[11px] text-zinc-400">{selectedBaySpans()!.name}</p>
+                  <div className="flex flex-col gap-2.5">
+                    <Field label="Khoảng cách Lx" unit="mm">
+                      <Input
+                        type="number"
+                        value={Math.round(selectedBaySpans()!.lx)}
+                        onChange={(e) => patchSelectedBaySpan("lx", Number(e.target.value))}
+                      />
+                    </Field>
+                    <Field label="Khoảng cách Ly" unit="mm">
+                      <Input
+                        type="number"
+                        value={Math.round(selectedBaySpans()!.ly)}
+                        onChange={(e) => patchSelectedBaySpan("ly", Number(e.target.value))}
+                      />
+                    </Field>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="success"
+                      size="sm"
+                      title="Chọn ô sàn tiếp theo (trái → phải)"
+                      onClick={selectNextPlanItem}
+                    >
+                      <ChevronRight /> Tiếp theo
+                    </Button>
+                    <Button variant="success" size="sm" onClick={applySelectionToAllSpans}>
+                      <Check /> Áp dụng cho các nhịp
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1629,100 +1581,23 @@ export function SlabApp() {
         </div>
 
         <div className="flex min-h-0 flex-col overflow-hidden">
-          {(tab === "axes" || tab === "beams" || tab === "draw") && (
+          {tab === "axes" && (
             <div className="shrink-0 border-b border-zinc-800 bg-zinc-900/80 px-3 py-2">
               {!planSelection && (
                 <div className="mb-1 text-[11px] text-zinc-500">
-                  Nhấp ô sàn / đoạn dầm trên bản vẽ, hoặc bấm{" "}
-                  <b className="text-emerald-400">Tiếp theo</b> để chọn lần lượt từ trái sang phải.
+                  Nhấp số hiệu trục trên bản vẽ để chỉnh tại danh sách trục bên trái.
                 </div>
               )}
-              {planSelection && (
+              {planSelection?.kind === "axis" && selectedAxisInfo() && (
                 <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <div className="text-xs font-semibold text-sky-300">
-                    {planSelection.kind === "bay"
-                      ? "Ô sàn đang chọn trên bản vẽ"
-                      : "Dầm đang chọn trên bản vẽ"}
+                  <div className="text-xs font-semibold text-amber-300">
+                    Trục {selectedAxisInfo()!.dir}: {selectedAxisInfo()!.spanLabel}
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => setPlanSelection(null)}>
                     Bỏ chọn
                   </Button>
                 </div>
               )}
-              {planSelection?.kind === "bay" && selectedBaySpans() && (
-                <div className="mb-2 flex flex-col gap-2.5">
-                  <div className="basis-full text-[11px] text-zinc-400">
-                    {selectedBaySpans()!.name}
-                  </div>
-                  <Field label="Khoảng cách Lx" unit="mm">
-                    <Input
-                      type="number"
-                      value={Math.round(selectedBaySpans()!.lx)}
-                      onChange={(e) => patchSelectedBaySpan("lx", Number(e.target.value))}
-                    />
-                  </Field>
-                  <Field label="Khoảng cách Ly" unit="mm">
-                    <Input
-                      type="number"
-                      value={Math.round(selectedBaySpans()!.ly)}
-                      onChange={(e) => patchSelectedBaySpan("ly", Number(e.target.value))}
-                    />
-                  </Field>
-                </div>
-              )}
-              {planSelection?.kind === "beam" && selectedBeamInfo() && (
-                <div className="mb-2 flex flex-col gap-2.5">
-                  <div className="basis-full text-[11px] text-zinc-400">
-                    {selectedBeamInfo()!.name}
-                  </div>
-                  <Field label="Khoảng cách L" unit="mm">
-                    <Input
-                      type="number"
-                      value={Math.round(selectedBeamInfo()!.length)}
-                      onChange={(e) => patchSelectedBeamLength(Number(e.target.value))}
-                    />
-                  </Field>
-                  <Field label="H" unit="mm">
-                    <Input
-                      type="number"
-                      value={selectedBeamInfo()!.H}
-                      onChange={(e) => patchSelectedBeamDims({ beamH: Number(e.target.value) || 0 })}
-                    />
-                  </Field>
-                  <Field label="B" unit="mm">
-                    <Input
-                      type="number"
-                      value={selectedBeamInfo()!.B}
-                      onChange={(e) => patchSelectedBeamDims({ beamB: Number(e.target.value) || 0 })}
-                    />
-                  </Field>
-                  <Field label="B1" unit="mm">
-                    <Input
-                      type="number"
-                      value={selectedBeamInfo()!.B1}
-                      onChange={(e) => patchSelectedBeamDims({ beamB1: Number(e.target.value) || 0 })}
-                    />
-                  </Field>
-                </div>
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="success"
-                  size="sm"
-                  title="Chọn đoạn dầm / ô sàn tiếp theo (trái → phải)"
-                  onClick={selectNextPlanItem}
-                >
-                  <ChevronRight /> Tiếp theo
-                </Button>
-                <Button
-                  variant="success"
-                  size="sm"
-                  disabled={!planSelection}
-                  onClick={applySelectionToAllSpans}
-                >
-                  <Check /> Áp dụng cho các nhịp
-                </Button>
-              </div>
             </div>
           )}
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -1731,8 +1606,7 @@ export function SlabApp() {
               show3d={project.show3d && tab === "model3d"}
               interactive={tab === "plan" || tab === "axes" || tab === "beams" || tab === "draw"}
               selection={planSelection}
-              onSelect={setPlanSelection}
-              editPanel={planEditPanel()}
+              onSelect={handlePlanSelect}
             />
           </div>
         </div>

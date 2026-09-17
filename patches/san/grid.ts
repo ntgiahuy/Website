@@ -45,6 +45,103 @@ export function beamOuterFaces(axisPos: number, sec: BeamSection): { lo: number;
   return { lo: axisPos - sec.b1, hi: axisPos + (sec.bw - sec.b1) };
 }
 
+/**
+ * B1 theo vị trí trục trên lưới:
+ * - biên đầu: tim = da ngoài lo (B1 = 0)
+ * - biên cuối: tim = da ngoài hi (B1 = B)
+ * - giữa: tim = tâm dầm (B1 = B/2)
+ */
+export function beamOffsetForAxisIndex(bw: number, index: number, count: number): number {
+  const B = Math.max(1, Math.round(bw) || 1);
+  if (count <= 1) return Math.round(B / 2);
+  if (index <= 0) return 0;
+  if (index >= count - 1) return B;
+  return Math.round(B / 2);
+}
+
+/**
+ * Ghép dầm → chỉ số trục: axisId → trùng vị trí → cùng thứ tự (khi số dầm = số trục) → gần nhất.
+ * Quan trọng khi đổi nhịp: vị trí trục đã đổi, không còn khớp pos cũ.
+ */
+function resolveBeamAxisIndex(
+  beam: PlanBeam,
+  axes: GridAxis[],
+  peersSorted: PlanBeam[],
+): number {
+  if (!axes.length) return -1;
+  if (beam.axisId) {
+    const byId = axes.findIndex((a) => a.id === beam.axisId);
+    if (byId >= 0) return byId;
+  }
+  const byPos = axes.findIndex((a) => Math.abs(a.pos - beam.axis) < 0.5);
+  if (byPos >= 0) return byPos;
+  if (peersSorted.length === axes.length) {
+    const peerIdx = peersSorted.findIndex((p) => p.id === beam.id);
+    if (peerIdx >= 0) return peerIdx;
+  }
+  let best = 0;
+  let bestDist = Math.abs(axes[0].pos - beam.axis);
+  for (let i = 1; i < axes.length; i++) {
+    const d = Math.abs(axes[i].pos - beam.axis);
+    if (d < bestDist) {
+      best = i;
+      bestDist = d;
+    }
+  }
+  return best;
+}
+
+/**
+ * Đưa dầm theo tim trục (axisId / vị trí) và chỉnh B1 biên / giữa.
+ * Gọi sau khi đổi khoảng cách / số lượng trục.
+ */
+export function syncBeamsToAxes(project: SlabProject): SlabProject {
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
+
+  const peersY = (project.beams ?? [])
+    .filter((b) => b.direction === "Y")
+    .slice()
+    .sort((a, b) => a.axis - b.axis || a.name.localeCompare(b.name));
+  const peersX = (project.beams ?? [])
+    .filter((b) => b.direction === "X")
+    .slice()
+    .sort((a, b) => a.axis - b.axis || a.name.localeCompare(b.name));
+
+  const beams = (project.beams ?? []).map((b) => {
+    if (b.direction === "Y") {
+      const idx = resolveBeamAxisIndex(b, axesX, peersY);
+      if (idx < 0) return { ...b, start: 0, end: Hplan };
+      const ax = axesX[idx];
+      const { b: bw } = parseSizeStr(b.size);
+      return {
+        ...b,
+        axis: ax.pos,
+        axisId: ax.id,
+        offset: beamOffsetForAxisIndex(bw, idx, axesX.length),
+        start: 0,
+        end: Hplan,
+      };
+    }
+
+    const idx = resolveBeamAxisIndex(b, axesY, peersX);
+    if (idx < 0) return { ...b, start: 0, end: W };
+    const ay = axesY[idx];
+    const { b: bw } = parseSizeStr(b.size);
+    return {
+      ...b,
+      axis: ay.pos,
+      axisId: ay.id,
+      offset: beamOffsetForAxisIndex(bw, idx, axesY.length),
+      start: 0,
+      end: W,
+    };
+  });
+
+  return { ...project, beams };
+}
+
 /** Đoạn dầm đứng (phương Y): kéo đầu đến da dầm ngang tại hai đầu. */
 export function verticalBeamSegExtent(
   project: SlabProject,
@@ -77,7 +174,10 @@ export function horizontalBeamSegExtent(
   return { xLo: faceLo.lo, xHi: faceHi.hi };
 }
 
-/** Phạm vi thép sàn trong ô: nằm trên dầm, thụt 50mm từ da dầm ngoài. */
+/**
+ * Phạm vi thép sàn trong ô: giữa da trong hai dầm, thụt insetMm vào trong ô.
+ * Không kéo thép xuyên qua thân dầm.
+ */
 export function bayRebarExtent(
   project: SlabProject,
   axesX: GridAxis[],
@@ -85,6 +185,113 @@ export function bayRebarExtent(
   ix: number,
   iy: number,
   insetMm = SLAB_REBAR_FACE_INSET_MM,
+): { x0: number; x1: number; y0: number; y1: number; mx: number; my: number } {
+  const slab = baySlabExtent(project, axesX, axesY, ix, iy);
+  const x0 = slab.x0 + insetMm;
+  const x1c = Math.max(x0, slab.x1 - insetMm);
+  const y0 = slab.y0 + insetMm;
+  const y1c = Math.max(y0, slab.y1 - insetMm);
+  return {
+    x0,
+    x1: x1c,
+    y0,
+    y1: y1c,
+    mx: (x0 + x1c) / 2,
+    my: (y0 + y1c) / 2,
+  };
+}
+
+/**
+ * Các đoạn tim trục đứng chỉ trong lòng ô sàn (giữa da trong dầm).
+ * Không vẽ khi tim trùng thân dầm đứng.
+ */
+export function axisInteriorSegmentsX(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+  axisPos: number,
+): { lo: number; hi: number }[] {
+  const spans: { lo: number; hi: number }[] = [];
+  const eps = 0.5;
+  for (let ix = 0; ix < axesX.length - 1; ix++) {
+    for (let iy = 0; iy < axesY.length - 1; iy++) {
+      const slab = baySlabExtent(project, axesX, axesY, ix, iy);
+      if (axisPos > slab.x0 + eps && axisPos < slab.x1 - eps && slab.y1 > slab.y0 + eps) {
+        spans.push({ lo: slab.y0, hi: slab.y1 });
+      }
+    }
+  }
+  return mergeAxisSpans(spans);
+}
+
+/**
+ * Các đoạn tim trục ngang chỉ trong lòng ô sàn (giữa da trong dầm).
+ * Không vẽ khi tim trùng thân dầm ngang.
+ */
+export function axisInteriorSegmentsY(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+  axisPos: number,
+): { lo: number; hi: number }[] {
+  const spans: { lo: number; hi: number }[] = [];
+  const eps = 0.5;
+  for (let ix = 0; ix < axesX.length - 1; ix++) {
+    for (let iy = 0; iy < axesY.length - 1; iy++) {
+      const slab = baySlabExtent(project, axesX, axesY, ix, iy);
+      if (axisPos > slab.y0 + eps && axisPos < slab.y1 - eps && slab.x1 > slab.x0 + eps) {
+        spans.push({ lo: slab.x0, hi: slab.x1 });
+      }
+    }
+  }
+  return mergeAxisSpans(spans);
+}
+
+function mergeAxisSpans(spans: { lo: number; hi: number }[]): { lo: number; hi: number }[] {
+  if (spans.length === 0) return [];
+  const sorted = [...spans].sort((a, b) => a.lo - b.lo);
+  const out: { lo: number; hi: number }[] = [{ ...sorted[0] }];
+  for (let i = 1; i < sorted.length; i++) {
+    const last = out[out.length - 1];
+    if (sorted[i].lo <= last.hi + 0.5) last.hi = Math.max(last.hi, sorted[i].hi);
+    else out.push({ ...sorted[i] });
+  }
+  return out;
+}
+
+/** Phần dầm nhô ngoài khung plan (mm) — dùng neo vòng số hiệu ngoài da dầm. */
+export function planBeamBleed(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+): { xMin: number; xMax: number; yMin: number; yMax: number } {
+  let xMin = 0;
+  let xMax = project.planWidth;
+  let yMin = 0;
+  let yMax = project.planHeight;
+  for (const ax of axesX) {
+    const f = beamOuterFaces(ax.pos, beamSectionOnAxis(project, "Y", ax));
+    xMin = Math.min(xMin, f.lo);
+    xMax = Math.max(xMax, f.hi);
+  }
+  for (const ay of axesY) {
+    const f = beamOuterFaces(ay.pos, beamSectionOnAxis(project, "X", ay));
+    yMin = Math.min(yMin, f.lo);
+    yMax = Math.max(yMax, f.hi);
+  }
+  return { xMin, xMax, yMin, yMax };
+}
+
+/**
+ * Phạm vi ô sàn theo mép dầm (da trong): giữa hai da dầm đứng / ngang,
+ * không lấy từ tim trục.
+ */
+export function baySlabExtent(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+  ix: number,
+  iy: number,
 ): { x0: number; x1: number; y0: number; y1: number; mx: number; my: number } {
   const ax0 = axesX[ix];
   const ax1 = axesX[ix + 1];
@@ -94,19 +301,22 @@ export function bayRebarExtent(
   const right = beamOuterFaces(ax1.pos, beamSectionOnAxis(project, "Y", ax1));
   const bottom = beamOuterFaces(ay0.pos, beamSectionOnAxis(project, "X", ay0));
   const top = beamOuterFaces(ay1.pos, beamSectionOnAxis(project, "X", ay1));
-  const x0 = left.lo + insetMm;
-  const x1 = right.hi - insetMm;
-  const y0 = bottom.lo + insetMm;
-  const y1 = top.hi - insetMm;
+  const x0 = left.hi;
+  const x1 = Math.max(x0, right.lo);
+  const y0 = bottom.hi;
+  const y1 = Math.max(y0, top.lo);
   return {
     x0,
-    x1: Math.max(x0, x1),
+    x1,
     y0,
-    y1: Math.max(y0, y1),
-    mx: (ax0.pos + ax1.pos) / 2,
-    my: (ay0.pos + ay1.pos) / 2,
+    y1,
+    mx: (x0 + x1) / 2,
+    my: (y0 + y1) / 2,
   };
 }
+
+/** Chiều dài móc thép sàn trên mặt bằng (mm). */
+export const SLAB_REBAR_HOOK_MM = 50;
 
 /** Đọc B / H / B1 từ info (kèm fallback chuỗi beamSize cũ). */
 export function beamDims(info: SlabInfo): { B: number; H: number; B1: number } {
@@ -286,6 +496,7 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
   for (const ax of axesX) {
     const old = findPrev("Y", ax.id, ax.pos);
     const dims = old ? parseSize(old.size) : { b: B, h: H };
+    const idx = axesX.findIndex((a) => a.id === ax.id);
     beams.push({
       id: old?.id ?? uid("beam"),
       name: nextName(old?.name),
@@ -295,12 +506,13 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
       axisId: ax.id,
       start: 0,
       end: Hplan,
-      offset: Number.isFinite(old?.offset) ? (old!.offset as number) : B1,
+      offset: beamOffsetForAxisIndex(dims.b, idx, axesX.length),
     });
   }
   for (const ay of axesY) {
     const old = findPrev("X", ay.id, ay.pos);
     const dims = old ? parseSize(old.size) : { b: B, h: H };
+    const idx = axesY.findIndex((a) => a.id === ay.id);
     beams.push({
       id: old?.id ?? uid("beam"),
       name: nextName(old?.name),
@@ -310,7 +522,7 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
       axisId: ay.id,
       start: 0,
       end: W,
-      offset: Number.isFinite(old?.offset) ? (old!.offset as number) : B1,
+      offset: beamOffsetForAxisIndex(dims.b, idx, axesY.length),
     });
   }
   return beams;
@@ -332,7 +544,9 @@ export function patchBeamOnAxis(
   const parsed = parseSize(current?.size ?? formatBeamSize(project.info.beamB, project.info.beamH));
   const B = dims.beamB ?? parsed.b;
   const H = dims.beamH ?? parsed.h;
-  const B1 = dims.beamB1 ?? current?.offset ?? Math.round(B / 2);
+  const B1 =
+    dims.beamB1 ??
+    beamOffsetForAxisIndex(B, axisIndex, axes.length);
   const size = formatBeamSize(B, H);
   const beams = (project.beams?.length ? project.beams : []).map((b) => {
     const match = b.axisId === axis.id || (b.direction === dir && Math.abs(b.axis - axis.pos) < 0.5);
@@ -341,7 +555,7 @@ export function patchBeamOnAxis(
   return { ...project, beams };
 }
 
-/** Áp dụng B/H/B1 của một dầm cho toàn bộ dầm trên mặt bằng. */
+/** Áp dụng B/H của một dầm cho toàn bộ; B1 biên/giữa theo lưới trục. */
 export function applyBeamDimsToAll(
   project: SlabProject,
   dims: { beamB: number; beamH: number; beamB1: number },
@@ -350,7 +564,6 @@ export function applyBeamDimsToAll(
   const beams = (project.beams?.length ? project.beams : []).map((b) => ({
     ...b,
     size,
-    offset: dims.beamB1,
   }));
   const info = syncBeamInfo({
     ...project.info,
@@ -358,7 +571,7 @@ export function applyBeamDimsToAll(
     beamH: dims.beamH,
     beamB1: dims.beamB1,
   });
-  return { ...project, info, beams };
+  return syncBeamsToAxes({ ...project, info, beams });
 }
 
 /** Đặt cùng một nhịp (mm) cho mọi khoảng giữa trục theo phương X hoặc Y. */
@@ -396,17 +609,17 @@ export function ensureAxes(project: SlabProject): SlabProject {
   return { ...project, info, axesX, axesY, ...size };
 }
 
-/** Cập nhật trục + kích thước mặt bằng — không đụng danh sách dầm. */
+/** Cập nhật trục + kích thước mặt bằng; dầm theo tim trục (biên / giữa). */
 export function applyAxesToProject(project: SlabProject): SlabProject {
   const withAxes = ensureAxes(project);
   const size = planSizeFromAxes(withAxes.axesX, withAxes.axesY);
   const info = syncBeamInfo(withAxes.info);
-  return {
+  return syncBeamsToAxes({
     ...withAxes,
     info,
     ...size,
     beams: withAxes.beams ?? [],
-  };
+  });
 }
 
 /**
@@ -468,6 +681,7 @@ export function applyAxisCount(
   const synced: PlanBeam[] = axes.map((ax, i) => {
     const prev = existing[i];
     const dims = prev ? parseSize(prev.size) : { b: B, h: H };
+    const bw = dims.b;
     return {
       id: prev?.id ?? uid("beam"),
       name: nextName(prev?.name),
@@ -477,7 +691,7 @@ export function applyAxisCount(
       axisId: ax.id,
       start: 0,
       end: beamDir === "Y" ? Hplan : W,
-      offset: Number.isFinite(prev?.offset) ? (prev!.offset as number) : B1,
+      offset: beamOffsetForAxisIndex(bw, i, axes.length),
     };
   });
 
@@ -500,20 +714,35 @@ export function createBeam(
   axisPos: number,
   index: number,
 ): PlanBeam {
-  const { B, H, B1 } = beamDims(project.info);
+  const { B, H } = beamDims(project.info);
   const prefix = project.info.beamNamePrefix || "D";
   const axesX = sortAxes(project.axesX ?? []);
   const axesY = sortAxes(project.axesY ?? []);
   const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
+  const axes = direction === "Y" ? axesX : axesY;
+  let axisIdx = axes.findIndex((a) => Math.abs(a.pos - axisPos) < 0.5);
+  if (axisIdx < 0 && axes.length) {
+    axisIdx = 0;
+    let best = Math.abs(axes[0].pos - axisPos);
+    for (let i = 1; i < axes.length; i++) {
+      const d = Math.abs(axes[i].pos - axisPos);
+      if (d < best) {
+        best = d;
+        axisIdx = i;
+      }
+    }
+  }
+  const axis = axisIdx >= 0 ? axes[axisIdx] : undefined;
   return {
     id: uid("beam"),
     name: `${prefix}${index}`,
     size: formatBeamSize(B, H),
     direction,
-    axis: axisPos,
+    axis: axis?.pos ?? axisPos,
+    axisId: axis?.id,
     start: 0,
     end: direction === "Y" ? Hplan : W,
-    offset: B1,
+    offset: beamOffsetForAxisIndex(B, Math.max(0, axisIdx), Math.max(1, axes.length)),
   };
 }
 
@@ -649,6 +878,73 @@ export function beamDrawRange(
     if (Math.abs(p.axis - hi) <= half) hi = Math.max(hi, faces.hi);
   }
   return { lo, hi };
+}
+
+/** Một đoạn dầm giữa hai trục vuông góc liên tiếp. */
+export type BeamSegment = {
+  index: number;
+  /** Đầu / cuối vẽ (da dầm giao). */
+  lo: number;
+  hi: number;
+  /** Nhịp tim giữa hai trục (mm). */
+  span: number;
+  /** Chỉ số trục xa hơn trong mảng trục vuông góc (để setAxisSpan). */
+  spanAxisIndex: number;
+  a0: GridAxis;
+  a1: GridAxis;
+};
+
+/**
+ * Chia dầm thành các đoạn giữa các trục vuông góc nằm trên thanh.
+ * Chọn / tô sáng / sửa L theo từng đoạn, không lấy cả đầu→cuối.
+ */
+export function beamSegments(project: SlabProject, beam: PlanBeam): BeamSegment[] {
+  const bLo = Math.min(beam.start, beam.end);
+  const bHi = Math.max(beam.start, beam.end);
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+
+  if (beam.direction === "Y") {
+    const crosses = axesY
+      .map((a, fullIndex) => ({ a, fullIndex }))
+      .filter(({ a }) => a.pos >= bLo - 0.5 && a.pos <= bHi + 0.5);
+    const out: BeamSegment[] = [];
+    for (let i = 0; i < crosses.length - 1; i++) {
+      const a0 = crosses[i].a;
+      const a1 = crosses[i + 1].a;
+      const { yLo, yHi } = verticalBeamSegExtent(project, a0.pos, a1.pos, axesY);
+      out.push({
+        index: i,
+        lo: yLo,
+        hi: yHi,
+        span: a1.pos - a0.pos,
+        spanAxisIndex: crosses[i + 1].fullIndex,
+        a0,
+        a1,
+      });
+    }
+    return out;
+  }
+
+  const crosses = axesX
+    .map((a, fullIndex) => ({ a, fullIndex }))
+    .filter(({ a }) => a.pos >= bLo - 0.5 && a.pos <= bHi + 0.5);
+  const out: BeamSegment[] = [];
+  for (let i = 0; i < crosses.length - 1; i++) {
+    const a0 = crosses[i].a;
+    const a1 = crosses[i + 1].a;
+    const { xLo, xHi } = horizontalBeamSegExtent(project, a0.pos, a1.pos, axesX);
+    out.push({
+      index: i,
+      lo: xLo,
+      hi: xHi,
+      span: a1.pos - a0.pos,
+      spanAxisIndex: crosses[i + 1].fullIndex,
+      a0,
+      a1,
+    });
+  }
+  return out;
 }
 
 /** Thêm một dầm theo phương (không thêm trục). */
