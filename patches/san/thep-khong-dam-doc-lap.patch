@@ -1,0 +1,117 @@
+From eebc7b90f8c28cda4297d9c2dc85a429f8e5a486 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 17 Sep 2026 08:52:47 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20kh=C3=B4ng=20b=E1=BB=91=20tr=C3=AD=20th?=
+ =?UTF-8?q?=C3=A9p=20s=C3=A0n=20tr=C3=AAn=20d=E1=BA=A7m=20=C4=91=E1=BB=99c?=
+ =?UTF-8?q?=20l=E1=BA=ADp?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Dầm kẹp giữa hai ô thủng/sàn thấp: cắt thép, không để đoạn trên thân dầm.
+---
+ lib/grid.ts | 71 +++++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 64 insertions(+), 7 deletions(-)
+
+diff --git a/lib/grid.ts b/lib/grid.ts
+index 09ad92a..bc599cd 100644
+--- a/lib/grid.ts
++++ b/lib/grid.ts
+@@ -282,10 +282,61 @@ export function bayRebarBarSegments(
+   return out;
+ }
+ 
++/** Loại ô: sàn thường / ô thủng / sàn thấp. */
++export function bayKindAt(
++  project: SlabProject,
++  axesX: GridAxis[],
++  axesY: GridAxis[],
++  ix: number,
++  iy: number,
++): "normal" | "opening" | "low" {
++  const { x0, x1, y0, y1 } = baySlabExtent(project, axesX, axesY, ix, iy);
++  if ((project.openings ?? []).some((o) => rectNearlyEquals(o, x0, y0, x1, y1))) return "opening";
++  if ((project.lowSlabs ?? []).some((o) => rectNearlyEquals(o, x0, y0, x1, y1))) return "low";
++  return "normal";
++}
++
++/**
++ * Thân dầm độc lập trên một hàng/cột: hai bên không phải sàn thường
++ * (ô thủng / sàn thấp) → không bố trí thép sàn trên thân dầm đó.
++ */
++export function independentBeamGaps(
++  project: SlabProject,
++  axesX: GridAxis[],
++  axesY: GridAxis[],
++  along: "X" | "Y",
++  stripIndex: number,
++): Array<{ lo: number; hi: number }> {
++  const gaps: Array<{ lo: number; hi: number }> = [];
++  if (along === "X") {
++    const iy = stripIndex;
++    for (let ix = 0; ix < axesX.length - 2; ix++) {
++      const left = bayKindAt(project, axesX, axesY, ix, iy);
++      const right = bayKindAt(project, axesX, axesY, ix + 1, iy);
++      if (left === "normal" || right === "normal") continue;
++      const a = baySlabExtent(project, axesX, axesY, ix, iy);
++      const b = baySlabExtent(project, axesX, axesY, ix + 1, iy);
++      if (b.x0 > a.x1 + 0.5) gaps.push({ lo: a.x1, hi: b.x0 });
++    }
++  } else {
++    const ix = stripIndex;
++    for (let iy = 0; iy < axesY.length - 2; iy++) {
++      const below = bayKindAt(project, axesX, axesY, ix, iy);
++      const above = bayKindAt(project, axesX, axesY, ix, iy + 1);
++      if (below === "normal" || above === "normal") continue;
++      const a = baySlabExtent(project, axesX, axesY, ix, iy);
++      const b = baySlabExtent(project, axesX, axesY, ix, iy + 1);
++      if (b.y0 > a.y1 + 0.5) gaps.push({ lo: a.y1, hi: b.y0 });
++    }
++  }
++  return gaps;
++}
++
+ /**
+  * Thép liên tục từ dầm biên đầu → dầm biên cuối:
+  * điểm đầu/cuối = da dầm ngoài ± lớp bảo vệ (cover).
+- * Chỉ cắt khi gặp ô thủng / sàn thấp (tại mí da vùng đó) — không cắt ở dầm trung gian.
++ * Cắt tại ô thủng / sàn thấp; không bố trí thép trên dầm độc lập
++ * (dầm kẹp giữa hai ô không phải sàn thường).
+  */
+ export function stripRebarBarSegments(
+   project: SlabProject,
+@@ -320,9 +371,12 @@ export function stripRebarBarSegments(
+       }
+       if (!(yHi > yLo)) continue;
+       const my = (yLo + yHi) / 2;
+-      const hCuts = cuts
+-        .filter((r) => my > Math.min(r.y0, r.y1) + 0.5 && my < Math.max(r.y0, r.y1) - 0.5)
+-        .map((r) => ({ lo: Math.min(r.x0, r.x1), hi: Math.max(r.x0, r.x1) }));
++      const hCuts = [
++        ...cuts
++          .filter((r) => my > Math.min(r.y0, r.y1) + 0.5 && my < Math.max(r.y0, r.y1) - 0.5)
++          .map((r) => ({ lo: Math.min(r.x0, r.x1), hi: Math.max(r.x0, r.x1) })),
++        ...independentBeamGaps(project, axesX, axesY, "X", iy),
++      ];
+       for (const s of subtract1D(xBarLo, xBarHi, hCuts)) {
+         out.push({ dir: "X", x0: s.lo, x1: s.hi, y: my });
+       }
+@@ -343,9 +397,12 @@ export function stripRebarBarSegments(
+       }
+       if (!(xHi > xLo)) continue;
+       const mx = (xLo + xHi) / 2;
+-      const vCuts = cuts
+-        .filter((r) => mx > Math.min(r.x0, r.x1) + 0.5 && mx < Math.max(r.x0, r.x1) - 0.5)
+-        .map((r) => ({ lo: Math.min(r.y0, r.y1), hi: Math.max(r.y0, r.y1) }));
++      const vCuts = [
++        ...cuts
++          .filter((r) => mx > Math.min(r.x0, r.x1) + 0.5 && mx < Math.max(r.x0, r.x1) - 0.5)
++          .map((r) => ({ lo: Math.min(r.y0, r.y1), hi: Math.max(r.y0, r.y1) })),
++        ...independentBeamGaps(project, axesX, axesY, "Y", ix),
++      ];
+       for (const s of subtract1D(yBarLo, yBarHi, vCuts)) {
+         out.push({ dir: "Y", y0: s.lo, y1: s.hi, x: mx });
+       }
+-- 
+2.43.0
+
