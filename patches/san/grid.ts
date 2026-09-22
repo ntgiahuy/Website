@@ -1394,6 +1394,12 @@ export function buildMergedDistRanges(
       }
       const lenMm = Math.hypot(xB - xA, yB - yA);
       if (lenMm > 1) {
+        // Neo chấm hình 2 đúng giao đường khoảng rải (đã gộp) ∩ thép sàn
+        const junctions = run.map((p) =>
+          first.dir === "X"
+            ? { x: xA, y: p.junction.y }
+            : { x: p.junction.x, y: yA },
+        );
         out.push({
           xA,
           yA,
@@ -1402,7 +1408,7 @@ export function buildMergedDistRanges(
           lenMm,
           dir: first.dir,
           markKey: first.markKey,
-          junctions: run.map((p) => p.junction),
+          junctions,
         });
       }
       run = [];

@@ -820,8 +820,9 @@ export function SlabPreview({
                         const epY = euX;
                         const bx = tx - euX * ah;
                         const by = tyPt - euY * ah;
-                        const ox = euX * capThick;
-                        const oy = euY * capThick;
+                        // Gạch dày kéo vào trong — tip = mí dầm − 50mm, không đè mí
+                        const ox = -euX * capThick;
+                        const oy = -euY * capThick;
                         return (
                           <g key={key}>
                             <polygon
@@ -870,17 +871,20 @@ export function SlabPreview({
                             {endCap(sxB, syB, sxA, syA, `b-${si}`)}
                             {seg.junctions.map((j, ji) => (
                               <g key={`j-${si}-${ji}`}>
+                                {/* Chấm hình 2: vòng + kim cương tại giao khoảng rải ∩ thép sàn */}
                                 <circle
                                   cx={X(j.x)}
                                   cy={Y(j.y)}
                                   r={jr}
-                                  fill="none"
+                                  fill="#ffffff"
                                   stroke="#ffffff"
-                                  strokeWidth="1.1"
+                                  strokeWidth="1.35"
                                 />
                                 <polygon
                                   points={`${X(j.x)},${Y(j.y) - jd} ${X(j.x) + jd},${Y(j.y)} ${X(j.x)},${Y(j.y) + jd} ${X(j.x) - jd},${Y(j.y)}`}
                                   fill="#ffffff"
+                                  stroke="#e5e7eb"
+                                  strokeWidth="0.6"
                                 />
                               </g>
                             ))}

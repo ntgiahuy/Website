@@ -187,8 +187,7 @@ function textInAxisBubble(ctx: Ctx, str: string, cx: number, cy: number, size = 
 
 /**
  * Đầu/cuối khoảng rải giống PDF hình 1:
- * gạch ngang dày (hình chữ nhật đặc) ở ngoài + tam giác đặc đỉnh chạm mép trong gạch,
- * nét mảnh nối vào đáy tam giác.
+ * tip = mí dầm − 50mm; gạch ngang dày kéo vào trong + tam giác đỉnh tại tip.
  */
 function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fromY: number) {
   const dx = tipX - fromX;
@@ -203,9 +202,9 @@ function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fro
   const capHalf = 4.5; // nửa bề rộng gạch ngang
   const capThick = 1.7; // bề dày gạch ngang (hình chữ nhật đặc)
 
-  // Gạch ngang dày: hình chữ nhật đặc, mép trong tại tip, kéo ra ngoài
-  const ox = ux * capThick;
-  const oy = uy * capThick;
+  // Gạch ngang dày: mép ngoài tại tip, kéo vào trong (không đè mí dầm)
+  const ox = -ux * capThick;
+  const oy = -uy * capThick;
   const capPath =
     `M ${tipX - px * capHalf} ${ty(tipY - py * capHalf)} ` +
     `L ${tipX + px * capHalf} ${ty(tipY + py * capHalf)} ` +
@@ -213,7 +212,7 @@ function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fro
     `L ${tipX - px * capHalf + ox} ${ty(tipY - py * capHalf + oy)} Z`;
   ctx.page.drawSvgPath(capPath, { color: DIST_BLUE });
 
-  // Tam giác: đỉnh tại tip (mép trong gạch), đáy hướng vào trong
+  // Tam giác: đỉnh tại tip, đáy hướng vào trong
   const bx = tipX - ux * ah;
   const by = tipY - uy * ah;
   const tri =
@@ -227,27 +226,30 @@ function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fro
 const DIST_END_AH = 5.5;
 
 /**
- * Chấm giao khoảng rải ∩ thanh thép (hình mẫu): kim cương trắng trong vòng tròn.
+ * Chấm giao khoảng rải ∩ thanh thép (hình 2): kim cương trong vòng tròn.
+ * PDF nền trắng → viền đen + kim cương trắng viền đen cho nổi.
  * (cx,cy) = tọa độ PDF top-left → ty khi vẽ.
  */
 function drawDistBarJunction(ctx: Ctx, cx: number, cy: number) {
   const r = 2.8;
-  const d = r * 0.7;
-  // Vòng trắng (chỉ viền)
+  const d = r * 0.72;
+  const cyPdf = ty(cy);
+  // Vòng: nền trắng + viền đen (pdf-lib size = đường kính)
   ctx.page.drawCircle({
     x: cx,
-    y: ty(cy),
-    size: r,
-    borderColor: rgb(1, 1, 1),
-    borderWidth: 0.7,
+    y: cyPdf,
+    size: r * 2,
+    color: rgb(1, 1, 1),
+    borderColor: BLACK,
+    borderWidth: 0.75,
   });
-  // Kim cương trắng (vuông xoay 45°)
+  // Kim cương trắng viền đen (vuông xoay 45°)
   const path =
     `M ${cx} ${ty(cy - d)} ` +
     `L ${cx + d} ${ty(cy)} ` +
     `L ${cx} ${ty(cy + d)} ` +
     `L ${cx - d} ${ty(cy)} Z`;
-  ctx.page.drawSvgPath(path, { color: rgb(1, 1, 1) });
+  ctx.page.drawSvgPath(path, { color: rgb(1, 1, 1), borderColor: BLACK, borderWidth: 0.55 });
 }
 
 /**
