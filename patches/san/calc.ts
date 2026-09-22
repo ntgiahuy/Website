@@ -7,6 +7,7 @@ import type {
 import {
   ensureAxes,
   slabDistRangeForBar,
+  buildMergedDistRanges,
   sortAxes,
   stripRebarBarSegments,
   type RebarBarSeg,
@@ -308,8 +309,8 @@ export function effectiveZones(project: SlabProject): RebarZone[] {
 }
 
 /**
- * 1 CK từ khoảng rải mặt bằng: với mỗi thanh strip thuộc zone,
- * cộng (L_khoảng_rải / a). L = mí dầm trong − 50 hai đầu.
+ * 1 CK từ khoảng rải đã gộp: ô kề nhau cùng số hiệu → 1 L;
+ * 1 CK = Σ round(L_gộp / a) cho các dải thuộc zone.
  */
 export function qtyEachFromDistRanges(
   project: SlabProject,
@@ -327,19 +328,22 @@ export function qtyEachFromDistRanges(
   const zx1 = Math.max(zone.x1, zone.x2);
   const zy0 = Math.min(zone.y1, zone.y2);
   const zy1 = Math.max(zone.y1, zone.y2);
-  let total = 0;
-  let matched = 0;
-  for (const bar of segs) {
-    if (bar.dir !== zone.direction) continue;
+  const zoneKey = `${zone.mark}|${zone.dia}|${zone.spacing}|${zone.direction}`;
+  const markKeyOf = (bar: RebarBarSeg) => {
+    if (bar.dir !== zone.direction) return "";
     const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;
     const my = bar.dir === "X" ? bar.y : (bar.y0 + bar.y1) / 2;
-    if (mx < zx0 - 1 || mx > zx1 + 1 || my < zy0 - 1 || my > zy1 + 1) continue;
-    const dist = slabDistRangeForBar(project, axesX, axesY, bar);
-    if (!dist || !(dist.lenMm > 1)) continue;
-    total += barsFromDistLength(dist.lenMm, zone.spacing);
-    matched += 1;
+    if (mx < zx0 - 1 || mx > zx1 + 1 || my < zy0 - 1 || my > zy1 + 1) return "";
+    return zoneKey;
+  };
+  const merged = buildMergedDistRanges(project, axesX, axesY, segs, markKeyOf);
+  const mine = merged.filter((m) => m.markKey === zoneKey);
+  if (mine.length) {
+    return Math.max(
+      1,
+      mine.reduce((s, m) => s + barsFromDistLength(m.lenMm, zone.spacing), 0),
+    );
   }
-  if (matched > 0) return Math.max(1, total);
   const { width } = zoneSpanMm(zone);
   return barsFromDistLength(width, zone.spacing);
 }

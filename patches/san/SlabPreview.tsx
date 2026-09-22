@@ -16,7 +16,7 @@ import {
   sortAxes,
   stripRebarBarSegments,
   stripRebarPressMarks,
-  slabDistRangeForBar,
+  buildMergedDistRanges,
   SLAB_REBAR_HOOK_MM,
 } from "@/lib/grid";
 import type { PlanSelection, SlabProject } from "@/lib/types";
@@ -786,18 +786,29 @@ export function SlabPreview({
                       </text>
                     </g>
                   ))}
-                  {/* Khoảng rải: mỗi thanh 1 nét mảnh ⊥ giữa thanh; đầu/cuối = mí dầm trong − 50 */}
+                  {/* Khoảng rải: ô kề nhau cùng số hiệu → 1 đường liên tục */}
                   {zones.some((z) => z.showSpacing) &&
-                    bars.map((bar, bi) => {
-                      const seg = slabDistRangeForBar(project, axesX, axesY, bar);
-                      if (!seg) return null;
-                      const sxA = X(seg.xA);
-                      const syA = Y(seg.yA);
-                      const sxB = X(seg.xB);
-                      const syB = Y(seg.yB);
-                      const ah = 8;
-                      const aw = 5;
-                      const cap = 8;
+                    (() => {
+                      const markKeyOf = (bar: (typeof bars)[number]) => {
+                        const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;
+                        const my = bar.dir === "X" ? bar.y : (bar.y0 + bar.y1) / 2;
+                        const hits = zones.filter((z) => {
+                          if (z.direction !== bar.dir) return false;
+                          const zx0 = Math.min(z.x1, z.x2);
+                          const zx1 = Math.max(z.x1, z.x2);
+                          const zy0 = Math.min(z.y1, z.y2);
+                          const zy1 = Math.max(z.y1, z.y2);
+                          return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
+                        });
+                        const z = hits.find((h) => h.layer === "bottom") ?? hits[0];
+                        if (z) return `${z.mark}|${z.dia}|${z.spacing}|${z.direction}`;
+                        return `${bar.dir}|10|150`;
+                      };
+                      const merged = buildMergedDistRanges(project, axesX, axesY, bars, markKeyOf);
+                      const ah = 14;
+                      const aw = 7;
+                      const capHalf = 11;
+                      const capThick = 4.2;
                       const endCap = (tx: number, tyPt: number, fromX: number, fromY: number, key: string) => {
                         const ex = tx - fromX;
                         const ey = tyPt - fromY;
@@ -808,69 +819,84 @@ export function SlabPreview({
                         const epY = euX;
                         const bx = tx - euX * ah;
                         const by = tyPt - euY * ah;
+                        const ox = euX * capThick;
+                        const oy = euY * capThick;
                         return (
                           <g key={key}>
+                            <polygon
+                              points={
+                                `${tx - epX * capHalf},${tyPt - epY * capHalf} ` +
+                                `${tx + epX * capHalf},${tyPt + epY * capHalf} ` +
+                                `${tx + epX * capHalf + ox},${tyPt + epY * capHalf + oy} ` +
+                                `${tx - epX * capHalf + ox},${tyPt - epY * capHalf + oy}`
+                              }
+                              fill="#2563eb"
+                            />
                             <polygon
                               points={`${tx},${tyPt} ${bx + epX * aw},${by + epY * aw} ${bx - epX * aw},${by - epY * aw}`}
                               fill="#2563eb"
                             />
-                            <line
-                              x1={tx - epX * cap}
-                              y1={tyPt - epY * cap}
-                              x2={tx + epX * cap}
-                              y2={tyPt + epY * cap}
-                              stroke="#2563eb"
-                              strokeWidth="2.2"
-                              strokeLinecap="butt"
-                            />
                           </g>
                         );
                       };
-                      const midX = (sxA + sxB) / 2;
-                      const midY = (syA + syB) / 2;
-                      const alongY = Math.abs(seg.yB - seg.yA) >= Math.abs(seg.xB - seg.xA);
-                      const dx = sxB - sxA;
-                      const dy = syB - syA;
-                      const plen = Math.hypot(dx, dy) || 1;
-                      const ux = dx / plen;
-                      const uy = dy / plen;
-                      const inset = Math.min(ah, plen * 0.35);
-                      // Giao khoảng rải ∩ thanh thép
-                      const jx = bar.dir === "X" ? midX : X(bar.x);
-                      const jy = bar.dir === "X" ? Y(bar.y) : midY;
-                      const jr = 3.2;
-                      const jd = jr * 0.72;
-                      return (
-                        <g key={`dist-${bi}`} pointerEvents="none">
-                          <line
-                            x1={sxA + ux * inset}
-                            y1={syA + uy * inset}
-                            x2={sxB - ux * inset}
-                            y2={syB - uy * inset}
-                            stroke="#2563eb"
-                            strokeWidth="1.0"
-                          />
-                          {endCap(sxA, syA, sxB, syB, `a-${bi}`)}
-                          {endCap(sxB, syB, sxA, syA, `b-${bi}`)}
-                          {/* Chấm giao: kim cương trắng trong vòng tròn */}
-                          <circle cx={jx} cy={jy} r={jr} fill="none" stroke="#ffffff" strokeWidth="1.1" />
-                          <polygon
-                            points={`${jx},${jy - jd} ${jx + jd},${jy} ${jx},${jy + jd} ${jx - jd},${jy}`}
-                            fill="#ffffff"
-                          />
-                          <text
-                            x={midX + (alongY ? 7 : 0)}
-                            y={midY + (alongY ? 0 : -7)}
-                            fill="#2563eb"
-                            fontSize="9"
-                            fontWeight="600"
-                            textAnchor={alongY ? "start" : "middle"}
-                          >
-                            {Math.round(seg.lenMm)}
-                          </text>
-                        </g>
-                      );
-                    })}
+                      return merged.map((seg, si) => {
+                        const sxA = X(seg.xA);
+                        const syA = Y(seg.yA);
+                        const sxB = X(seg.xB);
+                        const syB = Y(seg.yB);
+                        const midX = (sxA + sxB) / 2;
+                        const midY = (syA + syB) / 2;
+                        const alongY = Math.abs(seg.yB - seg.yA) >= Math.abs(seg.xB - seg.xA);
+                        const dx = sxB - sxA;
+                        const dy = syB - syA;
+                        const plen = Math.hypot(dx, dy) || 1;
+                        const ux = dx / plen;
+                        const uy = dy / plen;
+                        const inset = Math.min(ah, plen * 0.35);
+                        const jr = 3.2;
+                        const jd = jr * 0.72;
+                        return (
+                          <g key={`dist-${si}`} pointerEvents="none">
+                            <line
+                              x1={sxA + ux * inset}
+                              y1={syA + uy * inset}
+                              x2={sxB - ux * inset}
+                              y2={syB - uy * inset}
+                              stroke="#2563eb"
+                              strokeWidth="1.0"
+                            />
+                            {endCap(sxA, syA, sxB, syB, `a-${si}`)}
+                            {endCap(sxB, syB, sxA, syA, `b-${si}`)}
+                            {seg.junctions.map((j, ji) => (
+                              <g key={`j-${si}-${ji}`}>
+                                <circle
+                                  cx={X(j.x)}
+                                  cy={Y(j.y)}
+                                  r={jr}
+                                  fill="none"
+                                  stroke="#ffffff"
+                                  strokeWidth="1.1"
+                                />
+                                <polygon
+                                  points={`${X(j.x)},${Y(j.y) - jd} ${X(j.x) + jd},${Y(j.y)} ${X(j.x)},${Y(j.y) + jd} ${X(j.x) - jd},${Y(j.y)}`}
+                                  fill="#ffffff"
+                                />
+                              </g>
+                            ))}
+                            <text
+                              x={midX + (alongY ? 7 : 0)}
+                              y={midY + (alongY ? 0 : -7)}
+                              fill="#2563eb"
+                              fontSize="9"
+                              fontWeight="600"
+                              textAnchor={alongY ? "start" : "middle"}
+                            >
+                              {Math.round(seg.lenMm)}
+                            </text>
+                          </g>
+                        );
+                      });
+                    })()}
                 </>
               );
             })()}

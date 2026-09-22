@@ -25,6 +25,7 @@ import {
   stripRebarBarSegments,
   stripRebarPressMarks,
   slabDistRangeForBar,
+  buildMergedDistRanges,
   SLAB_REBAR_HOOK_MM,
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarZone, SlabProject } from "../types";
@@ -184,18 +185,35 @@ function textInAxisBubble(ctx: Ctx, str: string, cx: number, cy: number, size = 
   textInkCentered(ctx, str, cx, cy, size, BLACK, true);
 }
 
-/** Mũi tên đầu khoảng rải (hình 2): tam giác đặc đỉnh ra ngoài + gạch ngang dày tại tip. */
+/**
+ * Đầu/cuối khoảng rải giống PDF hình 1:
+ * gạch ngang dày (hình chữ nhật đặc) ở ngoài + tam giác đặc đỉnh chạm mép trong gạch,
+ * nét mảnh nối vào đáy tam giác.
+ */
 function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fromY: number) {
   const dx = tipX - fromX;
   const dy = tipY - fromY;
   const len = Math.hypot(dx, dy) || 1;
-  const ux = dx / len;
+  const ux = dx / len; // hướng ra ngoài (từ giữa → tip)
   const uy = dy / len;
   const px = -uy;
   const py = ux;
-  const ah = 6.5; // chiều cao tam giác
-  const aw = 4.0; // nửa đáy tam giác
-  const cap = 6.5; // nửa bề rộng gạch ngang
+  const ah = 11; // chiều cao tam giác
+  const aw = 5.5; // nửa đáy tam giác
+  const capHalf = 9; // nửa bề rộng gạch ngang
+  const capThick = 3.4; // bề dày gạch ngang (hình chữ nhật đặc)
+
+  // Gạch ngang dày: hình chữ nhật đặc, mép trong tại tip, kéo ra ngoài
+  const ox = ux * capThick;
+  const oy = uy * capThick;
+  const capPath =
+    `M ${tipX - px * capHalf} ${ty(tipY - py * capHalf)} ` +
+    `L ${tipX + px * capHalf} ${ty(tipY + py * capHalf)} ` +
+    `L ${tipX + px * capHalf + ox} ${ty(tipY + py * capHalf + oy)} ` +
+    `L ${tipX - px * capHalf + ox} ${ty(tipY - py * capHalf + oy)} Z`;
+  ctx.page.drawSvgPath(capPath, { color: DIST_BLUE });
+
+  // Tam giác: đỉnh tại tip (mép trong gạch), đáy hướng vào trong
   const bx = tipX - ux * ah;
   const by = tipY - uy * ah;
   const tri =
@@ -203,12 +221,10 @@ function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fro
     `L ${bx + px * aw} ${ty(by + py * aw)} ` +
     `L ${bx - px * aw} ${ty(by - py * aw)} Z`;
   ctx.page.drawSvgPath(tri, { color: DIST_BLUE });
-  // Gạch ngang dày qua đỉnh tam giác (vuông góc đường khoảng rải)
-  line(ctx, tipX - px * cap, tipY - py * cap, tipX + px * cap, tipY + py * cap, 1.8, DIST_BLUE);
 }
 
-/** Độ dài rút nét khoảng rải để chừa chỗ tam giác (PDF pt). */
-const DIST_END_AH = 6.5;
+/** Chiều cao tam giác đầu khoảng rải — dùng rút nét thân. */
+const DIST_END_AH = 11;
 
 /**
  * Chấm giao khoảng rải ∩ thanh thép (hình mẫu): kim cương trắng trong vòng tròn.
@@ -890,13 +906,27 @@ function drawPlan(
     }
   }
 
-  // —— Khoảng rải thép sàn: mỗi thanh 1 nét mảnh ⊥ giữa thanh; đầu/cuối = mí dầm trong − 50 ——
+  // —— Khoảng rải: ô kề nhau cùng số hiệu → 1 đường từ đầu dải đến cuối dải ——
   const showDist = zones.some((z) => z.showSpacing);
   if (showDist) {
-    for (let bi = 0; bi < bars.length; bi++) {
-      const bar = bars[bi];
-      const seg = slabDistRangeForBar(project, axesX, axesY, bar);
-      if (!seg) continue;
+    const markKeyOf = (bar: (typeof bars)[number]) => {
+      const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;
+      const my = bar.dir === "X" ? bar.y : (bar.y0 + bar.y1) / 2;
+      const hits = zones.filter((z) => {
+        if (z.direction !== bar.dir) return false;
+        const zx0 = Math.min(z.x1, z.x2);
+        const zx1 = Math.max(z.x1, z.x2);
+        const zy0 = Math.min(z.y1, z.y2);
+        const zy1 = Math.max(z.y1, z.y2);
+        return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
+      });
+      const z = hits.find((h) => h.layer === "bottom") ?? hits[0];
+      if (z) return `${z.mark}|${z.dia}|${z.spacing}|${z.direction}`;
+      const spec = steelSpecForBar(zones, ctx.model.schedule, bar);
+      return `${bar.dir}|${spec.dia}|${spec.spacing}`;
+    };
+    const merged = buildMergedDistRanges(project, axesX, axesY, bars, markKeyOf);
+    for (const seg of merged) {
       const pxA = toX(seg.xA);
       const pyA = toY(seg.yA);
       const pxB = toX(seg.xB);
@@ -906,7 +936,6 @@ function drawPlan(
       const plen = Math.hypot(dx, dy) || 1;
       const ux = dx / plen;
       const uy = dy / plen;
-      // Nét mảnh — rút hai đầu chừa tam giác (hình 2)
       const inset = Math.min(DIST_END_AH, plen * 0.35);
       line(
         ctx,
@@ -919,10 +948,9 @@ function drawPlan(
       );
       drawDistEndCap(ctx, pxA, pyA, pxB, pyB);
       drawDistEndCap(ctx, pxB, pyB, pxA, pyA);
-      // Chấm giao khoảng rải ∩ thanh thép (giữa thanh)
-      const jx = bar.dir === "X" ? (pxA + pxB) / 2 : toX(bar.x);
-      const jy = bar.dir === "X" ? toY(bar.y) : (pyA + pyB) / 2;
-      drawDistBarJunction(ctx, jx, jy);
+      for (const j of seg.junctions) {
+        drawDistBarJunction(ctx, toX(j.x), toY(j.y));
+      }
       const label = String(Math.round(seg.lenMm));
       const alongY = Math.abs(seg.yB - seg.yA) >= Math.abs(seg.xB - seg.xA);
       if (alongY) {

@@ -1241,6 +1241,185 @@ export function slabDistRangeForBar(
   return { xA, yA: my, xB, yB: my, lenMm: xB - xA };
 }
 
+export type MergedDistRange = DistRangeSeg & {
+  dir: "X" | "Y";
+  /** Điểm giao với từng thanh thuộc dải (vẽ chấm). */
+  junctions: Array<{ x: number; y: number }>;
+  markKey: string;
+};
+
+type DistRangePiece = DistRangeSeg & {
+  dir: "X" | "Y";
+  markKey: string;
+  /** Chỉ số ô dọc theo phương khoảng rải (ix với thanh Y; iy với thanh X). */
+  bayIndex: number;
+  /** Hàng/cột vuông góc — chỉ gộp trong cùng strip. */
+  stripKey: number;
+  junction: { x: number; y: number };
+};
+
+function bayIndexForBar(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+  bar: RebarBarSeg,
+): { bayIndex: number; stripKey: number } | null {
+  if (bar.dir === "Y") {
+    const my = (bar.y0 + bar.y1) / 2;
+    let ix = -1;
+    let iy = -1;
+    for (let j = 0; j < axesY.length - 1; j++) {
+      for (let i = 0; i < axesX.length - 1; i++) {
+        const s = baySlabExtent(project, axesX, axesY, i, j);
+        if (bar.x >= s.x0 - 1 && bar.x <= s.x1 + 1 && my >= s.y0 - 1 && my <= s.y1 + 1) {
+          ix = i;
+          iy = j;
+          break;
+        }
+      }
+      if (ix >= 0) break;
+    }
+    if (ix < 0) {
+      // Thanh đứng xuyên nhiều hàng: lấy cột theo X
+      for (let i = 0; i < axesX.length - 1; i++) {
+        const s = baySlabExtent(project, axesX, axesY, i, 0);
+        if (bar.x >= s.x0 - 1 && bar.x <= s.x1 + 1) {
+          ix = i;
+          break;
+        }
+      }
+      iy = 0;
+    }
+    if (ix < 0) return null;
+    return { bayIndex: ix, stripKey: iy };
+  }
+  const mx = (bar.x0 + bar.x1) / 2;
+  let ix = -1;
+  let iy = -1;
+  for (let j = 0; j < axesY.length - 1; j++) {
+    for (let i = 0; i < axesX.length - 1; i++) {
+      const s = baySlabExtent(project, axesX, axesY, i, j);
+      if (mx >= s.x0 - 1 && mx <= s.x1 + 1 && bar.y >= s.y0 - 1 && bar.y <= s.y1 + 1) {
+        ix = i;
+        iy = j;
+        break;
+      }
+    }
+    if (iy >= 0) break;
+  }
+  if (iy < 0) {
+    for (let j = 0; j < axesY.length - 1; j++) {
+      const s = baySlabExtent(project, axesX, axesY, 0, j);
+      if (bar.y >= s.y0 - 1 && bar.y <= s.y1 + 1) {
+        iy = j;
+        break;
+      }
+    }
+    ix = 0;
+  }
+  if (iy < 0) return null;
+  return { bayIndex: iy, stripKey: ix };
+}
+
+/**
+ * Gộp khoảng rải: ô sàn kề nhau liên tiếp cùng số hiệu → 1 đường
+ * từ điểm đầu khoảng rải đầu tiên đến điểm cuối khoảng rải cuối.
+ */
+export function buildMergedDistRanges(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+  bars: RebarBarSeg[],
+  markKeyOf: (bar: RebarBarSeg) => string,
+  insetMm: number = SLAB_DIST_RANGE_INSET_MM,
+): MergedDistRange[] {
+  const pieces: DistRangePiece[] = [];
+  for (const bar of bars) {
+    const seg = slabDistRangeForBar(project, axesX, axesY, bar, insetMm);
+    if (!seg) continue;
+    const idx = bayIndexForBar(project, axesX, axesY, bar);
+    if (!idx) continue;
+    const markKey = markKeyOf(bar);
+    if (!markKey) continue;
+    const junction =
+      bar.dir === "X"
+        ? { x: (bar.x0 + bar.x1) / 2, y: bar.y }
+        : { x: bar.x, y: (bar.y0 + bar.y1) / 2 };
+    pieces.push({
+      ...seg,
+      dir: bar.dir,
+      markKey,
+      bayIndex: idx.bayIndex,
+      stripKey: idx.stripKey,
+      junction,
+    });
+  }
+
+  // Nhóm theo phương + số hiệu + strip (cùng hàng/cột)
+  const groups = new Map<string, DistRangePiece[]>();
+  for (const p of pieces) {
+    const key = `${p.dir}|${p.markKey}|${p.stripKey}`;
+    const arr = groups.get(key) ?? [];
+    arr.push(p);
+    groups.set(key, arr);
+  }
+
+  const out: MergedDistRange[] = [];
+  for (const group of groups.values()) {
+    group.sort((a, b) => a.bayIndex - b.bayIndex);
+    // Chạy liên tiếp theo bayIndex
+    let run: DistRangePiece[] = [];
+    const flush = () => {
+      if (!run.length) return;
+      const first = run[0];
+      const last = run[run.length - 1];
+      let xA: number;
+      let yA: number;
+      let xB: number;
+      let yB: number;
+      if (first.dir === "Y") {
+        // Khoảng rải ngang: từ đầu trái → cuối phải
+        xA = Math.min(...run.map((p) => Math.min(p.xA, p.xB)));
+        xB = Math.max(...run.map((p) => Math.max(p.xA, p.xB)));
+        const my = run.reduce((s, p) => s + p.yA, 0) / run.length;
+        yA = my;
+        yB = my;
+      } else {
+        // Khoảng rải đứng: từ dưới → trên
+        yA = Math.min(...run.map((p) => Math.min(p.yA, p.yB)));
+        yB = Math.max(...run.map((p) => Math.max(p.yA, p.yB)));
+        const mx = run.reduce((s, p) => s + p.xA, 0) / run.length;
+        xA = mx;
+        xB = mx;
+      }
+      const lenMm = Math.hypot(xB - xA, yB - yA);
+      if (lenMm > 1) {
+        out.push({
+          xA,
+          yA,
+          xB,
+          yB,
+          lenMm,
+          dir: first.dir,
+          markKey: first.markKey,
+          junctions: run.map((p) => p.junction),
+        });
+      }
+      run = [];
+    };
+    for (const p of group) {
+      if (!run.length || p.bayIndex === run[run.length - 1].bayIndex + 1) {
+        run.push(p);
+      } else {
+        flush();
+        run.push(p);
+      }
+    }
+    flush();
+  }
+  return out;
+}
+
 /** Đoạn chéo trong hình chữ nhật (clip) theo hằng số x−y = c — nét sàn thấp /. */
 export function rectDiagonalHatchSegments(
   x0: number,
