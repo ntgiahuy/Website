@@ -6,8 +6,10 @@ import {
   axisInteriorSegmentsX,
   axisInteriorSegmentsY,
   baySlabExtent,
+  beamFaceDashStyle,
   beamSegSideFaces,
   beamSegments,
+  clippedBeamFaceParts,
   getBeamSegShift,
   isBeamSegOmitted,
   planBeamBleed,
@@ -369,6 +371,10 @@ export function SlabPreview({
   });
 
   const beamNodes: ReactNode[] = [];
+  /** Nét da dầm preview ≈ PDF: mảnh; trong = đứt, ngoài = liền; cắt chỗ giao. */
+  const BEAM_SW = 0.85;
+  const BEAM_DASH = "4 2.5";
+  const BEAM_STROKE = "#c4c4c8";
   for (const beam of project.beams ?? []) {
     const segs = beamSegments(project, beam);
 
@@ -384,7 +390,7 @@ export function SlabPreview({
       const lo = seg.lo;
       const hi = seg.hi;
 
-      // Đa giác đoạn dầm (có thể xéo khi s0 ≠ s1)
+      // Hit-area trong suốt (chọn đoạn) — không tô thân dầm
       const pts =
         beam.direction === "Y"
           ? [
@@ -405,13 +411,40 @@ export function SlabPreview({
       const labelY =
         beam.direction === "Y" ? Y((lo + hi) / 2) : Y(Math.max(hi0, hi1)) - 6;
 
+      const faceLines: ReactNode[] = [];
+      const pushFace = (face0: number, face1: number, key: string) => {
+        const style = beamFaceDashStyle(beam.direction, face0, face1, bleed);
+        const parts = clippedBeamFaceParts(project, beam.direction, face0, face1, lo, hi);
+        parts.forEach((p, i) => {
+          const x1 = beam.direction === "Y" ? X(p.faceA) : X(p.alongA);
+          const y1 = beam.direction === "Y" ? Y(p.alongA) : Y(p.faceA);
+          const x2 = beam.direction === "Y" ? X(p.faceB) : X(p.alongB);
+          const y2 = beam.direction === "Y" ? Y(p.alongB) : Y(p.faceB);
+          faceLines.push(
+            <line
+              key={`${key}-${i}`}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              stroke={active ? "#34d399" : BEAM_STROKE}
+              strokeWidth={active ? 1.4 : BEAM_SW}
+              strokeDasharray={style === "dashed" ? BEAM_DASH : undefined}
+              strokeLinecap="square"
+              pointerEvents="none"
+            />,
+          );
+        });
+      };
+      pushFace(lo0, lo1, "lo");
+      pushFace(hi0, hi1, "hi");
+
       beamNodes.push(
         <g key={`${beam.id}-s${seg.index}`}>
           <polygon
             points={points}
-            fill="#27272a"
-            stroke="#a1a1aa"
-            strokeWidth={1}
+            fill={active ? "rgba(52,211,153,0.2)" : "transparent"}
+            stroke="none"
             className={interactive && !insertBeamMode ? "cursor-pointer" : undefined}
             pointerEvents={interactive && !insertBeamMode ? "all" : "none"}
             onClick={(e) => {
@@ -420,45 +453,37 @@ export function SlabPreview({
               pick({ kind: "beam", beamId: beam.id, segIndex: seg.index }, e);
             }}
           />
+          {faceLines}
           {active && (
-            <>
-              <polygon
-                points={points}
-                fill="rgba(52,211,153,0.45)"
-                stroke="#34d399"
-                strokeWidth={2}
+            beam.direction === "Y" ? (
+              <text
+                x={labelX}
+                y={labelY}
+                fill="#6ee7b7"
+                fontSize="10"
+                fontWeight="700"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                transform={`rotate(-90 ${labelX} ${labelY})`}
                 pointerEvents="none"
-              />
-              {beam.direction === "Y" ? (
-                <text
-                  x={labelX}
-                  y={labelY}
-                  fill="#6ee7b7"
-                  fontSize="10"
-                  fontWeight="700"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  transform={`rotate(-90 ${labelX} ${labelY})`}
-                  pointerEvents="none"
-                >
-                  {beam.name} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
-                  {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
-                </text>
-              ) : (
-                <text
-                  x={labelX}
-                  y={labelY}
-                  textAnchor="middle"
-                  fill="#6ee7b7"
-                  fontSize="10"
-                  fontWeight="700"
-                  pointerEvents="none"
-                >
-                  {beam.name} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
-                  {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
-                </text>
-              )}
-            </>
+              >
+                {beam.name} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
+                {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
+              </text>
+            ) : (
+              <text
+                x={labelX}
+                y={labelY}
+                textAnchor="middle"
+                fill="#6ee7b7"
+                fontSize="10"
+                fontWeight="700"
+                pointerEvents="none"
+              >
+                {beam.name} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
+                {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
+              </text>
+            )
           )}
         </g>,
       );

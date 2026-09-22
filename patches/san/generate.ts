@@ -11,12 +11,13 @@ import {
   type ScheduleRow,
 } from "../calc";
 import {
-  beamFacesAtAlongDirect,
   beamOuterFaces,
   beamOuterFacesAtSpan,
   beamSectionOnAxis,
   beamSegSideFaces,
   beamSegments,
+  beamFaceDashStyle,
+  clippedBeamFaceParts,
   isBeamSegOmitted,
   planBeamBleed,
   rectDiagonalHatchSegments,
@@ -227,29 +228,28 @@ const DIST_END_AH = 5.5;
 
 /**
  * Chấm giao khoảng rải ∩ thanh thép (hình 2): kim cương trong vòng tròn.
- * PDF nền trắng → viền đen + kim cương trắng viền đen cho nổi.
+ * PDF nền trắng → viền/kim cương đen cho nổi.
  * (cx,cy) = tọa độ PDF top-left → ty khi vẽ.
  */
 function drawDistBarJunction(ctx: Ctx, cx: number, cy: number) {
   const r = 2.8;
   const d = r * 0.72;
   const cyPdf = ty(cy);
-  // Vòng: nền trắng + viền đen (pdf-lib size = đường kính)
+  // Vòng chỉ viền (pdf-lib size = đường kính)
   ctx.page.drawCircle({
     x: cx,
     y: cyPdf,
     size: r * 2,
-    color: rgb(1, 1, 1),
     borderColor: BLACK,
-    borderWidth: 0.75,
+    borderWidth: 0.85,
   });
-  // Kim cương trắng viền đen (vuông xoay 45°)
+  // Kim cương đặc (vuông xoay 45°)
   const path =
     `M ${cx} ${ty(cy - d)} ` +
     `L ${cx + d} ${ty(cy)} ` +
     `L ${cx} ${ty(cy + d)} ` +
     `L ${cx - d} ${ty(cy)} Z`;
-  ctx.page.drawSvgPath(path, { color: rgb(1, 1, 1), borderColor: BLACK, borderWidth: 0.55 });
+  ctx.page.drawSvgPath(path, { color: BLACK });
 }
 
 /**
@@ -1012,75 +1012,6 @@ function drawPlan(
 }
 
 /**
- * Trừ các khoảng cắt khỏi [from, to] → các đoạn còn lại (mm).
- */
-function subtractIntervals(
-  from: number,
-  to: number,
-  cuts: Array<{ lo: number; hi: number }>,
-): Array<[number, number]> {
-  let parts: Array<[number, number]> = [[Math.min(from, to), Math.max(from, to)]];
-  const sorted = [...cuts].sort((a, b) => a.lo - b.lo);
-  for (const c of sorted) {
-    const next: Array<[number, number]> = [];
-    for (const [a, b] of parts) {
-      const clo = Math.max(a, c.lo);
-      const chi = Math.min(b, c.hi);
-      if (clo >= chi - 0.5) {
-        next.push([a, b]);
-        continue;
-      }
-      if (a < clo - 0.5) next.push([a, clo]);
-      if (chi < b - 0.5) next.push([chi, b]);
-    }
-    parts = next;
-  }
-  return parts.filter(([a, b]) => b - a > 2);
-}
-
-/**
- * Khoảng dọc theo dầm cần cắt (thân dầm giao phương xuyên qua).
- * beam Y (đứng): cuts theo Y tại faceX; beam X (ngang): cuts theo X tại faceY.
- */
-function crossBodyCutsAlong(
-  project: SlabProject,
-  beamDir: PlanBeam["direction"],
-  face0: number,
-  face1: number,
-  along0: number,
-  along1: number,
-): Array<{ lo: number; hi: number }> {
-  const cuts: Array<{ lo: number; hi: number }> = [];
-  const faceLo = Math.min(face0, face1);
-  const faceHi = Math.max(face0, face1);
-  const aLo = Math.min(along0, along1);
-  const aHi = Math.max(along0, along1);
-  const faceMid = (face0 + face1) / 2;
-  const crossDir: PlanBeam["direction"] = beamDir === "Y" ? "X" : "Y";
-  const perpAxes =
-    crossDir === "X"
-      ? sortAxes(project.axesX ?? [])
-      : sortAxes(project.axesY ?? []);
-
-  for (const other of project.beams ?? []) {
-    if (other.direction !== crossDir) continue;
-    for (const seg of beamSegments(project, other)) {
-      if (isBeamSegOmitted(other, seg.a0.id, seg.a1.id)) continue;
-      const s0 = Math.min(seg.lo, seg.hi);
-      const s1 = Math.max(seg.lo, seg.hi);
-      // Face của dầm đang vẽ có giao bề rộng “dọc” của dầm kia?
-      if (faceHi < s0 - 2 || faceLo > s1 + 2) continue;
-      const alongOnOther = Math.min(s1, Math.max(s0, faceMid));
-      const body = beamFacesAtAlongDirect(other, alongOnOther, perpAxes);
-      if (body.hi - body.lo < 1) continue;
-      if (body.hi < aLo - 2 || body.lo > aHi + 2) continue;
-      cuts.push({ lo: body.lo, hi: body.hi });
-    }
-  }
-  return cuts;
-}
-
-/**
  * Vẽ một da dầm, đã cắt đoạn xuyên thân dầm giao.
  * Y-beam: along = Y, face = X; X-beam: along = X, face = Y.
  */
@@ -1096,19 +1027,12 @@ function drawBeamFaceClipped(
   dash: number[] | undefined,
   project: SlabProject,
 ) {
-  const cuts = crossBodyCutsAlong(project, beamDir, face0, face1, along0, along1);
-  const parts = subtractIntervals(along0, along1, cuts);
-  const span = along1 - along0;
-  for (const [a0, a1] of parts) {
-    if (Math.abs(span) < 1e-6) continue;
-    const t0 = (a0 - along0) / span;
-    const t1 = (a1 - along0) / span;
-    const f0 = face0 + t0 * (face1 - face0);
-    const f1 = face0 + t1 * (face1 - face0);
+  const parts = clippedBeamFaceParts(project, beamDir, face0, face1, along0, along1);
+  for (const p of parts) {
     if (beamDir === "Y") {
-      line(ctx, toX(f0), toY(a0), toX(f1), toY(a1), BEAM_STROKE, BLACK, dash);
+      line(ctx, toX(p.faceA), toY(p.alongA), toX(p.faceB), toY(p.alongB), BEAM_STROKE, BLACK, dash);
     } else {
-      line(ctx, toX(a0), toY(f0), toX(a1), toY(f1), BEAM_STROKE, BLACK, dash);
+      line(ctx, toX(p.alongA), toY(p.faceA), toX(p.alongB), toY(p.faceB), BEAM_STROKE, BLACK, dash);
     }
   }
 }
@@ -1126,72 +1050,18 @@ function drawBeam(
 ) {
   const { project } = ctx;
   const segs = beamSegments(project, b);
-  const eps = 2; // mm — nhận diện da trùng biên sàn
 
   for (const seg of segs) {
     if (isBeamSegOmitted(b, seg.a0.id, seg.a1.id)) continue;
     const { lo0, hi0, lo1, hi1 } = beamSegSideFaces(b, seg.index);
     const lo = seg.lo;
     const hi = seg.hi;
-    if (b.direction === "Y") {
-      const loMid = (lo0 + lo1) / 2;
-      const hiMid = (hi0 + hi1) / 2;
-      const loOuter = Math.abs(loMid - bleed.xMin) <= eps;
-      const hiOuter = Math.abs(hiMid - bleed.xMax) <= eps;
-      drawBeamFaceClipped(
-        ctx,
-        "Y",
-        lo0,
-        lo1,
-        lo,
-        hi,
-        toX,
-        toY,
-        loOuter ? undefined : BEAM_INNER_DASH,
-        project,
-      );
-      drawBeamFaceClipped(
-        ctx,
-        "Y",
-        hi0,
-        hi1,
-        lo,
-        hi,
-        toX,
-        toY,
-        hiOuter ? undefined : BEAM_INNER_DASH,
-        project,
-      );
-    } else {
-      const loMid = (lo0 + lo1) / 2;
-      const hiMid = (hi0 + hi1) / 2;
-      const loOuter = Math.abs(loMid - bleed.yMin) <= eps;
-      const hiOuter = Math.abs(hiMid - bleed.yMax) <= eps;
-      drawBeamFaceClipped(
-        ctx,
-        "X",
-        lo0,
-        lo1,
-        lo,
-        hi,
-        toX,
-        toY,
-        loOuter ? undefined : BEAM_INNER_DASH,
-        project,
-      );
-      drawBeamFaceClipped(
-        ctx,
-        "X",
-        hi0,
-        hi1,
-        lo,
-        hi,
-        toX,
-        toY,
-        hiOuter ? undefined : BEAM_INNER_DASH,
-        project,
-      );
-    }
+    const loDash =
+      beamFaceDashStyle(b.direction, lo0, lo1, bleed) === "dashed" ? BEAM_INNER_DASH : undefined;
+    const hiDash =
+      beamFaceDashStyle(b.direction, hi0, hi1, bleed) === "dashed" ? BEAM_INNER_DASH : undefined;
+    drawBeamFaceClipped(ctx, b.direction, lo0, lo1, lo, hi, toX, toY, loDash, project);
+    drawBeamFaceClipped(ctx, b.direction, hi0, hi1, lo, hi, toX, toY, hiDash, project);
   }
 }
 

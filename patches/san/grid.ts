@@ -406,6 +406,119 @@ export function horizontalBeamSegExtent(
   return { xLo: faceLo.lo, xHi: faceHi.hi };
 }
 
+/** Trừ các khoảng cắt khỏi [from, to] → các đoạn còn lại (mm). */
+export function subtractIntervals(
+  from: number,
+  to: number,
+  cuts: Array<{ lo: number; hi: number }>,
+): Array<[number, number]> {
+  let parts: Array<[number, number]> = [[Math.min(from, to), Math.max(from, to)]];
+  const sorted = [...cuts].sort((a, b) => a.lo - b.lo);
+  for (const c of sorted) {
+    const next: Array<[number, number]> = [];
+    for (const [a, b] of parts) {
+      const clo = Math.max(a, c.lo);
+      const chi = Math.min(b, c.hi);
+      if (clo >= chi - 0.5) {
+        next.push([a, b]);
+        continue;
+      }
+      if (a < clo - 0.5) next.push([a, clo]);
+      if (chi < b - 0.5) next.push([chi, b]);
+    }
+    parts = next;
+  }
+  return parts.filter(([a, b]) => b - a > 2);
+}
+
+/**
+ * Khoảng dọc theo dầm cần cắt (thân dầm giao phương xuyên qua).
+ * beam Y (đứng): cuts theo Y tại faceX; beam X (ngang): cuts theo X tại faceY.
+ */
+export function crossBodyCutsAlong(
+  project: SlabProject,
+  beamDir: PlanBeam["direction"],
+  face0: number,
+  face1: number,
+  along0: number,
+  along1: number,
+): Array<{ lo: number; hi: number }> {
+  const cuts: Array<{ lo: number; hi: number }> = [];
+  const faceLo = Math.min(face0, face1);
+  const faceHi = Math.max(face0, face1);
+  const aLo = Math.min(along0, along1);
+  const aHi = Math.max(along0, along1);
+  const faceMid = (face0 + face1) / 2;
+  const crossDir: PlanBeam["direction"] = beamDir === "Y" ? "X" : "Y";
+  const perpAxes =
+    crossDir === "X" ? sortAxes(project.axesX ?? []) : sortAxes(project.axesY ?? []);
+
+  for (const other of project.beams ?? []) {
+    if (other.direction !== crossDir) continue;
+    for (const seg of beamSegments(project, other)) {
+      if (isBeamSegOmitted(other, seg.a0.id, seg.a1.id)) continue;
+      const s0 = Math.min(seg.lo, seg.hi);
+      const s1 = Math.max(seg.lo, seg.hi);
+      if (faceHi < s0 - 2 || faceLo > s1 + 2) continue;
+      const alongOnOther = Math.min(s1, Math.max(s0, faceMid));
+      const body = beamFacesAtAlongDirect(other, alongOnOther, perpAxes);
+      if (body.hi - body.lo < 1) continue;
+      if (body.hi < aLo - 2 || body.lo > aHi + 2) continue;
+      cuts.push({ lo: body.lo, hi: body.hi });
+    }
+  }
+  return cuts;
+}
+
+export type BeamFaceStrokeStyle = "solid" | "dashed";
+
+/**
+ * Các đoạn nét da dầm đã cắt chỗ giao thân (giống PDF).
+ * Y-beam: face = X, along = Y; X-beam: face = Y, along = X.
+ */
+export function clippedBeamFaceParts(
+  project: SlabProject,
+  beamDir: PlanBeam["direction"],
+  face0: number,
+  face1: number,
+  along0: number,
+  along1: number,
+): Array<{ faceA: number; faceB: number; alongA: number; alongB: number }> {
+  const cuts = crossBodyCutsAlong(project, beamDir, face0, face1, along0, along1);
+  const parts = subtractIntervals(along0, along1, cuts);
+  const span = along1 - along0;
+  if (Math.abs(span) < 1e-6) return [];
+  return parts.map(([a0, a1]) => {
+    const t0 = (a0 - along0) / span;
+    const t1 = (a1 - along0) / span;
+    return {
+      faceA: face0 + t0 * (face1 - face0),
+      faceB: face0 + t1 * (face1 - face0),
+      alongA: a0,
+      alongB: a1,
+    };
+  });
+}
+
+/**
+ * Da dầm ngoài (biên sàn) nét liền; da trong nét đứt — cùng quy ước PDF.
+ */
+export function beamFaceDashStyle(
+  beamDir: PlanBeam["direction"],
+  face0: number,
+  face1: number,
+  bleed: { xMin: number; xMax: number; yMin: number; yMax: number },
+  epsMm = 2,
+): BeamFaceStrokeStyle {
+  const mid = (face0 + face1) / 2;
+  if (beamDir === "Y") {
+    if (Math.abs(mid - bleed.xMin) <= epsMm || Math.abs(mid - bleed.xMax) <= epsMm) return "solid";
+  } else if (Math.abs(mid - bleed.yMin) <= epsMm || Math.abs(mid - bleed.yMax) <= epsMm) {
+    return "solid";
+  }
+  return "dashed";
+}
+
 /**
  * Phạm vi thép sàn trong ô: giữa da trong hai dầm, thụt insetMm (mặc định = lớp BV).
  * Không kéo thép xuyên qua thân dầm.
