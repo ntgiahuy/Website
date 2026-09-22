@@ -1945,9 +1945,6 @@ export function SlabApp() {
             <div className="flex flex-col gap-3">
               <Panel title="Vẽ thép sàn" className="min-w-0 flex-1">
                 <div className="flex flex-col gap-2.5">
-                  <Field label="Số hiệu thép" wide>
-                    <Input value={zoneForm.mark} onChange={(e) => setZoneForm({ ...zoneForm, mark: e.target.value })} />
-                  </Field>
                   <Field label="Tỷ lệ bản vẽ">
                     <Input
                       type="number"
