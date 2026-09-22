@@ -148,6 +148,11 @@ export function SlabApp() {
           ensureBeamsSplitBays(parseProjectFile(JSON.parse(raw))),
         );
         setProject(parsed);
+        try {
+          localStorage.setItem(STORE_KEY, JSON.stringify(parsed));
+        } catch {
+          /* ignore quota */
+        }
         if (parsed.zones[0]) {
           setZoneForm(parsed.zones[0]);
           setSelectedZoneId(parsed.zones[0].id);
