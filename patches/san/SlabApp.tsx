@@ -36,6 +36,7 @@ import {
   beamSegments,
   bumpBeamTypeName,
   equalizeAxisSpans,
+  ensureBeamsSplitBays,
   isBeamSegOmitted,
   patchBeam,
   patchBeamOnAxis,
@@ -139,7 +140,7 @@ export function SlabApp() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
       if (raw) {
-        const parsed = parseProjectFile(JSON.parse(raw));
+        const parsed = ensureBeamsSplitBays(parseProjectFile(JSON.parse(raw)));
         setProject(parsed);
         if (parsed.zones[0]) {
           setZoneForm(parsed.zones[0]);
@@ -152,9 +153,11 @@ export function SlabApp() {
   }, []);
 
   function persist(next: SlabProject) {
-    setProject(next);
+    // Dầm cắt qua ô phải có trục — tránh chọn ô sàn dính liền băng qua dầm
+    const normalized = ensureBeamsSplitBays(next);
+    setProject(normalized);
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(next));
+      localStorage.setItem(STORE_KEY, JSON.stringify(normalized));
     } catch {
       /* ignore quota */
     }
@@ -271,13 +274,28 @@ export function SlabApp() {
     }
   }
 
-  /** Đổi vị trí tim dầm chèn giữa ô (không gắn trục). */
+  /** Đổi vị trí tim dầm (kèm trục) — luôn tách ô sàn theo dầm. */
   function patchSelectedFreeBeamAxis(value: number) {
     if (planSelection?.kind !== "beam") return;
     const beam = project.beams.find((b) => b.id === planSelection.beamId);
-    if (!beam?.free) return;
+    if (!beam) return;
     const v = Math.max(0, Math.round(value) || 0);
-    persist(patchBeam(project, beam.id, { axis: v, free: true, axisId: undefined }));
+    // Di chuyển tim + gắn trục (promote free) để ô sàn không dính liền qua dầm
+    if (beam.free || !beam.axisId) {
+      persist(ensureBeamsSplitBays(patchBeam(project, beam.id, { axis: v, free: undefined, axisId: undefined })));
+      return;
+    }
+    const axesKey = beam.direction === "Y" ? "axesX" : "axesY";
+    const axes = sortAxes(project[axesKey] ?? []).map((a) =>
+      a.id === beam.axisId ? { ...a, pos: v } : a,
+    );
+    persist(
+      applyAxesToProject({
+        ...project,
+        [axesKey]: axes,
+        beams: project.beams.map((b) => (b.id === beam.id ? { ...b, axis: v } : b)),
+      }),
+    );
   }
 
 

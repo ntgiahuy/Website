@@ -96,7 +96,7 @@ export interface BeamSegShift {
 
 /**
  * Đối tượng đang chọn trên mặt bằng:
- * - bay: ô sàn giữa hai cặp trục
+ * - bay: ô sàn giữa 4 dầm (lưới trục gắn dầm; dầm cắt giữa ô → tách thành nhiều ô)
  * - beam: một đoạn dầm giữa hai trục giao (không phải cả thanh đầu→cuối)
  * - axis: số hiệu / nhịp trục (X hoặc Y)
  */

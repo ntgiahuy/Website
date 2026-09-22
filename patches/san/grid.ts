@@ -1985,17 +1985,93 @@ export function ensureAxes(project: SlabProject): SlabProject {
   return { ...project, info, axesX, axesY, ...size };
 }
 
+/**
+ * Ô sàn = khoảng giữa 4 dầm. Dầm free / lệch trục phải có trục tại tim
+ * để tách ô (1 dầm cắt ngang → 2 ô; cắt ngang + dọc → 4 ô).
+ */
+export function ensureBeamsSplitBays(project: SlabProject): SlabProject {
+  const base = ensureAxes(project);
+  let axesX = sortAxes(base.axesX ?? []);
+  let axesY = sortAxes(base.axesY ?? []);
+  const beamsIn = base.beams ?? [];
+  const tol = 1;
+
+  const addAxisX = (pos: number) => {
+    const p = Math.round(pos);
+    if (axesX.some((a) => Math.abs(a.pos - p) <= tol)) return;
+    axesX = sortAxes([...axesX, { id: uid("ax"), name: nextAxisNameX(axesX), pos: p }]);
+  };
+  const addAxisY = (pos: number) => {
+    const p = Math.round(pos);
+    if (axesY.some((a) => Math.abs(a.pos - p) <= tol)) return;
+    axesY = sortAxes([...axesY, { id: uid("ay"), name: nextAxisNameY(axesY), pos: p }]);
+  };
+
+  for (const b of beamsIn) {
+    if (b.direction === "Y") addAxisX(b.axis);
+    else addAxisY(b.axis);
+  }
+
+  const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
+  const snapped = beamsIn.map((b) => {
+    const axes = b.direction === "Y" ? axesX : axesY;
+    let best = axes[0];
+    let bestD = Infinity;
+    for (const a of axes) {
+      const d = Math.abs(a.pos - b.axis);
+      if (d < bestD) {
+        bestD = d;
+        best = a;
+      }
+    }
+    const { free: _free, ...rest } = b;
+    return {
+      ...rest,
+      axisId: best.id,
+      axis: best.pos,
+      start: 0,
+      end: b.direction === "Y" ? Hplan : W,
+    };
+  });
+
+  // Một dầm / (phương + trục)
+  const seen = new Set<string>();
+  const dedup: PlanBeam[] = [];
+  for (const b of snapped) {
+    const k = `${b.direction}:${b.axisId}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    dedup.push(b);
+  }
+
+  const size = planSizeFromAxes(axesX, axesY);
+  return syncBeamsToAxes({
+    ...base,
+    axesX,
+    axesY,
+    ...size,
+    beams: dedup,
+    info: syncBeamInfo({
+      ...base.info,
+      beamCountX: dedup.filter((b) => b.direction === "Y").length,
+      beamCountY: dedup.filter((b) => b.direction === "X").length,
+    }),
+  });
+}
+
 /** Cập nhật trục + kích thước mặt bằng; dầm theo tim trục (biên / giữa). */
 export function applyAxesToProject(project: SlabProject): SlabProject {
   const withAxes = ensureAxes(project);
   const size = planSizeFromAxes(withAxes.axesX, withAxes.axesY);
   const info = syncBeamInfo(withAxes.info);
-  return syncBeamsToAxes({
+  const synced = syncBeamsToAxes({
     ...withAxes,
     info,
     ...size,
     beams: withAxes.beams ?? [],
   });
+  // Dầm giữa ô / lệch trục → thêm trục để ô sàn không dính liền băng qua dầm
+  return ensureBeamsSplitBays(synced);
 }
 
 /**
@@ -2020,7 +2096,12 @@ export function applyAxisCount(
           axesX: project.axesX,
           axesY: setAxisCount(project.axesY ?? [], n, project.planHeight || 4500, "Y"),
         };
-  const withAxes = applyAxesToProject({ ...project, ...nextAxes });
+  const withAxes = applyAxesToProject({
+    ...project,
+    ...nextAxes,
+    // Bỏ dầm free — số trục mới quyết định ô; free sẽ bị ensureBeamsSplitBays thêm trục lệch
+    beams: (project.beams ?? []).filter((b) => !b.free),
+  });
   const axesX = sortAxes(withAxes.axesX ?? []);
   const axesY = sortAxes(withAxes.axesY ?? []);
   const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
@@ -2030,19 +2111,9 @@ export function applyAxisCount(
 
   const beamDir: PlanBeam["direction"] = dir === "X" ? "Y" : "X";
   const axes = dir === "X" ? axesX : axesY;
-  const existingAll = (withAxes.beams ?? [])
-    .filter((b) => b.direction === beamDir)
+  const existing = (withAxes.beams ?? [])
+    .filter((b) => b.direction === beamDir && !b.free)
     .sort((a, b) => a.axis - b.axis);
-  const freeKept = existingAll
-    .filter((b) => b.free)
-    .map((b) => ({
-      ...b,
-      free: true as const,
-      axisId: undefined,
-      start: 0,
-      end: beamDir === "Y" ? Hplan : W,
-    }));
-  const existing = existingAll.filter((b) => !b.free);
   const keptOther = (withAxes.beams ?? [])
     .filter((b) => b.direction !== beamDir)
     .map((b) => ({
@@ -2081,8 +2152,8 @@ export function applyAxisCount(
     };
   });
 
-  const beams = dir === "X" ? [...synced, ...freeKept, ...keptOther] : [...keptOther, ...synced, ...freeKept];
-  return {
+  const beams = dir === "X" ? [...synced, ...keptOther] : [...keptOther, ...synced];
+  return ensureBeamsSplitBays({
     ...withAxes,
     beams,
     info: syncBeamInfo({
@@ -2090,7 +2161,7 @@ export function applyAxisCount(
       beamCountX: beams.filter((b) => b.direction === "Y").length,
       beamCountY: beams.filter((b) => b.direction === "X").length,
     }),
-  };
+  });
 }
 
 /** Tạo dầm mới theo phương (Y = dầm đứng / theo trục X). */
@@ -2133,7 +2204,8 @@ export function createBeam(
 }
 
 /**
- * Đổi số lượng dầm theo phương — không thêm/bớt trục.
+ * Đổi số lượng dầm theo phương — đồng bộ số trục + dầm trên tim
+ * (mỗi dầm một trục → ô sàn tách đúng giữa các dầm).
  * Phương X (UI): dầm đứng (direction Y). Phương Y: dầm ngang (direction X).
  */
 export function applyBeamCounts(
@@ -2144,82 +2216,10 @@ export function applyBeamCounts(
   const base = ensureAxes(project);
   const cx = Math.max(0, Math.round(countX ?? base.info.beamCountX ?? 0));
   const cy = Math.max(0, Math.round(countY ?? base.info.beamCountY ?? 0));
-  const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(base.axesX, base.axesY);
-  const { B, H, B1 } = beamDims(base.info);
-  const size = formatBeamSize(B, H);
-  const prefix = base.info.beamNamePrefix || "D";
-
-  const existingY = (base.beams ?? [])
-    .filter((b) => b.direction === "Y" && !b.free)
-    .sort((a, b) => a.axis - b.axis);
-  const existingX = (base.beams ?? [])
-    .filter((b) => b.direction === "X" && !b.free)
-    .sort((a, b) => a.axis - b.axis);
-  const freeY = (base.beams ?? [])
-    .filter((b) => b.direction === "Y" && b.free)
-    .map((b) => ({ ...b, free: true as const, axisId: undefined, start: 0, end: Hplan }));
-  const freeX = (base.beams ?? [])
-    .filter((b) => b.direction === "X" && b.free)
-    .map((b) => ({ ...b, free: true as const, axisId: undefined, start: 0, end: W }));
-
-  const place = (n: number, i: number, total: number) =>
-    n <= 1 ? Math.round(total / 2) : Math.round((total * i) / (n - 1));
-
-  const nextY: PlanBeam[] = [];
-  for (let i = 0; i < cx; i++) {
-    const axisPos = place(cx, i, W);
-    const prev = existingY[i];
-    if (prev) {
-      nextY.push({ ...prev, axis: axisPos, start: 0, end: Hplan });
-    } else {
-      nextY.push({
-        id: uid("beam"),
-        name: `${prefix}${nextY.length + existingX.length + 1}`,
-        size,
-        direction: "Y",
-        axis: axisPos,
-        start: 0,
-        end: Hplan,
-        offset: B1,
-      });
-    }
-  }
-
-  const nextX: PlanBeam[] = [];
-  for (let i = 0; i < cy; i++) {
-    const axisPos = place(cy, i, Hplan);
-    const prev = existingX[i];
-    if (prev) {
-      nextX.push({ ...prev, axis: axisPos, start: 0, end: W });
-    } else {
-      nextX.push({
-        id: uid("beam"),
-        name: `${prefix}${nextY.length + nextX.length + 1}`,
-        size,
-        direction: "X",
-        axis: axisPos,
-        start: 0,
-        end: W,
-        offset: B1,
-      });
-    }
-  }
-
-  // Đánh lại tên nếu trùng / thiếu
-  const beams = [...nextY, ...freeY, ...nextX, ...freeX].map((b, i) => ({
-    ...b,
-    name: b.name?.trim() ? b.name : `${prefix}${i + 1}`,
-  }));
-
-  return {
-    ...base,
-    info: syncBeamInfo({
-      ...base.info,
-      beamCountX: beams.filter((b) => b.direction === "Y").length,
-      beamCountY: beams.filter((b) => b.direction === "X").length,
-    }),
-    beams,
-  };
+  let next: SlabProject = base;
+  if (cx >= 2) next = applyAxisCount(next, "X", cx);
+  if (cy >= 2) next = applyAxisCount(next, "Y", cy);
+  return ensureBeamsSplitBays(next);
 }
 
 /** Chèn thêm trục X — không thêm dầm. */
@@ -2481,7 +2481,7 @@ export function beamSegments(project: SlabProject, beam: PlanBeam): BeamSegment[
   return out;
 }
 
-/** Thêm một dầm theo phương (không thêm trục). */
+/** Thêm một dầm theo phương — tạo trục tại tim để tách ô sàn. */
 export function addBeam(
   project: SlabProject,
   direction: PlanBeam["direction"],
@@ -2496,13 +2496,15 @@ export function addBeam(
       : Math.round(Hplan / 2 + same.length * 300);
   const beam = createBeam(base, direction, axisPos, beams.length + 1);
   beams.push(beam);
-  const beamCountX = beams.filter((b) => b.direction === "Y").length;
-  const beamCountY = beams.filter((b) => b.direction === "X").length;
-  return {
+  return ensureBeamsSplitBays({
     ...base,
     beams,
-    info: syncBeamInfo({ ...base.info, beamCountX, beamCountY }),
-  };
+    info: syncBeamInfo({
+      ...base.info,
+      beamCountX: beams.filter((b) => b.direction === "Y").length,
+      beamCountY: beams.filter((b) => b.direction === "X").length,
+    }),
+  });
 }
 
 /** Tăng số đuôi tên dầm: D1 → D2, DX → DX1, D → D1. */
