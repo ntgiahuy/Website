@@ -501,22 +501,16 @@ export function clippedBeamFaceParts(
 }
 
 /**
- * Da dầm ngoài (biên sàn) nét liền; da trong nét đứt — cùng quy ước PDF.
+ * Da dầm luôn nét liền — không dùng nét đứt (không có sàn che khuất trên mặt bằng).
  */
 export function beamFaceDashStyle(
-  beamDir: PlanBeam["direction"],
-  face0: number,
-  face1: number,
-  bleed: { xMin: number; xMax: number; yMin: number; yMax: number },
-  epsMm = 2,
+  _beamDir: PlanBeam["direction"],
+  _face0: number,
+  _face1: number,
+  _bleed: { xMin: number; xMax: number; yMin: number; yMax: number },
+  _epsMm = 2,
 ): BeamFaceStrokeStyle {
-  const mid = (face0 + face1) / 2;
-  if (beamDir === "Y") {
-    if (Math.abs(mid - bleed.xMin) <= epsMm || Math.abs(mid - bleed.xMax) <= epsMm) return "solid";
-  } else if (Math.abs(mid - bleed.yMin) <= epsMm || Math.abs(mid - bleed.yMax) <= epsMm) {
-    return "solid";
-  }
-  return "dashed";
+  return "solid";
 }
 
 /**

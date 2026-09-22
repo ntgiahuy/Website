@@ -16,7 +16,6 @@ import {
   beamSectionOnAxis,
   beamSegSideFaces,
   beamSegments,
-  beamFaceDashStyle,
   clippedBeamFaceParts,
   isBeamSegOmitted,
   planBeamBleed,
@@ -46,8 +45,6 @@ const REBAR_MARK_R = 4.8;
 const AXIS_BUBBLE_R = 5.5;
 const AXIS_BUBBLE_GAP = 10;
 const AXIS_BUBBLE_OFFSET = AXIS_BUBBLE_R + AXIS_BUBBLE_GAP;
-/** Da dầm phía trong (hướng vào ô sàn): nét đứt đều. */
-const BEAM_INNER_DASH = [3.2, 2];
 /** Tim trục: gạch–chấm–gạch–chấm liên tục. */
 const AXIS_CENTERLINE_DASH = [7, 1.6, 1.2, 1.6];
 /** Nét da dầm (mỏng hơn khung ngoài). */
@@ -1038,7 +1035,7 @@ function drawBeamFaceClipped(
 }
 
 /**
- * Vẽ dầm đúng bề rộng B: da ngoài nét liền, da trong nét đứt;
+ * Vẽ dầm đúng bề rộng B: da dầm nét liền mảnh;
  * cắt nét tại chỗ giao thân dầm (không xuyên cắt qua nhau).
  */
 function drawBeam(
@@ -1048,6 +1045,7 @@ function drawBeam(
   toY: (mm: number) => number,
   bleed: { xMin: number; xMax: number; yMin: number; yMax: number },
 ) {
+  void bleed;
   const { project } = ctx;
   const segs = beamSegments(project, b);
 
@@ -1056,12 +1054,9 @@ function drawBeam(
     const { lo0, hi0, lo1, hi1 } = beamSegSideFaces(b, seg.index);
     const lo = seg.lo;
     const hi = seg.hi;
-    const loDash =
-      beamFaceDashStyle(b.direction, lo0, lo1, bleed) === "dashed" ? BEAM_INNER_DASH : undefined;
-    const hiDash =
-      beamFaceDashStyle(b.direction, hi0, hi1, bleed) === "dashed" ? BEAM_INNER_DASH : undefined;
-    drawBeamFaceClipped(ctx, b.direction, lo0, lo1, lo, hi, toX, toY, loDash, project);
-    drawBeamFaceClipped(ctx, b.direction, hi0, hi1, lo, hi, toX, toY, hiDash, project);
+    // Nét liền — không sàn che khuất trên mặt bằng
+    drawBeamFaceClipped(ctx, b.direction, lo0, lo1, lo, hi, toX, toY, undefined, project);
+    drawBeamFaceClipped(ctx, b.direction, hi0, hi1, lo, hi, toX, toY, undefined, project);
   }
 }
 
