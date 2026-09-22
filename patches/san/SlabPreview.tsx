@@ -414,7 +414,11 @@ export function SlabPreview({
       const faceLines: ReactNode[] = [];
       const pushFace = (face0: number, face1: number, key: string) => {
         const style = beamFaceDashStyle(beam.direction, face0, face1, bleed);
-        const parts = clippedBeamFaceParts(project, beam.direction, face0, face1, lo, hi);
+        // Da biên ngoài: không cắt chỗ giao — giữ nét liền suốt đầu/cuối dầm
+        const parts =
+          style === "solid"
+            ? [{ faceA: face0, faceB: face1, alongA: lo, alongB: hi }]
+            : clippedBeamFaceParts(project, beam.direction, face0, face1, lo, hi);
         parts.forEach((p, i) => {
           const x1 = beam.direction === "Y" ? X(p.faceA) : X(p.alongA);
           const y1 = beam.direction === "Y" ? Y(p.alongA) : Y(p.faceA);

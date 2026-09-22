@@ -1012,8 +1012,9 @@ function drawPlan(
 }
 
 /**
- * Vẽ một da dầm, đã cắt đoạn xuyên thân dầm giao.
- * Y-beam: along = Y, face = X; X-beam: along = X, face = Y.
+ * Vẽ một da dầm.
+ * Da biên ngoài (solid): không cắt — nét liền suốt.
+ * Da trong (dashed): cắt đoạn xuyên thân dầm giao.
  */
 function drawBeamFaceClipped(
   ctx: Ctx,
@@ -1027,7 +1028,9 @@ function drawBeamFaceClipped(
   dash: number[] | undefined,
   project: SlabProject,
 ) {
-  const parts = clippedBeamFaceParts(project, beamDir, face0, face1, along0, along1);
+  const parts = dash
+    ? clippedBeamFaceParts(project, beamDir, face0, face1, along0, along1)
+    : [{ faceA: face0, faceB: face1, alongA: along0, alongB: along1 }];
   for (const p of parts) {
     if (beamDir === "Y") {
       line(ctx, toX(p.faceA), toY(p.alongA), toX(p.faceB), toY(p.alongB), BEAM_STROKE, BLACK, dash);
