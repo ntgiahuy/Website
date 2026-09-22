@@ -1,0 +1,309 @@
+From 4edabd479e3d9839e3b34edbb6b8cf5b2f7cda4b Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Tue, 22 Sep 2026 09:43:10 +0000
+Subject: [PATCH 1/2] =?UTF-8?q?PDF=20m=E1=BA=B7t=20b=E1=BA=B1ng:=20d?=
+ =?UTF-8?q?=E1=BA=A7m=202=20n=C3=A9t=20=C4=91en=20=C4=91=C3=BAng=20b?=
+ =?UTF-8?q?=E1=BB=81=20r=E1=BB=99ng,=20th=C3=A9p=20=C4=91=E1=BB=8F=20+=20v?=
+ =?UTF-8?q?=C3=B2ng=20STT=20=C3=98a?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Vẽ da dầm (2 cạnh) màu đen; chỉ thanh thép và số hiệu (vòng STT + Ødia a) dùng đỏ.
+---
+ lib/pdf/generate.ts | 122 +++++++++++++++++++++++++++++++-------------
+ 1 file changed, 87 insertions(+), 35 deletions(-)
+
+diff --git a/lib/pdf/generate.ts b/lib/pdf/generate.ts
+index 5d85984..e323963 100644
+--- a/lib/pdf/generate.ts
++++ b/lib/pdf/generate.ts
+@@ -30,9 +30,9 @@ const PAGE_H = 1191;
+ const BLACK = rgb(0, 0, 0);
+ const GRAY = rgb(0.45, 0.45, 0.45);
+ const AXIS_DASH = rgb(0.35, 0.35, 0.35);
+-/** Đường line dầm trên mặt bằng (như bản vẽ shop). */
+-const BEAM_LINE = rgb(0.82, 0.12, 0.12);
++/** Chỉ thép dùng nét đỏ; dầm / khung / tim trục = đen. */
+ const REBAR_RED = rgb(0.86, 0.15, 0.15);
++const REBAR_MARK_R = 5.2;
+ /** Vòng số hiệu trục PDF: bán kính + khoảng hở khỏi da dầm. */
+ const AXIS_BUBBLE_R = 5.5;
+ const AXIS_BUBBLE_GAP = 10;
+@@ -99,6 +99,7 @@ function textSimple(
+   size = 8,
+   bold = false,
+   align: "left" | "center" | "right" = "left",
++  color = BLACK,
+ ) {
+   const font = bold ? ctx.fontBold : ctx.font;
+   const width = font.widthOfTextAtSize(str, size);
+@@ -110,14 +111,22 @@ function textSimple(
+     y: ty(y) - size * 0.78,
+     size,
+     font,
+-    color: BLACK,
++    color,
+   });
+   return width;
+ }
+ 
+-/** Số hiệu trục: căn giữa tâm vòng theo bbox mực glyph (pdf-lib y = baseline). */
+-function textInAxisBubble(ctx: Ctx, str: string, cx: number, cy: number, size = 6.5) {
+-  const font = ctx.fontBold;
++/** Căn giữa tâm theo bbox mực (dùng cho số trong vòng thép / trục). */
++function textInkCentered(
++  ctx: Ctx,
++  str: string,
++  cx: number,
++  cy: number,
++  size: number,
++  color = BLACK,
++  bold = true,
++) {
++  const font = bold ? ctx.fontBold : ctx.font;
+   const kit = ctx.boldKit;
+   const scale = size / kit.unitsPerEm;
+   const glyphs = kit.layout(str).glyphs;
+@@ -141,23 +150,58 @@ function textInAxisBubble(ctx: Ctx, str: string, cx: number, cy: number, size =
+       y: ty(cy) - size * 0.37,
+       size,
+       font,
+-      color: BLACK,
++      color,
+     });
+     return;
+   }
+   const inkCx = ((minX + maxX) / 2) * scale;
+   const inkCy = ((minY + maxY) / 2) * scale;
+-  // Nhích xuống nhẹ: tâm mực hình học hơi cao hơn tâm quang học chữ cái.
+   const opticalNudge = size * 0.04;
+   ctx.page.drawText(str, {
+     x: cx - inkCx,
+     y: ty(cy) - inkCy - opticalNudge,
+     size,
+     font,
+-    color: BLACK,
++    color,
+   });
+ }
+ 
++/** Số hiệu trục: căn giữa tâm vòng. */
++function textInAxisBubble(ctx: Ctx, str: string, cx: number, cy: number, size = 6.5) {
++  textInkCentered(ctx, str, cx, cy, size, BLACK, true);
++}
++
++/** Số thứ tự thép trong vòng tròn đỏ + Ødia a spacing. */
++function drawRebarCallout(
++  ctx: Ctx,
++  cx: number,
++  cy: number,
++  stt: number,
++  dia: number,
++  spacing: number,
++) {
++  ctx.page.drawCircle({
++    x: cx,
++    y: ty(cy),
++    size: REBAR_MARK_R,
++    borderColor: REBAR_RED,
++    borderWidth: 0.75,
++  });
++  textInkCentered(ctx, String(stt), cx, cy, 6.2, REBAR_RED, true);
++  textSimple(ctx, `Ø${dia}a${spacing}`, cx + REBAR_MARK_R + 3, cy + 2, 6.5, true, "left", REBAR_RED);
++}
++
++/** STT thép theo thứ tự bảng thống kê (cùng số hiệu → cùng STT). */
++function rebarSttByMark(schedule: ScheduleRow[]): Map<string, { stt: number; dia: number; spacing: number }> {
++  const map = new Map<string, { stt: number; dia: number; spacing: number }>();
++  let n = 1;
++  for (const row of schedule) {
++    if (map.has(row.mark)) continue;
++    map.set(row.mark, { stt: n++, dia: row.dia, spacing: row.spacing });
++  }
++  return map;
++}
++
+ function textVertical(ctx: Ctx, str: string, cx: number, yMid: number, size = 11, bold = true) {
+   const font = bold ? ctx.fontBold : ctx.font;
+   const width = font.widthOfTextAtSize(str, size);
+@@ -292,7 +336,7 @@ function drawPlan(
+     textInAxisBubble(ctx, ay.name, bx, y);
+   }
+ 
+-  // —— Đường line dầm (tim thân, có lệch/xéo) + số hiệu D1(220x500) ——
++  // —— Dầm: 2 nét đen theo da (đúng bề rộng B), không dùng đỏ ——
+   for (const b of project.beams) {
+     drawBeam(ctx, b, toX, toY);
+   }
+@@ -329,7 +373,7 @@ function drawPlan(
+     textSimple(ctx, o.name || "Ô", toX((ox0 + ox1) / 2), toY((oy0 + oy1) / 2), 6.5, true, "center");
+   }
+ 
+-  // —— Thép sàn + số hiệu thép ——
++  // —— Thép sàn (chỉ nét đỏ) + vòng STT + Øa ——
+   const hook = SLAB_REBAR_HOOK_MM;
+   const pressAmber = rgb(0.9, 0.55, 0.1);
+   for (const bar of stripRebarBarSegments(project, axesX, axesY)) {
+@@ -357,16 +401,19 @@ function drawPlan(
+     textSimple(ctx, `↓${m.drop}`, toX(m.x) + 4, toY(m.y) - 4, 5.5, false, "left");
+   }
+ 
+-  // Số hiệu thép tại tâm vùng (MC 1-1 Ø10a150…)
++  // Số hiệu thép: vòng tròn STT + Ødia a spacing (đỏ)
++  const sttMap = rebarSttByMark(ctx.model.schedule);
+   for (const z of zones) {
++    const info = sttMap.get(z.mark) ?? {
++      stt: sttMap.size + 1,
++      dia: z.dia,
++      spacing: z.spacing,
++    };
+     const mx = (Math.min(z.x1, z.x2) + Math.max(z.x1, z.x2)) / 2;
+     const my = (Math.min(z.y1, z.y2) + Math.max(z.y1, z.y2)) / 2;
+-    const spec = `Ø${z.dia}a${z.spacing}`;
+-    const label = `${z.mark} ${spec}`;
+-    // Offset nhẹ theo phương để X/Y không chồng nhau
+-    const dy = z.direction === "X" ? (z.layer === "top" ? -12 : 10) : z.layer === "top" ? -22 : 22;
+-    const dx = z.direction === "Y" ? (z.layer === "top" ? 14 : -14) : 0;
+-    textSimple(ctx, label, toX(mx) + dx, toY(my) + dy, 6.5, true, "center");
++    const dy = z.direction === "X" ? (z.layer === "top" ? -14 : 12) : z.layer === "top" ? -26 : 26;
++    const dx = z.direction === "Y" ? (z.layer === "top" ? 16 : -18) : 0;
++    drawRebarCallout(ctx, toX(mx) + dx, toY(my) + dy, info.stt, info.dia, info.spacing);
+   }
+ 
+   dimH(ctx, x0, x0 + pw, edgeBottom + AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 8, `${Math.round(project.planWidth)}`);
+@@ -380,8 +427,7 @@ function drawPlan(
+ }
+ 
+ /**
+- * Vẽ dầm dạng đường line (tim thân) + nhãn Name(BxH) — giống bản vẽ shop minh họa.
+- * Dầm xéo/lệch: nối tim tại hai đầu đoạn.
++ * Vẽ dầm đúng bề rộng B: 2 nét đen theo da (có lệch/xéo) + nhãn Name(BxH).
+  */
+ function drawBeam(
+   ctx: Ctx,
+@@ -398,18 +444,19 @@ function drawBeam(
+   for (const seg of segs) {
+     if (isBeamSegOmitted(b, seg.a0.id, seg.a1.id)) continue;
+     const { lo0, hi0, lo1, hi1 } = beamSegSideFaces(b, seg.index);
+-    const mid0 = (lo0 + hi0) / 2;
+-    const mid1 = (lo1 + hi1) / 2;
+     const lo = seg.lo;
+     const hi = seg.hi;
+     if (b.direction === "Y") {
+-      line(ctx, toX(mid0), toY(lo), toX(mid1), toY(hi), 1.05, BEAM_LINE);
+-      labelX += toX((mid0 + mid1) / 2);
++      // Hai da dọc theo thân (2 nét = đúng bề rộng B)
++      line(ctx, toX(lo0), toY(lo), toX(lo1), toY(hi), 0.9, BLACK);
++      line(ctx, toX(hi0), toY(lo), toX(hi1), toY(hi), 0.9, BLACK);
++      labelX += toX(Math.max(hi0, hi1)) + 6;
+       labelY += (toY(lo) + toY(hi)) / 2;
+     } else {
+-      line(ctx, toX(lo), toY(mid0), toX(hi), toY(mid1), 1.05, BEAM_LINE);
++      line(ctx, toX(lo), toY(lo0), toX(hi), toY(lo1), 0.9, BLACK);
++      line(ctx, toX(lo), toY(hi0), toX(hi), toY(hi1), 0.9, BLACK);
+       labelX += (toX(lo) + toX(hi)) / 2;
+-      labelY += toY((mid0 + mid1) / 2);
++      labelY += toY(Math.max(hi0, hi1)) - 6;
+     }
+     labelN += 1;
+   }
+@@ -419,9 +466,9 @@ function drawBeam(
+   const ly = labelY / labelN;
+   const tag = `${b.name}(${b.size})`;
+   if (b.direction === "Y") {
+-    textVertical(ctx, tag, lx + 7, ly, 5.8, false);
++    textVertical(ctx, tag, lx, ly, 5.8, false);
+   } else {
+-    textSimple(ctx, tag, lx, ly - 7, 5.8, false, "center");
++    textSimple(ctx, tag, lx, ly, 5.8, false, "center");
+   }
+ }
+ 
+@@ -431,21 +478,24 @@ function drawShops(ctx: Ctx, yStart: number, rows: ScheduleRow[]) {
+   y += 18;
+   const colW = 260;
+   const rowH = 52;
++  const sttMap = rebarSttByMark(rows);
+   rows.forEach((row, i) => {
+     const col = i % 3;
+     const r = Math.floor(i / 3);
+     const x = 36 + col * (colW + 16);
+     const yy = y + r * (rowH + 10);
+     rect(ctx, x, yy, colW, rowH, 0.7);
+-    textSimple(ctx, row.mark, x + 8, yy + 10, 8, true);
++    const info = sttMap.get(row.mark) ?? { stt: i + 1, dia: row.dia, spacing: row.spacing };
++    drawRebarCallout(ctx, x + 14, yy + 12, info.stt, info.dia, info.spacing);
++    textSimple(ctx, row.mark, x + 8, yy + 26, 6.5, false, "left");
+     textSimple(
+       ctx,
+-      `Ø${row.dia}a${row.spacing} · ${row.layer} · ${row.direction}`,
++      `${row.layer} · ${row.direction}`,
+       x + 70,
+-      yy + 10,
+-      7,
++      yy + 26,
++      6.5,
+     );
+-    drawShape(ctx, row, x + 8, yy + 16, colW - 16, 28);
++    drawShape(ctx, row, x + 8, yy + 30, colW - 16, 18);
+   });
+   const rowsN = Math.ceil(rows.length / 3);
+   return y + rowsN * (rowH + 10) + 8;
+@@ -584,7 +634,7 @@ function drawScheduleTable(ctx: Ctx, x: number, y: number) {
+ 
+   const headers = [
+     "TÊN CK",
+-    "SỐ HIỆU",
++    "STT",
+     "HÌNH DẠNG",
+     "Ø",
+     "DÀI 1",
+@@ -596,10 +646,12 @@ function drawScheduleTable(ctx: Ctx, x: number, y: number) {
+   ];
+   headers.forEach((lb, i) => textSimple(ctx, lb, mid(i), ty0 + headerH / 2 + 2, 6, false, "center"));
+ 
++  const sttMap = rebarSttByMark(rows);
+   rows.forEach((row, i) => {
+     const ry = ty0 + headerH + i * rowH;
+     line(ctx, colX[1], ry + rowH, x + w, ry + rowH, 0.3);
+-    textSimple(ctx, row.mark, mid(1), ry + rowH / 2 + 2, 7, false, "center");
++    const info = sttMap.get(row.mark) ?? { stt: i + 1, dia: row.dia, spacing: row.spacing };
++    textSimple(ctx, String(info.stt), mid(1), ry + rowH / 2 + 2, 7, true, "center");
+     drawShape(ctx, row, colX[2] + 2, ry + 1, cols[2].w - 4, rowH - 2);
+     textSimple(ctx, String(row.dia), mid(3), ry + rowH / 2 + 2, 7, false, "center");
+     textSimple(ctx, String(row.barLength), mid(4), ry + rowH / 2 + 2, 7, false, "center");
+-- 
+2.43.0
+
+
+From 1643847f0b0fa7878753b27e984aa77f407e8d02 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Tue, 22 Sep 2026 09:43:43 +0000
+Subject: [PATCH 2/2] Spread rebar STT callouts to reduce overlap on plan
+
+---
+ lib/pdf/generate.ts | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/lib/pdf/generate.ts b/lib/pdf/generate.ts
+index e323963..4fa940b 100644
+--- a/lib/pdf/generate.ts
++++ b/lib/pdf/generate.ts
+@@ -411,8 +411,11 @@ function drawPlan(
+     };
+     const mx = (Math.min(z.x1, z.x2) + Math.max(z.x1, z.x2)) / 2;
+     const my = (Math.min(z.y1, z.y2) + Math.max(z.y1, z.y2)) / 2;
+-    const dy = z.direction === "X" ? (z.layer === "top" ? -14 : 12) : z.layer === "top" ? -26 : 26;
+-    const dx = z.direction === "Y" ? (z.layer === "top" ? 16 : -18) : 0;
++    // Tách 4 số hiệu (MC/MT × X/Y) khỏi tâm ô để không chồng
++    const dy =
++      z.direction === "X" ? (z.layer === "top" ? -20 : 18) : z.layer === "top" ? -36 : 36;
++    const dx =
++      z.direction === "Y" ? (z.layer === "top" ? 28 : -34) : z.layer === "top" ? -22 : 22;
+     drawRebarCallout(ctx, toX(mx) + dx, toY(my) + dy, info.stt, info.dia, info.spacing);
+   }
+ 
+-- 
+2.43.0
+
