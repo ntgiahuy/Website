@@ -35,15 +35,19 @@ import {
   baySlabExtent,
   beamSegments,
   bumpBeamTypeName,
+  clampPlanBeamNamesToCatalog,
   equalizeAxisSpans,
   ensureBeamsSplitBays,
+  findBeamTypeByName,
   isBeamSegOmitted,
+  normalizeBeamTypeName,
   patchBeam,
   patchBeamOnAxis,
   patchBeamSegShift,
   getBeamSegShift,
   patchBeamType,
   patchBeamTypeDim,
+  planBeamDisplayName,
   rectNearlyEquals,
   removeAxis,
   removeBeam,
@@ -140,7 +144,9 @@ export function SlabApp() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
       if (raw) {
-        const parsed = ensureBeamsSplitBays(parseProjectFile(JSON.parse(raw)));
+        const parsed = clampPlanBeamNamesToCatalog(
+          ensureBeamsSplitBays(parseProjectFile(JSON.parse(raw))),
+        );
         setProject(parsed);
         if (parsed.zones[0]) {
           setZoneForm(parsed.zones[0]);
@@ -154,7 +160,8 @@ export function SlabApp() {
 
   function persist(next: SlabProject) {
     // Dầm cắt qua ô phải có trục — tránh chọn ô sàn dính liền băng qua dầm
-    const normalized = ensureBeamsSplitBays(next);
+    // Tên dầm mặt bằng chỉ trong Danh sách dầm
+    const normalized = clampPlanBeamNamesToCatalog(ensureBeamsSplitBays(next));
     setProject(normalized);
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(normalized));
@@ -235,7 +242,7 @@ export function SlabApp() {
 
     return {
       id: beam.id,
-      name: `${beam.name} · ${seg.a0.name}–${seg.a1.name} · ${beam.direction === "Y" ? "đứng" : "ngang"}${beam.free ? " · giữa ô" : ""}`,
+      name: `${planBeamDisplayName(project, beam.name)} · ${seg.a0.name}–${seg.a1.name} · ${beam.direction === "Y" ? "đứng" : "ngang"}${beam.free ? " · giữa ô" : ""}`,
       length: seg.span,
       axis: beam.axis,
       free: Boolean(beam.free),
@@ -488,27 +495,32 @@ export function SlabApp() {
     setInsertBeamMode(false);
   }
 
-  /** Loại dầm dùng khi chèn: ưu tiên dòng đã chọn trên danh sách. */
+  /** Loại dầm dùng khi chèn: ưu tiên dòng đã chọn trên danh sách; tên phải có trong list. */
   function resolveInsertBeamType(): { name: string; size: string; offset: number } | null {
     const selectedTypes = (project.beamTypes ?? []).filter((t) => listSelectedIds.includes(t.id));
     const t = selectedTypes[0];
     if (t) {
       return {
-        name: t.name,
+        name: normalizeBeamTypeName(t.name) || t.name,
         size: t.size || `${project.info.beamB}x${project.info.beamH}`,
         offset: Number.isFinite(t.offset)
           ? t.offset
           : Math.round((project.info.beamB || 220) / 2),
       };
     }
-    const name = (bulkBeamName.trim() || project.info.beamNamePrefix || "").trim();
-    if (!name) return null;
+    const typed = findBeamTypeByName(
+      project,
+      bulkBeamName.trim() || project.info.beamNamePrefix || "",
+    );
+    if (!typed) return null;
     return {
-      name,
-      size: `${project.info.beamB}x${project.info.beamH}`,
-      offset: Number.isFinite(project.info.beamB1)
-        ? project.info.beamB1
-        : Math.round((project.info.beamB || 220) / 2),
+      name: normalizeBeamTypeName(typed.name) || typed.name,
+      size: typed.size || `${project.info.beamB}x${project.info.beamH}`,
+      offset: Number.isFinite(typed.offset)
+        ? typed.offset
+        : Number.isFinite(project.info.beamB1)
+          ? project.info.beamB1
+          : Math.round((project.info.beamB || 220) / 2),
     };
   }
 
@@ -766,11 +778,17 @@ export function SlabApp() {
     // Ưu tiên: đoạn đã chọn trên bản vẽ; nếu chọn loại dầm trên list thì lấy tên loại
     const selectedTypes = (project.beamTypes ?? []).filter((t) => listSelectedIds.includes(t.id));
     const typeFromList = selectedTypes[0];
-    const name = (bulkBeamName.trim() || typeFromList?.name || "").trim();
-    if (!name) {
+    const rawName = (bulkBeamName.trim() || typeFromList?.name || "").trim();
+    if (!rawName) {
       setStatus("Nhập tên hoặc chọn loại trên danh sách, rồi click đoạn trên bản vẽ (không cần phím).");
       return;
     }
+    const type = findBeamTypeByName(project, rawName) || typeFromList;
+    if (!type || !findBeamTypeByName(project, type.name)) {
+      setStatus(`«${rawName}» không có trong Danh sách dầm — chỉ gán tên đã có trong list.`);
+      return;
+    }
+    const name = normalizeBeamTypeName(type.name) || type.name;
     const targetBeamIds =
       fromPlan.length > 0
         ? fromPlan
@@ -781,10 +799,12 @@ export function SlabApp() {
       setStatus("Click đoạn dầm trên bản vẽ để gán tên — Shift/Ctrl chỉ khi chọn nhiều.");
       return;
     }
-    const size = typeFromList?.size || `${project.info.beamB}x${project.info.beamH}`;
-    const offset =
-      typeFromList?.offset ??
-      (Number.isFinite(project.info.beamB1) ? project.info.beamB1 : Math.round((project.info.beamB || 220) / 2));
+    const size = type.size || `${project.info.beamB}x${project.info.beamH}`;
+    const offset = Number.isFinite(type.offset)
+      ? type.offset
+      : Number.isFinite(project.info.beamB1)
+        ? project.info.beamB1
+        : Math.round((project.info.beamB || 220) / 2);
     persist(applyBeamTypeToBeams(project, targetBeamIds, { name, size, offset }));
     setStatus(`Đã gán «${name}» cho ${targetBeamIds.length} dầm trên mặt bằng.`);
     setBulkBeamName("");
@@ -803,12 +823,16 @@ export function SlabApp() {
       size: `${Math.round(B)}x${Math.round(H)}`,
       offset: Math.round(B1),
     });
+    if (!next) {
+      setStatus(`Tên «${name}» đã có trong danh sách — không được trùng tên.`);
+      return;
+    }
     const bumped = bumpBeamTypeName(name);
     persist({
       ...next,
       info: { ...next.info, beamNamePrefix: bumped },
     });
-    setStatus(`Đã thêm loại dầm «${name}» vào danh sách.`);
+    setStatus(`Đã thêm loại dầm «${normalizeBeamTypeName(name)}» vào danh sách.`);
   }
 
   useEffect(() => {
@@ -1639,9 +1663,22 @@ export function SlabApp() {
                             className="min-w-0 w-full whitespace-nowrap"
                             title="Tên dầm"
                             value={t.name}
-                            onChange={(e) =>
-                              persist(patchBeamType(project, t.id, { name: e.target.value }))
-                            }
+                            onChange={(e) => {
+                              const nextName = e.target.value;
+                              const next = patchBeamType(project, t.id, { name: nextName });
+                              if (
+                                next === project &&
+                                normalizeBeamTypeName(nextName) &&
+                                normalizeBeamTypeName(nextName).toLowerCase() !==
+                                  normalizeBeamTypeName(t.name).toLowerCase()
+                              ) {
+                                setStatus(
+                                  `Tên «${normalizeBeamTypeName(nextName)}» đã có — không được trùng tên.`,
+                                );
+                                return;
+                              }
+                              persist(next);
+                            }}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {

@@ -1834,8 +1834,7 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
   const axesX = sortAxes(project.axesX ?? []);
   const axesY = sortAxes(project.axesY ?? []);
   const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
-  const prefix = project.info.beamNamePrefix || "D";
-  const { B, H, B1 } = beamDims(project.info);
+  const { B, H } = beamDims(project.info);
   const defaultSize = formatBeamSize(B, H);
   const prev = project.beams ?? [];
   const findPrev = (direction: PlanBeam["direction"], axisId: string, axis: number) =>
@@ -1843,17 +1842,13 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
     prev.find((b) => !b.free && b.direction === direction && Math.abs(b.axis - axis) < 0.5);
 
   const beams: PlanBeam[] = [];
-  let n = 1;
-  const usedNames = new Set<string>();
-  const nextName = (preferred?: string) => {
-    if (preferred && preferred.trim() && !usedNames.has(preferred)) {
-      usedNames.add(preferred);
-      return preferred;
-    }
-    let name = `${prefix}${n++}`;
-    while (usedNames.has(name)) name = `${prefix}${n++}`;
-    usedNames.add(name);
-    return name;
+  const catalog = beamTypeNameSet(project);
+  let typeIdx = 0;
+  const pickName = (preferred?: string) => {
+    const pref = normalizeBeamTypeName(preferred || "");
+    if (pref && catalog.has(pref.toLowerCase())) return pref;
+    const t = beamTypeAtIndex(project, typeIdx++);
+    return t?.name || "—";
   };
 
   for (const ax of axesX) {
@@ -1862,7 +1857,7 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
     const idx = axesX.findIndex((a) => a.id === ax.id);
     beams.push({
       id: old?.id ?? uid("beam"),
-      name: nextName(old?.name),
+      name: pickName(old?.name),
       size: old ? formatBeamSize(dims.b, dims.h) : defaultSize,
       direction: "Y",
       axis: ax.pos,
@@ -1878,7 +1873,7 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
     const idx = axesY.findIndex((a) => a.id === ay.id);
     beams.push({
       id: old?.id ?? uid("beam"),
-      name: nextName(old?.name),
+      name: pickName(old?.name),
       size: old ? formatBeamSize(dims.b, dims.h) : defaultSize,
       direction: "X",
       axis: ay.pos,
@@ -1888,10 +1883,11 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
       offset: beamOffsetForAxisIndex(dims.b, idx, axesY.length),
     });
   }
-  // Giữ dầm chèn giữa ô (không gắn trục)
+  // Giữ dầm chèn giữa ô (không gắn trục) — tên vẫn chỉ trong danh sách
   for (const b of prev.filter((x) => x.free)) {
     beams.push({
       ...b,
+      name: pickName(b.name),
       free: true,
       axisId: undefined,
       start: 0,
@@ -2105,9 +2101,9 @@ export function applyAxisCount(
   const axesX = sortAxes(withAxes.axesX ?? []);
   const axesY = sortAxes(withAxes.axesY ?? []);
   const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
-  const { B, H, B1 } = beamDims(withAxes.info);
+  const { B, H } = beamDims(withAxes.info);
   const defaultSize = formatBeamSize(B, H);
-  const prefix = withAxes.info.beamNamePrefix || "D";
+  const catalog = beamTypeNameSet(withAxes);
 
   const beamDir: PlanBeam["direction"] = dir === "X" ? "Y" : "X";
   const axes = dir === "X" ? axesX : axesY;
@@ -2122,33 +2118,38 @@ export function applyAxisCount(
       end: b.direction === "Y" ? Hplan : W,
     }));
 
-  const usedNames = new Set(keptOther.map((b) => b.name).filter(Boolean));
-  let nameIdx = 1;
-  const nextName = (preferred?: string) => {
-    if (preferred && preferred.trim() && !usedNames.has(preferred)) {
-      usedNames.add(preferred);
-      return preferred;
-    }
-    let name = `${prefix}${nameIdx++}`;
-    while (usedNames.has(name)) name = `${prefix}${nameIdx++}`;
-    usedNames.add(name);
-    return name;
+  const pickName = (i: number, preferred?: string) => {
+    const pref = normalizeBeamTypeName(preferred || "");
+    if (pref && catalog.has(pref.toLowerCase())) return pref;
+    return beamTypeAtIndex(withAxes, i)?.name || "—";
   };
 
   const synced: PlanBeam[] = axes.map((ax, i) => {
     const prev = existing[i];
-    const dims = prev ? parseSize(prev.size) : { b: B, h: H };
+    const fromList = beamTypeAtIndex(withAxes, i);
+    const dims = prev
+      ? parseSize(prev.size)
+      : fromList
+        ? parseSize(fromList.size)
+        : { b: B, h: H };
     const bw = dims.b;
     return {
       id: prev?.id ?? uid("beam"),
-      name: nextName(prev?.name),
-      size: prev ? formatBeamSize(dims.b, dims.h) : defaultSize,
+      name: pickName(i, prev?.name),
+      size: prev
+        ? formatBeamSize(dims.b, dims.h)
+        : fromList?.size || defaultSize,
       direction: beamDir,
       axis: ax.pos,
       axisId: ax.id,
       start: 0,
       end: beamDir === "Y" ? Hplan : W,
-      offset: beamOffsetForAxisIndex(bw, i, axes.length),
+      offset:
+        prev && Number.isFinite(prev.offset)
+          ? (prev.offset as number)
+          : fromList && Number.isFinite(fromList.offset)
+            ? (fromList.offset as number)
+            : beamOffsetForAxisIndex(bw, i, axes.length),
     };
   });
 
@@ -2164,15 +2165,13 @@ export function applyAxisCount(
   });
 }
 
-/** Tạo dầm mới theo phương (Y = dầm đứng / theo trục X). */
+/** Tạo dầm mới theo phương (Y = dầm đứng / theo trục X). Tên lấy từ Danh sách dầm. */
 export function createBeam(
   project: SlabProject,
   direction: PlanBeam["direction"],
   axisPos: number,
   index: number,
 ): PlanBeam {
-  const { B, H } = beamDims(project.info);
-  const prefix = project.info.beamNamePrefix || "D";
   const axesX = sortAxes(project.axesX ?? []);
   const axesY = sortAxes(project.axesY ?? []);
   const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
@@ -2190,16 +2189,23 @@ export function createBeam(
     }
   }
   const axis = axisIdx >= 0 ? axes[axisIdx] : undefined;
+  const fromList = beamTypeAtIndex(project, Math.max(0, index - 1));
+  const { B: bDef, H: hDef } = beamDims(project.info);
+  const size = fromList?.size || formatBeamSize(bDef, hDef);
+  const parsed = parseSize(size);
   return {
     id: uid("beam"),
-    name: `${prefix}${index}`,
-    size: formatBeamSize(B, H),
+    name: fromList?.name || "—",
+    size: formatBeamSize(parsed.b, parsed.h),
     direction,
     axis: axis?.pos ?? axisPos,
     axisId: axis?.id,
     start: 0,
     end: direction === "Y" ? Hplan : W,
-    offset: beamOffsetForAxisIndex(B, Math.max(0, axisIdx), Math.max(1, axes.length)),
+    offset:
+      fromList && Number.isFinite(fromList.offset)
+        ? (fromList.offset as number)
+        : beamOffsetForAxisIndex(parsed.b, Math.max(0, axisIdx), Math.max(1, axes.length)),
   };
 }
 
@@ -2515,6 +2521,86 @@ export function bumpBeamTypeName(name: string): string {
   return `${raw}1`;
 }
 
+/** Chuẩn hóa tên loại dầm để so khớp (không phân biệt hoa thường / khoảng trắng). */
+export function normalizeBeamTypeName(name: string): string {
+  return (name || "").trim().replace(/\s+/g, " ");
+}
+
+/** Tập tên trong Danh sách dầm. */
+export function beamTypeNameSet(project: SlabProject): Set<string> {
+  return new Set(
+    (project.beamTypes ?? [])
+      .map((t) => normalizeBeamTypeName(t.name))
+      .filter(Boolean)
+      .map((n) => n.toLowerCase()),
+  );
+}
+
+export function findBeamTypeByName(
+  project: SlabProject,
+  name: string,
+): BeamTypeDef | undefined {
+  const key = normalizeBeamTypeName(name).toLowerCase();
+  if (!key) return undefined;
+  return (project.beamTypes ?? []).find(
+    (t) => normalizeBeamTypeName(t.name).toLowerCase() === key,
+  );
+}
+
+/** Tên hiển thị trên mặt bằng: chỉ tên có trong Danh sách dầm. */
+export function planBeamDisplayName(project: SlabProject, beamName: string): string {
+  const t = findBeamTypeByName(project, beamName);
+  return t ? normalizeBeamTypeName(t.name) : "—";
+}
+
+/**
+ * Đồng bộ tên dầm trên mặt bằng với Danh sách dầm:
+ * tên ngoài list được gán lại theo thứ tự list (xoay vòng).
+ */
+export function clampPlanBeamNamesToCatalog(project: SlabProject): SlabProject {
+  const types = project.beamTypes ?? [];
+  if (!types.length) {
+    let changed = false;
+    const beams = (project.beams ?? []).map((b) => {
+      if (normalizeBeamTypeName(b.name) === "—") return b;
+      changed = true;
+      return { ...b, name: "—" };
+    });
+    return changed ? { ...project, beams } : project;
+  }
+  const catalog = beamTypeNameSet(project);
+  let idx = 0;
+  let changed = false;
+  const beams = (project.beams ?? []).map((b) => {
+    const pref = normalizeBeamTypeName(b.name);
+    if (pref && catalog.has(pref.toLowerCase())) {
+      const canon = findBeamTypeByName(project, pref)?.name ?? pref;
+      if (canon !== b.name) changed = true;
+      return canon === b.name ? b : { ...b, name: canon };
+    }
+    const t = types[((idx % types.length) + types.length) % types.length];
+    idx += 1;
+    changed = true;
+    return { ...b, name: normalizeBeamTypeName(t.name) || t.name };
+  });
+  return changed ? { ...project, beams } : project;
+}
+
+/** Lấy loại dầm theo thứ tự danh sách (xoay vòng) — không tự tạo tên ngoài list. */
+export function beamTypeAtIndex(
+  project: SlabProject,
+  index: number,
+): Pick<BeamTypeDef, "name" | "size" | "offset"> | null {
+  const types = project.beamTypes ?? [];
+  if (!types.length) return null;
+  const t = types[((index % types.length) + types.length) % types.length];
+  return {
+    name: normalizeBeamTypeName(t.name) || t.name,
+    size: t.size,
+    offset: t.offset,
+  };
+}
+
 /** Tên gợi ý cho loại dầm tiếp theo (D1, D2…). */
 export function suggestNextBeamTypeName(project: SlabProject): string {
   const types = project.beamTypes ?? [];
@@ -2523,19 +2609,24 @@ export function suggestNextBeamTypeName(project: SlabProject): string {
     return `${prefix}1`;
   }
   const last = types[types.length - 1]?.name || "D1";
-  return bumpBeamTypeName(last);
+  let next = bumpBeamTypeName(last);
+  const used = beamTypeNameSet(project);
+  while (used.has(next.toLowerCase())) next = bumpBeamTypeName(next);
+  return next;
 }
 
 /**
  * Thêm loại dầm vào danh sách (nút Thêm).
- * Cùng tên vẫn thêm được dòng mới nếu H/B khác (1 tên có thể nhiều kích thước).
+ * Không cho trùng tên (không phân biệt hoa thường).
+ * Trả về null nếu tên trống hoặc trùng.
  */
 export function addOrUpdateBeamType(
   project: SlabProject,
   input: { name: string; size?: string; offset?: number },
-): SlabProject {
-  const name = (input.name || "").trim();
-  if (!name) return project;
+): SlabProject | null {
+  const name = normalizeBeamTypeName(input.name);
+  if (!name) return null;
+  if (beamTypeNameSet(project).has(name.toLowerCase())) return null;
   const { B, H, B1 } = beamDims(project.info);
   const size = (input.size || formatBeamSize(B, H)).trim() || formatBeamSize(B, H);
   const offset = Number.isFinite(input.offset as number)
@@ -2579,10 +2670,32 @@ export function patchBeamType(
   typeId: string,
   patch: Partial<BeamTypeDef>,
 ): SlabProject {
-  return {
-    ...project,
-    beamTypes: (project.beamTypes ?? []).map((t) => (t.id === typeId ? { ...t, ...patch } : t)),
-  };
+  const types = project.beamTypes ?? [];
+  const prev = types.find((t) => t.id === typeId);
+  if (!prev) return project;
+
+  let nextName = prev.name;
+  if (patch.name !== undefined) {
+    const n = normalizeBeamTypeName(patch.name);
+    if (!n) return project;
+    const dup = types.some(
+      (t) => t.id !== typeId && normalizeBeamTypeName(t.name).toLowerCase() === n.toLowerCase(),
+    );
+    if (dup) return project;
+    nextName = n;
+  }
+
+  const nextTypes = types.map((t) =>
+    t.id === typeId ? { ...t, ...patch, name: nextName } : t,
+  );
+  const oldKey = normalizeBeamTypeName(prev.name).toLowerCase();
+  const beams =
+    nextName !== prev.name
+      ? (project.beams ?? []).map((b) =>
+          normalizeBeamTypeName(b.name).toLowerCase() === oldKey ? { ...b, name: nextName } : b,
+        )
+      : project.beams;
+  return { ...project, beamTypes: nextTypes, beams };
 }
 
 /** Gán loại dầm (tên + BxH + B1) cho các dầm mặt bằng theo id. */

@@ -13,6 +13,7 @@ import {
   getBeamSegShift,
   isBeamSegOmitted,
   planBeamBleed,
+  planBeamDisplayName,
   rectDiagonalHatchSegments,
   rectOpeningDiagonals,
   sortAxes,
@@ -471,7 +472,7 @@ export function SlabPreview({
                 transform={`rotate(-90 ${labelX} ${labelY})`}
                 pointerEvents="none"
               >
-                {beam.name} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
+                {planBeamDisplayName(project, beam.name)} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
                 {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
               </text>
             ) : (
@@ -484,7 +485,7 @@ export function SlabPreview({
                 fontWeight="700"
                 pointerEvents="none"
               >
-                {beam.name} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
+                {planBeamDisplayName(project, beam.name)} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
                 {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
               </text>
             )
@@ -506,10 +507,11 @@ export function SlabPreview({
           ? (() => {
               const beam = project.beams.find((b) => b.id === selection.beamId);
               if (!beam) return `Đoạn dầm: ${selection.beamId}`;
+              const label = planBeamDisplayName(project, beam.name);
               const seg = beamSegments(project, beam)[selection.segIndex];
               return seg
-                ? `Đoạn dầm: ${beam.name} · ${seg.a0.name}–${seg.a1.name}`
-                : `Đoạn dầm: ${beam.name}`;
+                ? `Đoạn dầm: ${label} · ${seg.a0.name}–${seg.a1.name}`
+                : `Đoạn dầm: ${label}`;
             })()
           : `Trục ${selection.dir}: ${
               (selection.dir === "X" ? axesX : axesY).find((a) => a.id === selection.axisId)?.name ?? "?"
