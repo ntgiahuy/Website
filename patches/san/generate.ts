@@ -211,6 +211,30 @@ function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fro
 const DIST_END_AH = 6.5;
 
 /**
+ * Chấm giao khoảng rải ∩ thanh thép (hình mẫu): kim cương trắng trong vòng tròn.
+ * (cx,cy) = tọa độ PDF top-left → ty khi vẽ.
+ */
+function drawDistBarJunction(ctx: Ctx, cx: number, cy: number) {
+  const r = 2.8;
+  const d = r * 0.7;
+  // Vòng trắng (chỉ viền)
+  ctx.page.drawCircle({
+    x: cx,
+    y: ty(cy),
+    size: r,
+    borderColor: rgb(1, 1, 1),
+    borderWidth: 0.7,
+  });
+  // Kim cương trắng (vuông xoay 45°)
+  const path =
+    `M ${cx} ${ty(cy - d)} ` +
+    `L ${cx + d} ${ty(cy)} ` +
+    `L ${cx} ${ty(cy + d)} ` +
+    `L ${cx - d} ${ty(cy)} Z`;
+  ctx.page.drawSvgPath(path, { color: rgb(1, 1, 1) });
+}
+
+/**
  * Số hiệu thép: vòng STT + Ødia a spacing trên 1 hàng (đỏ, không đậm).
  * dir = phương thanh — chữ song song thanh (X ngang / Y dọc).
  * (cx,cy) = tâm vòng (đã offset khỏi nét thép).
@@ -895,6 +919,10 @@ function drawPlan(
       );
       drawDistEndCap(ctx, pxA, pyA, pxB, pyB);
       drawDistEndCap(ctx, pxB, pyB, pxA, pyA);
+      // Chấm giao khoảng rải ∩ thanh thép (giữa thanh)
+      const jx = bar.dir === "X" ? (pxA + pxB) / 2 : toX(bar.x);
+      const jy = bar.dir === "X" ? toY(bar.y) : (pyA + pyB) / 2;
+      drawDistBarJunction(ctx, jx, jy);
       const label = String(Math.round(seg.lenMm));
       const alongY = Math.abs(seg.yB - seg.yA) >= Math.abs(seg.xB - seg.xA);
       if (alongY) {

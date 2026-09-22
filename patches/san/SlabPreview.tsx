@@ -835,6 +835,11 @@ export function SlabPreview({
                       const ux = dx / plen;
                       const uy = dy / plen;
                       const inset = Math.min(ah, plen * 0.35);
+                      // Giao khoảng rải ∩ thanh thép
+                      const jx = bar.dir === "X" ? midX : X(bar.x);
+                      const jy = bar.dir === "X" ? Y(bar.y) : midY;
+                      const jr = 3.2;
+                      const jd = jr * 0.72;
                       return (
                         <g key={`dist-${bi}`} pointerEvents="none">
                           <line
@@ -847,6 +852,12 @@ export function SlabPreview({
                           />
                           {endCap(sxA, syA, sxB, syB, `a-${bi}`)}
                           {endCap(sxB, syB, sxA, syA, `b-${bi}`)}
+                          {/* Chấm giao: kim cương trắng trong vòng tròn */}
+                          <circle cx={jx} cy={jy} r={jr} fill="none" stroke="#ffffff" strokeWidth="1.1" />
+                          <polygon
+                            points={`${jx},${jy - jd} ${jx + jd},${jy} ${jx},${jy + jd} ${jx - jd},${jy}`}
+                            fill="#ffffff"
+                          />
                           <text
                             x={midX + (alongY ? 7 : 0)}
                             y={midY + (alongY ? 0 : -7)}
