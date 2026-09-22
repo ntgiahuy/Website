@@ -135,10 +135,10 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
   if (project.layoutPreset === "manual") return project.zones;
 
   const pad = Math.max(...project.beams.map((b) => parseBeamSize(b.size).b / 2), 110);
-  const cover = project.info.cover;
+  const cover = Math.max(0, Math.round(Number(project.info.cover) || 0));
   const W = project.planWidth;
   const H = project.planHeight;
-  const box = { x1: pad, y1: pad, x2: W - pad, y2: H - pad, cover: 50 };
+  const box = { x1: pad, y1: pad, x2: W - pad, y2: H - pad, cover };
 
   if (project.layoutPreset === "simple2") {
     const bot = parseSteelSpec(project.simple2.bottomSpec) ?? { dia: 10, spacing: 150 };

@@ -97,7 +97,7 @@ function sampleBeams(): PlanBeam[] {
 }
 
 function sampleZones(): RebarZone[] {
-  const cover = 50;
+  const cover = defaultInfo().cover;
   const pad = 110;
   return [
     {

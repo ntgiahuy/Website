@@ -1,17 +1,26 @@
-import type { BeamSegShift, BeamTypeDef, GridAxis, PlanBeam, SlabInfo, SlabProject } from "./types";
+import type {
+  BeamSegShift,
+  BeamTypeDef,
+  GridAxis,
+  PlanBeam,
+  RebarZone,
+  SlabInfo,
+  SlabProject,
+} from "./types";
 import { uid } from "./utils";
 
 /** Thụt thép sàn khỏi da dầm (fallback nếu cover chưa có). */
 export const SLAB_REBAR_FACE_INSET_MM = 50;
 
-/** Lớp bảo vệ (mm) — sắt trừ da dầm biên. Ưu tiên cover vùng thép nếu có. */
+/** Lớp bảo vệ (mm) — khoảng hở đầu thép so với da dầm = Dày lớp bảo vệ. */
 export function slabCoverMm(project: SlabProject): number {
+  const c = Number(project.info?.cover);
+  if (Number.isFinite(c) && c >= 0) return Math.round(c);
   const fromZones = (project.zones ?? [])
     .map((z) => Number(z.cover))
-    .filter((c) => Number.isFinite(c) && c >= 0);
+    .filter((n) => Number.isFinite(n) && n >= 0);
   if (fromZones.length) return Math.round(Math.max(...fromZones));
-  const c = Number(project.info.cover);
-  return Number.isFinite(c) && c >= 0 ? Math.round(c) : SLAB_REBAR_FACE_INSET_MM;
+  return SLAB_REBAR_FACE_INSET_MM;
 }
 
 export function formatBeamSize(b: number, h: number): string {
@@ -1629,18 +1638,31 @@ export function rectNearlyEquals(
 /** Chiều dài móc thép sàn trên mặt bằng (mm) — fallback khi zone không có. */
 export const SLAB_REBAR_HOOK_MM = 50;
 
+/** Móc mặc định theo preset (simple2 / economy2) khi không khớp zone. */
+function presetHookFallbackMm(project: SlabProject): number {
+  if (project.layoutPreset === "simple2") {
+    return Math.max(0, Math.round(Number(project.simple2?.bottomHook) || 0));
+  }
+  if (project.layoutPreset === "economy2") {
+    return Math.max(0, Math.round(Number(project.economy2?.bottomHook) || 0));
+  }
+  return SLAB_REBAR_HOOK_MM;
+}
+
 /**
  * Móc trái/phải theo vùng thép phủ tâm thanh (cùng phương).
+ * Truyền `zones` = effectiveZones(project) để đúng Móc thép trái/phải (kể cả preset).
  * 0 = không vẽ móc.
  */
 export function hooksForRebarBar(
   project: SlabProject,
   bar: RebarBarSeg,
+  zones?: RebarZone[],
 ): { left: number; right: number } {
-  const zones = project.zones ?? [];
+  const list = zones ?? project.zones ?? [];
   const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;
   const my = bar.dir === "X" ? bar.y : (bar.y0 + bar.y1) / 2;
-  const hits = zones.filter((z) => {
+  const hits = list.filter((z) => {
     if (z.direction !== bar.dir) return false;
     const zx0 = Math.min(z.x1, z.x2);
     const zx1 = Math.max(z.x1, z.x2);
@@ -1649,7 +1671,10 @@ export function hooksForRebarBar(
     return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
   });
   const z = hits.find((h) => h.layer === "bottom") ?? hits[0];
-  if (!z) return { left: SLAB_REBAR_HOOK_MM, right: SLAB_REBAR_HOOK_MM };
+  if (!z) {
+    const h = presetHookFallbackMm(project);
+    return { left: h, right: h };
+  }
   return {
     left: Math.max(0, Math.round(Number(z.leftHook) || 0)),
     right: Math.max(0, Math.round(Number(z.rightHook) || 0)),

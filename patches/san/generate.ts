@@ -855,8 +855,9 @@ function drawPlan(
   // —— Thép sàn (chỉ nét đỏ) + vòng STT + Øa ——
   const pressAmber = rgb(0.9, 0.55, 0.1);
   const bars = stripRebarBarSegments(project, axesX, axesY);
+  const rebarZones = effectiveZones(project);
   for (const bar of bars) {
-    const { left: leftHook, right: rightHook } = hooksForRebarBar(project, bar);
+    const { left: leftHook, right: rightHook } = hooksForRebarBar(project, bar, rebarZones);
     if (bar.dir === "X") {
       line(ctx, toX(bar.x0), toY(bar.y), toX(bar.x1), toY(bar.y), 0.55, REBAR_RED);
       if (leftHook > 0) {

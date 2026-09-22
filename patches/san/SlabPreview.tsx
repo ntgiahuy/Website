@@ -713,7 +713,7 @@ export function SlabPreview({
               return (
                 <>
                   {bars.map((bar, i) => {
-                    const { left: leftHook, right: rightHook } = hooksForRebarBar(project, bar);
+                    const { left: leftHook, right: rightHook } = hooksForRebarBar(project, bar, zones);
                     if (bar.dir === "X") {
                       return (
                         <g key={`rebar-x-${i}`} pointerEvents="none">
