@@ -2142,7 +2142,7 @@ export function SlabApp() {
                       );
                     })}
                   </div>
-                  <p className="mt-1.5 rounded border border-zinc-600/80 bg-zinc-900/80 px-2 py-1.5 text-[10px] leading-snug text-zinc-400">
+                  <p className="mt-1.5 text-[10px] leading-snug text-zinc-500">
                     {lowRebarMode === "press"
                       ? "Nhấn: thép đi thẳng xuyên ô; tại dầm quanh ô nhấn xuống bằng chênh cao độ sàn thấp."
                       : "Cắt: tách với sàn thường; thép trong ô thấp + lên thân dầm, lệch ½ khoảng rải để không chồng sắt."}
@@ -2208,8 +2208,8 @@ export function SlabApp() {
                       })}
                     </div>
                     {selectedBayKind() === "low" && (
-                      <div className="mt-2 rounded border border-zinc-700/80 bg-zinc-950/50 p-2">
-                        <div className="mb-1.5 text-[11px] text-zinc-500">Thép sàn thấp</div>
+                      <div className="mt-2">
+                        <div className="mb-1 text-[11px] text-zinc-500">Thép sàn thấp</div>
                         <div className="flex flex-wrap gap-1.5">
                           {(
                             [
@@ -2231,11 +2231,6 @@ export function SlabApp() {
                             );
                           })}
                         </div>
-                        <p className="mt-1.5 rounded border border-zinc-600/80 bg-zinc-900/80 px-2 py-1.5 text-[10px] leading-snug text-zinc-400">
-                          {selectedLowRebarMode() === "press"
-                            ? "Nhấn: thép đi thẳng xuyên ô; tại dầm quanh ô nhấn xuống bằng chênh cao độ sàn thấp."
-                            : "Cắt: tách với sàn thường; thép trong ô thấp + lên thân dầm, lệch ½ khoảng rải để không chồng sắt."}
-                        </p>
                       </div>
                     )}
                   </div>
