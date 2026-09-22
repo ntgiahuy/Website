@@ -1495,93 +1495,93 @@ export function SlabApp() {
 
           {tab === "beams" && (
             <div className="flex flex-col gap-3">
-              <Panel title="Tạo dầm mới" className="min-w-0 w-full">
+              <Panel title="Số liệu dầm" className="min-w-0 w-full">
                 <div className="flex flex-col gap-2.5">
-                  <div className="flex flex-wrap items-end gap-1.5">
-                    <Field label="Tên dầm">
-                      <Input
-                        className="w-24"
-                        value={project.info.beamNamePrefix}
-                        placeholder="VD: D1"
-                        onChange={(e) => patchInfo({ beamNamePrefix: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            addBeamTypeFromForm();
-                          }
-                        }}
-                      />
-                    </Field>
-                    <Field label="H dầm" unit="mm">
-                      <Input
-                        type="number"
-                        className="w-20"
-                        value={project.info.beamH ?? 500}
-                        onChange={(e) => patchBeamDims({ beamH: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
-                    <Field label="B dầm" unit="mm">
-                      <Input
-                        type="number"
-                        className="w-20"
-                        value={project.info.beamB ?? 220}
-                        onChange={(e) => patchBeamDims({ beamB: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
-                    <Button size="sm" variant="success" onClick={addBeamTypeFromForm} title="Lưu vào danh sách">
-                      <Plus /> Thêm
-                    </Button>
-                  </div>
-                  <p className="text-[10px] text-zinc-500">
-                    Cùng tên D1 có thể thêm nhiều dòng với H/B khác nhau.
-                  </p>
+                  <Field label="Số lượng dầm theo phương X (dầm đứng)">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={project.info.beamCountX ?? project.beams.filter((b) => b.direction === "Y").length}
+                      onChange={(e) => patchBeamCount("X", Number(e.target.value))}
+                    />
+                  </Field>
+                  <Field label="Số lượng dầm theo phương Y (dầm ngang)">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={project.info.beamCountY ?? project.beams.filter((b) => b.direction === "X").length}
+                      onChange={(e) => patchBeamCount("Y", Number(e.target.value))}
+                    />
+                  </Field>
+                  <Field label="Chiều cao dầm H" unit="mm">
+                    <Input
+                      type="number"
+                      value={project.info.beamH ?? 500}
+                      onChange={(e) => patchBeamDims({ beamH: Number(e.target.value) || 0 })}
+                    />
+                  </Field>
+                  <Field label="Chiều rộng dầm B" unit="mm">
+                    <Input
+                      type="number"
+                      value={project.info.beamB ?? 220}
+                      onChange={(e) => patchBeamDims({ beamB: Number(e.target.value) || 0 })}
+                    />
+                  </Field>
+                  <Field label="Lệch trục B1" unit="mm">
+                    <Input
+                      type="number"
+                      value={project.info.beamB1 ?? 110}
+                      onChange={(e) => patchBeamDims({ beamB1: Number(e.target.value) || 0 })}
+                    />
+                  </Field>
                 </div>
+                <p className="mt-1.5 text-[11px] text-zinc-500">
+                  B1 tự động: trục biên = da dầm ngoài (B1=0 hoặc B); trục giữa = tâm dầm (B1=B/2).
+                  Đổi khoảng cách tim trục thì dầm theo tim. Kích thước:{" "}
+                  {project.info.beamSizeX || `${project.info.beamB}x${project.info.beamH}`}.
+                </p>
                 <div className="mt-3 rounded border border-zinc-700 bg-zinc-950/60 p-2">
-                  <div className="mb-2 text-xs font-semibold text-sky-300">Số liệu dầm</div>
+                  <div className="mb-2 text-xs font-semibold text-sky-300">Tạo dầm mới</div>
                   <div className="flex flex-col gap-2.5">
-                    <Field label="Số lượng dầm theo phương X (dầm đứng)">
-                      <Input
-                        type="number"
-                        min={0}
-                        value={project.info.beamCountX ?? project.beams.filter((b) => b.direction === "Y").length}
-                        onChange={(e) => patchBeamCount("X", Number(e.target.value))}
-                      />
-                    </Field>
-                    <Field label="Số lượng dầm theo phương Y (dầm ngang)">
-                      <Input
-                        type="number"
-                        min={0}
-                        value={project.info.beamCountY ?? project.beams.filter((b) => b.direction === "X").length}
-                        onChange={(e) => patchBeamCount("Y", Number(e.target.value))}
-                      />
-                    </Field>
-                    <Field label="Chiều cao dầm H" unit="mm">
-                      <Input
-                        type="number"
-                        value={project.info.beamH ?? 500}
-                        onChange={(e) => patchBeamDims({ beamH: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
-                    <Field label="Chiều rộng dầm B" unit="mm">
-                      <Input
-                        type="number"
-                        value={project.info.beamB ?? 220}
-                        onChange={(e) => patchBeamDims({ beamB: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
-                    <Field label="Lệch trục B1" unit="mm">
-                      <Input
-                        type="number"
-                        value={project.info.beamB1 ?? 110}
-                        onChange={(e) => patchBeamDims({ beamB1: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
+                    <div className="flex flex-wrap items-end gap-1.5">
+                      <Field label="Tên dầm">
+                        <Input
+                          className="w-24"
+                          value={project.info.beamNamePrefix}
+                          placeholder="VD: D1"
+                          onChange={(e) => patchInfo({ beamNamePrefix: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addBeamTypeFromForm();
+                            }
+                          }}
+                        />
+                      </Field>
+                      <Field label="H dầm" unit="mm">
+                        <Input
+                          type="number"
+                          className="w-20"
+                          value={project.info.beamH ?? 500}
+                          onChange={(e) => patchBeamDims({ beamH: Number(e.target.value) || 0 })}
+                        />
+                      </Field>
+                      <Field label="B dầm" unit="mm">
+                        <Input
+                          type="number"
+                          className="w-20"
+                          value={project.info.beamB ?? 220}
+                          onChange={(e) => patchBeamDims({ beamB: Number(e.target.value) || 0 })}
+                        />
+                      </Field>
+                      <Button size="sm" variant="success" onClick={addBeamTypeFromForm} title="Lưu vào danh sách">
+                        <Plus /> Thêm
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-zinc-500">
+                      Cùng tên D1 có thể thêm nhiều dòng với H/B khác nhau.
+                    </p>
                   </div>
-                  <p className="mt-1.5 text-[11px] text-zinc-500">
-                    B1 tự động: trục biên = da dầm ngoài (B1=0 hoặc B); trục giữa = tâm dầm (B1=B/2).
-                    Đổi khoảng cách tim trục thì dầm theo tim. Kích thước:{" "}
-                    {project.info.beamSizeX || `${project.info.beamB}x${project.info.beamH}`}.
-                  </p>
                 </div>
                 <div className="mt-3 rounded border border-zinc-700 bg-zinc-950/60 p-2">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
