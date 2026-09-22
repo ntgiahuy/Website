@@ -1,0 +1,931 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { effectiveZones } from "@/lib/calc";
+import {
+  axisInteriorSegmentsX,
+  axisInteriorSegmentsY,
+  baySlabExtent,
+  beamSegSideFaces,
+  beamSegments,
+  getBeamSegShift,
+  isBeamSegOmitted,
+  planBeamBleed,
+  rectDiagonalHatchSegments,
+  rectOpeningDiagonals,
+  sortAxes,
+  stripRebarBarSegments,
+  stripRebarPressMarks,
+  SLAB_REBAR_HOOK_MM,
+} from "@/lib/grid";
+import type { PlanSelection, SlabProject } from "@/lib/types";
+import { buildBeamFrameScene, projectSceneToSvg } from "@/lib/view3d";
+
+type Anchor = { leftPct: number; topPct: number };
+
+/** Bán kính vòng số hiệu trục (px SVG). */
+const AXIS_BUBBLE_R = 6;
+/** Khoảng hở giữa da dầm ngoài và mép vòng (kề sàn, không chạm). */
+const AXIS_BUBBLE_GAP = 12;
+/** Tâm vòng số hiệu cách da dầm ngoài. */
+const AXIS_BUBBLE_OFFSET = AXIS_BUBBLE_R + AXIS_BUBBLE_GAP;
+
+function clamp(n: number, lo: number, hi: number) {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+export function SlabPreview({
+  project,
+  show3d,
+  selection = null,
+  beamMultiSelect = [],
+  onSelect,
+  interactive = false,
+  insertBeamMode = false,
+  editPanel = null,
+}: {
+  project: SlabProject;
+  show3d?: boolean;
+  selection?: PlanSelection | null;
+  /** Các đoạn dầm đang chọn (Ctrl/Shift) — tô nhấn trên bản vẽ. */
+  beamMultiSelect?: Array<{ beamId: string; segIndex: number }>;
+  onSelect?: (sel: PlanSelection | null, e?: MouseEvent) => void;
+  /** Cho phép nhấp chọn ô sàn / đoạn dầm / số hiệu trục trên bản vẽ. */
+  interactive?: boolean;
+  /** Đang chèn dầm vào ô — ưu tiên click ô sàn, không bắt sự kiện trên thân dầm. */
+  insertBeamMode?: boolean;
+  /** Bảng chỉnh sửa kích thước hiển thị tại vị trí chọn. */
+  editPanel?: ReactNode;
+}) {
+  const zones = useMemo(() => effectiveZones(project), [project]);
+  const axesX = useMemo(() => sortAxes(project.axesX ?? []), [project.axesX]);
+  const axesY = useMemo(() => sortAxes(project.axesY ?? []), [project.axesY]);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState<Anchor | null>(null);
+
+  const W = 640;
+  const H = 420;
+  const bleed = useMemo(() => planBeamBleed(project, axesX, axesY), [project, axesX, axesY]);
+  const bleedMm = Math.max(
+    0,
+    -bleed.xMin,
+    -bleed.yMin,
+    bleed.xMax - project.planWidth,
+    bleed.yMax - project.planHeight,
+  );
+  // Chừa chỗ: dầm nhô ngoài plan + vòng số hiệu + khe hở
+  const pad = Math.max(48, AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 12 + bleedMm * 0.04);
+  const sx = (W - pad * 2) / Math.max(project.planWidth, 1);
+  const sy = (H - pad * 2) / Math.max(project.planHeight, 1);
+  const s = Math.min(sx, sy);
+  const ox = pad + (W - pad * 2 - project.planWidth * s) / 2;
+  const oy = pad + (H - pad * 2 - project.planHeight * s) / 2;
+  const X = (mm: number) => ox + mm * s;
+  const Y = (mm: number) => oy + (project.planHeight - mm) * s;
+  /** Da dầm ngoài cùng — neo vòng số hiệu / đường dẫn (không dính thân dầm). */
+  const outerLeft = bleed.xMin;
+  const outerBottom = bleed.yMin;
+
+  function anchorFromSvg(svgX: number, svgY: number): Anchor {
+    return {
+      leftPct: clamp((svgX / W) * 100, 8, 78),
+      topPct: clamp((svgY / H) * 100, 8, 72),
+    };
+  }
+
+  function anchorFromSelection(sel: PlanSelection): Anchor {
+    if (sel.kind === "bay") {
+      const { x0, x1, y0, y1 } = baySlabExtent(project, axesX, axesY, sel.ix, sel.iy);
+      return anchorFromSvg(X((x0 + x1) / 2), Y((y0 + y1) / 2));
+    }
+    if (sel.kind === "beam") {
+      const beam = project.beams.find((b) => b.id === sel.beamId);
+      if (!beam) return { leftPct: 50, topPct: 40 };
+      const segs = beamSegments(project, beam);
+      const seg = segs[sel.segIndex] ?? segs[0];
+      if (!seg) return { leftPct: 50, topPct: 40 };
+      if (beam.direction === "Y") {
+        return anchorFromSvg(X(beam.axis) + 28, Y((seg.lo + seg.hi) / 2));
+      }
+      return anchorFromSvg(X((seg.lo + seg.hi) / 2), Y(beam.axis) - 28);
+    }
+    const axes = sel.dir === "X" ? axesX : axesY;
+    const ax = axes.find((a) => a.id === sel.axisId);
+    if (!ax) return { leftPct: 50, topPct: 40 };
+    if (sel.dir === "X") return anchorFromSvg(X(ax.pos), Y(outerBottom) + AXIS_BUBBLE_OFFSET + 20);
+    return anchorFromSvg(X(outerLeft) - AXIS_BUBBLE_OFFSET, Y(ax.pos));
+  }
+
+  function pick(sel: PlanSelection | null, e?: MouseEvent) {
+    onSelect?.(sel, e);
+    if (!sel) {
+      setAnchor(null);
+      return;
+    }
+    if (e && wrapRef.current) {
+      const r = wrapRef.current.getBoundingClientRect();
+      setAnchor({
+        leftPct: clamp(((e.clientX - r.left) / Math.max(r.width, 1)) * 100, 4, 72),
+        topPct: clamp(((e.clientY - r.top) / Math.max(r.height, 1)) * 100, 4, 70),
+      });
+      return;
+    }
+    setAnchor(anchorFromSelection(sel));
+  }
+
+  useEffect(() => {
+    if (!selection) {
+      setAnchor(null);
+      return;
+    }
+    setAnchor((prev) => prev ?? anchorFromSelection(selection));
+    // Chỉ neo lại khi đổi đối tượng chọn (không theo mọi frame geometry).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selection?.kind, selection && "beamId" in selection ? selection.beamId : null, selection && "segIndex" in selection ? selection.segIndex : null, selection && "axisId" in selection ? selection.axisId : null, selection && "ix" in selection ? selection.ix : null, selection && "iy" in selection ? selection.iy : null]);
+
+  if (show3d) {
+    const scene = buildBeamFrameScene(project);
+    const view = projectSceneToSvg(scene, { width: 920, height: 540, pad: 40 });
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center bg-zinc-900 p-3">
+        <svg
+          viewBox={`0 0 ${view.width} ${view.height}`}
+          className="h-full w-full max-h-full rounded border border-zinc-700 bg-white"
+          role="img"
+          aria-label={view.title}
+        >
+          <defs>
+            <pattern id="lowHatch3d" patternUnits="userSpaceOnUse" width="6" height="6">
+              <circle cx="1.2" cy="1.2" r="0.7" fill="#9ca3af" />
+            </pattern>
+            <marker
+              id="distArrow"
+              viewBox="0 0 10 10"
+              refX="5"
+              refY="5"
+              markerWidth="4.5"
+              markerHeight="4.5"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb" />
+            </marker>
+          </defs>
+          {view.polygons.map((poly, i) => (
+            <polygon
+              key={`f-${i}`}
+              points={poly.points}
+              fill={poly.kind === "hatch" ? "url(#lowHatch3d)" : "#ffffff"}
+              stroke="none"
+            />
+          ))}
+          {view.edges.map((e, i) => (
+            <line
+              key={`e-${i}`}
+              x1={e.x1}
+              y1={e.y1}
+              x2={e.x2}
+              y2={e.y2}
+              stroke={e.style === "solid" ? "#0a0a0a" : "#9ca3af"}
+              strokeWidth={e.style === "solid" ? 1.45 : 0.55}
+              strokeDasharray={e.style === "dashed" ? "3.5 2.2" : undefined}
+              strokeLinecap="round"
+            />
+          ))}
+          {view.lines.map((ln, i) => (
+            <line
+              key={`x-${i}`}
+              x1={ln.x1}
+              y1={ln.y1}
+              x2={ln.x2}
+              y2={ln.y2}
+              stroke="#6b7280"
+              strokeWidth={1}
+              strokeDasharray="6 4"
+            />
+          ))}
+          {view.marks.map((m, i) => (
+            <g key={`m-${i}`} transform={`translate(${m.x}, ${m.y})`}>
+              <polygon points="-7,0 7,0 0,-10" fill="#111" />
+              <line x1={0} y1={0} x2={0} y2={14} stroke="#111" strokeWidth={1} />
+              <text x={10} y={-2} fill="#111" fontSize="11" fontWeight="700" fontFamily="sans-serif">
+                {m.elevText}
+              </text>
+              <text x={10} y={12} fill="#374151" fontSize="10" fontFamily="sans-serif">
+                {m.hsText}
+              </text>
+            </g>
+          ))}
+          <text
+            x={view.width / 2}
+            y={view.height - 22}
+            textAnchor="middle"
+            fill="#111"
+            fontSize="13"
+            fontWeight="700"
+            fontFamily="sans-serif"
+          >
+            {view.title}
+          </text>
+          <text
+            x={view.width / 2}
+            y={view.height - 8}
+            textAnchor="middle"
+            fill="#4b5563"
+            fontSize="11"
+            fontFamily="sans-serif"
+          >
+            {view.subtitle}
+          </text>
+        </svg>
+      </div>
+    );
+  }
+
+  const bayNodes: ReactNode[] = [];
+  for (let ix = 0; ix < axesX.length - 1; ix++) {
+    for (let iy = 0; iy < axesY.length - 1; iy++) {
+      const { x0, x1, y0, y1 } = baySlabExtent(project, axesX, axesY, ix, iy);
+      const active = selection?.kind === "bay" && selection.ix === ix && selection.iy === iy;
+      bayNodes.push(
+        <g key={`bay-${ix}-${iy}`}>
+          <rect
+            x={X(x0)}
+            y={Y(y1)}
+            width={(x1 - x0) * s}
+            height={(y1 - y0) * s}
+            fill={active ? "rgba(56,189,248,0.18)" : interactive ? "rgba(39,39,42,0.35)" : "transparent"}
+            stroke={active ? "#38bdf8" : "transparent"}
+            strokeWidth={active ? 1.6 : 0}
+            className={interactive ? (insertBeamMode ? "cursor-crosshair" : "cursor-pointer") : undefined}
+            pointerEvents={interactive ? "all" : "none"}
+            onClick={(e) => {
+              if (!interactive || !onSelect) return;
+              e.stopPropagation();
+              pick({ kind: "bay", ix, iy }, e);
+            }}
+          />
+          {active && (
+            <text
+              x={X((x0 + x1) / 2)}
+              y={Y((y0 + y1) / 2)}
+              textAnchor="middle"
+              fill="#7dd3fc"
+              fontSize="11"
+              fontWeight="700"
+              pointerEvents="none"
+            >
+              {axesX[ix].name}-{axesY[iy].name} · {Math.round(x1 - x0)}×{Math.round(y1 - y0)}
+            </text>
+          )}
+        </g>,
+      );
+    }
+  }
+
+  const lowSlabNodes: ReactNode[] = (project.lowSlabs ?? []).map((ls) => {
+    const x0 = ls.x;
+    const y0 = ls.y;
+    const x1 = ls.x + ls.w;
+    const y1 = ls.y + ls.h;
+    const segs = rectDiagonalHatchSegments(x0, y0, x1, y1, 200);
+    return (
+      <g key={`low-${ls.id}`} pointerEvents="none">
+        <rect
+          x={X(x0)}
+          y={Y(y1)}
+          width={ls.w * s}
+          height={ls.h * s}
+          fill="rgba(161,161,170,0.06)"
+          stroke="#a1a1aa"
+          strokeWidth={0.8}
+        />
+        {segs.map((seg, i) => (
+          <line
+            key={`low-hatch-${ls.id}-${i}`}
+            x1={X(seg.xA)}
+            y1={Y(seg.yA)}
+            x2={X(seg.xB)}
+            y2={Y(seg.yB)}
+            stroke="#c4c4c8"
+            strokeWidth={0.9}
+            opacity={0.95}
+          />
+        ))}
+        <text
+          x={X((x0 + x1) / 2)}
+          y={Y((y0 + y1) / 2) + 4}
+          textAnchor="middle"
+          fill="#d4d4d8"
+          fontSize="10"
+          fontWeight="600"
+        >
+          {ls.name || "ST"}
+          {(ls.rebarMode ?? "press") === "cut" ? " · cắt" : " · nhấn"}
+        </text>
+      </g>
+    );
+  });
+
+  const openingNodes: ReactNode[] = (project.openings ?? []).map((op) => {
+    const x0 = op.x;
+    const y0 = op.y;
+    const x1 = op.x + op.w;
+    const y1 = op.y + op.h;
+    const [d1, d2] = rectOpeningDiagonals(x0, y0, x1, y1);
+    return (
+      <g key={`op-${op.id}`} pointerEvents="none">
+        <rect
+          x={X(x0)}
+          y={Y(y1)}
+          width={op.w * s}
+          height={op.h * s}
+          fill="rgba(24,24,27,0.55)"
+          stroke="#e4e4e7"
+          strokeWidth={1}
+        />
+        <line
+          x1={X(d1.xA)}
+          y1={Y(d1.yA)}
+          x2={X(d1.xB)}
+          y2={Y(d1.yB)}
+          stroke="#e4e4e7"
+          strokeWidth={1.2}
+          strokeDasharray="6 4"
+        />
+        <line
+          x1={X(d2.xA)}
+          y1={Y(d2.yA)}
+          x2={X(d2.xB)}
+          y2={Y(d2.yB)}
+          stroke="#e4e4e7"
+          strokeWidth={1.2}
+          strokeDasharray="6 4"
+        />
+        <text
+          x={X((x0 + x1) / 2)}
+          y={Y((y0 + y1) / 2) + 4}
+          textAnchor="middle"
+          fill="#fafafa"
+          fontSize="10"
+          fontWeight="700"
+        >
+          {op.name || "Ô"}
+        </text>
+      </g>
+    );
+  });
+
+  const beamNodes: ReactNode[] = [];
+  for (const beam of project.beams ?? []) {
+    const segs = beamSegments(project, beam);
+
+    for (const seg of segs) {
+      if (isBeamSegOmitted(beam, seg.a0.id, seg.a1.id)) continue;
+      const active =
+        (selection?.kind === "beam" &&
+          selection.beamId === beam.id &&
+          selection.segIndex === seg.index) ||
+        beamMultiSelect.some((s) => s.beamId === beam.id && s.segIndex === seg.index);
+      const { lo0, hi0, lo1, hi1 } = beamSegSideFaces(beam, seg.index);
+      const { s0, s1 } = getBeamSegShift(beam, seg.index);
+      const lo = seg.lo;
+      const hi = seg.hi;
+
+      // Đa giác đoạn dầm (có thể xéo khi s0 ≠ s1)
+      const pts =
+        beam.direction === "Y"
+          ? [
+              [X(lo0), Y(lo)],
+              [X(hi0), Y(lo)],
+              [X(hi1), Y(hi)],
+              [X(lo1), Y(hi)],
+            ]
+          : [
+              [X(lo), Y(lo0)],
+              [X(lo), Y(hi0)],
+              [X(hi), Y(hi1)],
+              [X(hi), Y(lo1)],
+            ];
+      const points = pts.map(([px, py]) => `${px},${py}`).join(" ");
+      const labelX =
+        beam.direction === "Y" ? X(Math.max(hi0, hi1)) + 10 : X((lo + hi) / 2);
+      const labelY =
+        beam.direction === "Y" ? Y((lo + hi) / 2) : Y(Math.max(hi0, hi1)) - 6;
+
+      beamNodes.push(
+        <g key={`${beam.id}-s${seg.index}`}>
+          <polygon
+            points={points}
+            fill="#27272a"
+            stroke="#a1a1aa"
+            strokeWidth={1}
+            className={interactive && !insertBeamMode ? "cursor-pointer" : undefined}
+            pointerEvents={interactive && !insertBeamMode ? "all" : "none"}
+            onClick={(e) => {
+              if (!interactive || insertBeamMode || !onSelect) return;
+              e.stopPropagation();
+              pick({ kind: "beam", beamId: beam.id, segIndex: seg.index }, e);
+            }}
+          />
+          {active && (
+            <>
+              <polygon
+                points={points}
+                fill="rgba(52,211,153,0.45)"
+                stroke="#34d399"
+                strokeWidth={2}
+                pointerEvents="none"
+              />
+              {beam.direction === "Y" ? (
+                <text
+                  x={labelX}
+                  y={labelY}
+                  fill="#6ee7b7"
+                  fontSize="10"
+                  fontWeight="700"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  transform={`rotate(-90 ${labelX} ${labelY})`}
+                  pointerEvents="none"
+                >
+                  {beam.name} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
+                  {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
+                </text>
+              ) : (
+                <text
+                  x={labelX}
+                  y={labelY}
+                  textAnchor="middle"
+                  fill="#6ee7b7"
+                  fontSize="10"
+                  fontWeight="700"
+                  pointerEvents="none"
+                >
+                  {beam.name} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
+                  {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
+                </text>
+              )}
+            </>
+          )}
+        </g>,
+      );
+    }
+  }
+
+  const statusText = !interactive
+    ? `${project.info.name} · ${project.beams.length} dầm · ${axesX.length - 1}×${axesY.length - 1} ô`
+    : insertBeamMode
+      ? "Đang chèn dầm — click ô sàn để thêm trục và tách ô độc lập (1 dầm → 2 ô; X+Y → 4 ô)."
+      : !selection
+      ? "Nhấp ô sàn, dầm hoặc số hiệu trục trên bản vẽ để chỉnh kích thước tại chỗ."
+      : selection.kind === "bay"
+        ? `Ô sàn: ${axesX[selection.ix]?.name ?? "?"}–${axesX[selection.ix + 1]?.name ?? "?"} / ${axesY[selection.iy]?.name ?? "?"}–${axesY[selection.iy + 1]?.name ?? "?"}`
+        : selection.kind === "beam"
+          ? (() => {
+              const beam = project.beams.find((b) => b.id === selection.beamId);
+              if (!beam) return `Đoạn dầm: ${selection.beamId}`;
+              const seg = beamSegments(project, beam)[selection.segIndex];
+              return seg
+                ? `Đoạn dầm: ${beam.name} · ${seg.a0.name}–${seg.a1.name}`
+                : `Đoạn dầm: ${beam.name}`;
+            })()
+          : `Trục ${selection.dir}: ${
+              (selection.dir === "X" ? axesX : axesY).find((a) => a.id === selection.axisId)?.name ?? "?"
+            }`;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-zinc-950">
+      <div ref={wrapRef} className="relative min-h-0 flex-1">
+        <div className="flex h-full min-h-0 items-center justify-center p-1 sm:p-2">
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            className="h-full w-full"
+            preserveAspectRatio="xMidYMid meet"
+            onClick={() => {
+              if (interactive && onSelect) pick(null);
+            }}
+          >
+            <rect
+              x={X(0)}
+              y={Y(project.planHeight)}
+              width={project.planWidth * s}
+              height={project.planHeight * s}
+              fill="#111113"
+              stroke="#79b8ff"
+              strokeWidth="1.5"
+              pointerEvents="none"
+            />
+            {bayNodes}
+            {lowSlabNodes}
+            {openingNodes}
+            {axesX.map((ax) => {
+              const active = selection?.kind === "axis" && selection.dir === "X" && selection.axisId === ax.id;
+              const cx = X(ax.pos);
+              const edgeY = Y(outerBottom);
+              const cy = edgeY + AXIS_BUBBLE_OFFSET;
+              const stroke = active ? "#79b8ff" : "#52525b";
+              const sw = active ? 1.2 : 0.6;
+              const interior = axisInteriorSegmentsX(project, axesX, axesY, ax.pos);
+              return (
+                <g key={`ax-${ax.id}`}>
+                  {/* Tim trục: gạch–chấm liên tục trong lòng ô */}
+                  {interior.map((span, i) => (
+                    <line
+                      key={`ax-span-${ax.id}-${i}`}
+                      x1={cx}
+                      y1={Y(span.hi)}
+                      x2={cx}
+                      y2={Y(span.lo)}
+                      stroke={stroke}
+                      strokeWidth={sw}
+                      strokeDasharray="7 2 1.5 2"
+                      pointerEvents="none"
+                    />
+                  ))}
+                  {/* Đường dẫn nét mảnh gạch đứt: mép vòng → da sàn ngoài */}
+                  <line
+                    x1={cx}
+                    y1={cy - AXIS_BUBBLE_R}
+                    x2={cx}
+                    y2={edgeY}
+                    stroke="#79b8ff"
+                    strokeWidth={0.65}
+                    strokeDasharray="2 1.75"
+                    opacity={0.9}
+                    pointerEvents="none"
+                  />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={AXIS_BUBBLE_R}
+                    fill={active ? "#1e3a5f" : "#0d1117"}
+                    stroke="#79b8ff"
+                    strokeWidth={active ? 1.5 : 0.95}
+                    className={interactive ? "cursor-pointer" : undefined}
+                    pointerEvents={interactive ? "all" : "none"}
+                    onClick={(e) => {
+                      if (!interactive || !onSelect) return;
+                      e.stopPropagation();
+                      pick({ kind: "axis", dir: "X", axisId: ax.id }, e);
+                    }}
+                  />
+                  <text
+                    x={cx}
+                    y={cy}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fill="#79b8ff"
+                    fontSize="8"
+                    fontWeight="700"
+                    pointerEvents="none"
+                  >
+                    {ax.name}
+                  </text>
+                </g>
+              );
+            })}
+            {axesY.map((ay) => {
+              const active = selection?.kind === "axis" && selection.dir === "Y" && selection.axisId === ay.id;
+              const edgeX = X(outerLeft);
+              const cx = edgeX - AXIS_BUBBLE_OFFSET;
+              const cy = Y(ay.pos);
+              const stroke = active ? "#fbbf24" : "#52525b";
+              const sw = active ? 1.2 : 0.6;
+              const interior = axisInteriorSegmentsY(project, axesX, axesY, ay.pos);
+              return (
+                <g key={`ay-${ay.id}`}>
+                  {/* Tim trục: gạch–chấm liên tục trong lòng ô */}
+                  {interior.map((span, i) => (
+                    <line
+                      key={`ay-span-${ay.id}-${i}`}
+                      x1={X(span.lo)}
+                      y1={cy}
+                      x2={X(span.hi)}
+                      y2={cy}
+                      stroke={stroke}
+                      strokeWidth={sw}
+                      strokeDasharray="7 2 1.5 2"
+                      pointerEvents="none"
+                    />
+                  ))}
+                  {/* Đường dẫn nét mảnh gạch đứt: mép vòng → da sàn ngoài */}
+                  <line
+                    x1={cx + AXIS_BUBBLE_R}
+                    y1={cy}
+                    x2={edgeX}
+                    y2={cy}
+                    stroke="#fbbf24"
+                    strokeWidth={0.65}
+                    strokeDasharray="2 1.75"
+                    opacity={0.9}
+                    pointerEvents="none"
+                  />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={AXIS_BUBBLE_R}
+                    fill={active ? "#5b3b0a" : "#0d1117"}
+                    stroke="#fbbf24"
+                    strokeWidth={active ? 1.5 : 0.95}
+                    className={interactive ? "cursor-pointer" : undefined}
+                    pointerEvents={interactive ? "all" : "none"}
+                    onClick={(e) => {
+                      if (!interactive || !onSelect) return;
+                      e.stopPropagation();
+                      pick({ kind: "axis", dir: "Y", axisId: ay.id }, e);
+                    }}
+                  />
+                  <text
+                    x={cx}
+                    y={cy}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fill="#fbbf24"
+                    fontSize="8"
+                    fontWeight="700"
+                    pointerEvents="none"
+                  >
+                    {ay.name}
+                  </text>
+                </g>
+              );
+            })}
+            {beamNodes}
+            {(() => {
+              const bars = stripRebarBarSegments(project, axesX, axesY);
+              const hook = SLAB_REBAR_HOOK_MM;
+              const stroke = "#ef4444";
+              const pressMarks = stripRebarPressMarks(project, axesX, axesY);
+              const tick = 70;
+              return (
+                <>
+                  {bars.map((bar, i) => {
+                    if (bar.dir === "X") {
+                      return (
+                        <g key={`rebar-x-${i}`} pointerEvents="none">
+                          <line
+                            x1={X(bar.x0)}
+                            y1={Y(bar.y)}
+                            x2={X(bar.x1)}
+                            y2={Y(bar.y)}
+                            stroke={stroke}
+                            strokeWidth="1.6"
+                            opacity="0.95"
+                          />
+                          <line
+                            x1={X(bar.x0)}
+                            y1={Y(bar.y)}
+                            x2={X(bar.x0)}
+                            y2={Y(bar.y - hook)}
+                            stroke={stroke}
+                            strokeWidth="1.6"
+                            opacity="0.95"
+                          />
+                          <line
+                            x1={X(bar.x1)}
+                            y1={Y(bar.y)}
+                            x2={X(bar.x1)}
+                            y2={Y(bar.y - hook)}
+                            stroke={stroke}
+                            strokeWidth="1.6"
+                            opacity="0.95"
+                          />
+                        </g>
+                      );
+                    }
+                    return (
+                      <g key={`rebar-y-${i}`} pointerEvents="none">
+                        <line
+                          x1={X(bar.x)}
+                          y1={Y(bar.y0)}
+                          x2={X(bar.x)}
+                          y2={Y(bar.y1)}
+                          stroke={stroke}
+                          strokeWidth="1.6"
+                          opacity="0.95"
+                        />
+                        <line
+                          x1={X(bar.x)}
+                          y1={Y(bar.y0)}
+                          x2={X(bar.x + hook)}
+                          y2={Y(bar.y0)}
+                          stroke={stroke}
+                          strokeWidth="1.6"
+                          opacity="0.95"
+                        />
+                        <line
+                          x1={X(bar.x)}
+                          y1={Y(bar.y1)}
+                          x2={X(bar.x + hook)}
+                          y2={Y(bar.y1)}
+                          stroke={stroke}
+                          strokeWidth="1.6"
+                          opacity="0.95"
+                        />
+                      </g>
+                    );
+                  })}
+                  {pressMarks.map((m, i) => (
+                    <g key={`press-${i}`} pointerEvents="none">
+                      {/* Ký hiệu nhấn tại thân dầm: tick ⊥ thanh + ghi độ nhấn */}
+                      {m.dir === "X" ? (
+                        <>
+                          <line
+                            x1={X(m.x)}
+                            y1={Y(m.y - tick)}
+                            x2={X(m.x)}
+                            y2={Y(m.y + tick)}
+                            stroke="#f59e0b"
+                            strokeWidth="1.4"
+                            opacity="0.95"
+                          />
+                          <line
+                            x1={X(m.x - tick * 0.35)}
+                            y1={Y(m.y + tick * 0.55)}
+                            x2={X(m.x)}
+                            y2={Y(m.y + tick)}
+                            stroke="#f59e0b"
+                            strokeWidth="1.4"
+                          />
+                          <line
+                            x1={X(m.x + tick * 0.35)}
+                            y1={Y(m.y + tick * 0.55)}
+                            x2={X(m.x)}
+                            y2={Y(m.y + tick)}
+                            stroke="#f59e0b"
+                            strokeWidth="1.4"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <line
+                            x1={X(m.x - tick)}
+                            y1={Y(m.y)}
+                            x2={X(m.x + tick)}
+                            y2={Y(m.y)}
+                            stroke="#f59e0b"
+                            strokeWidth="1.4"
+                            opacity="0.95"
+                          />
+                          <line
+                            x1={X(m.x + tick * 0.55)}
+                            y1={Y(m.y - tick * 0.35)}
+                            x2={X(m.x + tick)}
+                            y2={Y(m.y)}
+                            stroke="#f59e0b"
+                            strokeWidth="1.4"
+                          />
+                          <line
+                            x1={X(m.x + tick * 0.55)}
+                            y1={Y(m.y + tick * 0.35)}
+                            x2={X(m.x + tick)}
+                            y2={Y(m.y)}
+                            stroke="#f59e0b"
+                            strokeWidth="1.4"
+                          />
+                        </>
+                      )}
+                      <text
+                        x={X(m.x) + (m.dir === "X" ? 6 : 8)}
+                        y={Y(m.y) + (m.dir === "X" ? -6 : 3)}
+                        fill="#fbbf24"
+                        fontSize="9"
+                        fontWeight="600"
+                      >
+                        ↓{m.drop}
+                      </text>
+                    </g>
+                  ))}
+                  {/* Khoảng rải thép sàn: đường xanh ⊥ phương thanh, đầu mũi tên */}
+                  {zones
+                    .filter((z) => z.showSpacing)
+                    .map((z, zi) => {
+                      const zx0 = Math.min(z.x1, z.x2);
+                      const zx1 = Math.max(z.x1, z.x2);
+                      const zy0 = Math.min(z.y1, z.y2);
+                      const zy1 = Math.max(z.y1, z.y2);
+                      // Lệch nhẹ theo lớp để không chồng nhiều số hiệu
+                      const nudge =
+                        (z.layer === "top" ? 1 : z.layer === "structural" ? -1 : 0) * 120 +
+                        (zi % 3) * 40;
+                      let xA: number;
+                      let yA: number;
+                      let xB: number;
+                      let yB: number;
+                      let lenMm: number;
+                      if (z.direction === "X") {
+                        // Thanh ngang → khoảng rải dọc Y
+                        const mx = (zx0 + zx1) / 2 + nudge;
+                        xA = mx;
+                        yA = zy0;
+                        xB = mx;
+                        yB = zy1;
+                        lenMm = zy1 - zy0;
+                      } else {
+                        // Thanh đứng → khoảng rải ngang X
+                        const my = (zy0 + zy1) / 2 + nudge;
+                        xA = zx0;
+                        yA = my;
+                        xB = zx1;
+                        yB = my;
+                        lenMm = zx1 - zx0;
+                      }
+                      if (!(lenMm > 1)) return null;
+                      const midX = (X(xA) + X(xB)) / 2;
+                      const midY = (Y(yA) + Y(yB)) / 2;
+                      return (
+                        <g key={`dist-${z.id}`} pointerEvents="none">
+                          <line
+                            x1={X(xA)}
+                            y1={Y(yA)}
+                            x2={X(xB)}
+                            y2={Y(yB)}
+                            stroke="#2563eb"
+                            strokeWidth="1.8"
+                            markerStart="url(#distArrow)"
+                            markerEnd="url(#distArrow)"
+                          />
+                          {/* Chấm trắng tại giao với thanh cùng zone */}
+                          {bars.flatMap((b, bi) => {
+                            if (b.dir === "X" && z.direction === "X") {
+                              if (
+                                b.y < zy0 - 1 ||
+                                b.y > zy1 + 1 ||
+                                xA < Math.min(b.x0, b.x1) - 1 ||
+                                xA > Math.max(b.x0, b.x1) + 1
+                              ) {
+                                return [];
+                              }
+                              return [
+                                <circle
+                                  key={`dist-dot-${z.id}-${bi}`}
+                                  cx={X(xA)}
+                                  cy={Y(b.y)}
+                                  r="2.2"
+                                  fill="#fff"
+                                  stroke="#2563eb"
+                                  strokeWidth="1"
+                                />,
+                              ];
+                            }
+                            if (b.dir === "Y" && z.direction === "Y") {
+                              if (
+                                b.x < zx0 - 1 ||
+                                b.x > zx1 + 1 ||
+                                yA < Math.min(b.y0, b.y1) - 1 ||
+                                yA > Math.max(b.y0, b.y1) + 1
+                              ) {
+                                return [];
+                              }
+                              return [
+                                <circle
+                                  key={`dist-dot-${z.id}-${bi}`}
+                                  cx={X(b.x)}
+                                  cy={Y(yA)}
+                                  r="2.2"
+                                  fill="#fff"
+                                  stroke="#2563eb"
+                                  strokeWidth="1"
+                                />,
+                              ];
+                            }
+                            return [];
+                          })}
+                          <text
+                            x={midX + (z.direction === "X" ? 8 : 0)}
+                            y={midY + (z.direction === "X" ? 0 : -8)}
+                            fill="#2563eb"
+                            fontSize="10"
+                            fontWeight="700"
+                            textAnchor={z.direction === "X" ? "start" : "middle"}
+                          >
+                            {Math.round(lenMm)}
+                          </text>
+                        </g>
+                      );
+                    })}
+                </>
+              );
+            })()}
+            <text x={W / 2} y={18} textAnchor="middle" fill="#79b8ff" fontSize="13" fontWeight="700">
+              {project.info.name} · {Math.round(project.planWidth)}×{Math.round(project.planHeight)} ×{" "}
+              {project.info.thickness}mm
+            </text>
+          </svg>
+        </div>
+
+        {interactive && selection && editPanel && anchor && (
+          <div
+            className="pointer-events-auto absolute z-30 w-[220px] -translate-x-1/2 rounded-lg border border-sky-500/50 bg-zinc-950/95 p-2.5 shadow-xl shadow-black/50 backdrop-blur-sm"
+            style={{ left: `${anchor.leftPct}%`, top: `${anchor.topPct}%` }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {editPanel}
+          </div>
+        )}
+      </div>
+      <div className="shrink-0 border-t border-zinc-800 px-3 py-1.5 text-[11px] text-zinc-500">{statusText}</div>
+    </div>
+  );
+}
