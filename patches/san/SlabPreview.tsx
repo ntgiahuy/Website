@@ -38,6 +38,7 @@ function clamp(n: number, lo: number, hi: number) {
 export function SlabPreview({
   project,
   show3d,
+  zoomPct = 100,
   selection = null,
   beamMultiSelect = [],
   onSelect,
@@ -47,6 +48,8 @@ export function SlabPreview({
 }: {
   project: SlabProject;
   show3d?: boolean;
+  /** Phóng to / thu nhỏ bản vẽ (100 = vừa khung). */
+  zoomPct?: number;
   selection?: PlanSelection | null;
   /** Các đoạn dầm đang chọn (Ctrl/Shift) — tô nhấn trên bản vẽ. */
   beamMultiSelect?: Array<{ beamId: string; segIndex: number }>;
@@ -483,18 +486,29 @@ export function SlabPreview({
               (selection.dir === "X" ? axesX : axesY).find((a) => a.id === selection.axisId)?.name ?? "?"
             }`;
 
+  const zoom = Math.min(300, Math.max(50, zoomPct));
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-zinc-950">
-      <div ref={wrapRef} className="relative min-h-0 flex-1">
-        <div className="flex h-full min-h-0 items-center justify-center p-1 sm:p-2">
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            className="h-full w-full"
-            preserveAspectRatio="xMidYMid meet"
-            onClick={() => {
-              if (interactive && onSelect) pick(null);
+      <div ref={wrapRef} className="relative min-h-0 flex-1 overflow-auto">
+        <div className="flex min-h-full min-w-full items-center justify-center p-1 sm:p-2">
+          <div
+            className="relative"
+            style={{
+              width: `${zoom}%`,
+              height: `${zoom}%`,
+              minWidth: zoom < 100 ? undefined : "100%",
+              minHeight: zoom < 100 ? undefined : "100%",
             }}
           >
+            <svg
+              viewBox={`0 0 ${W} ${H}`}
+              className="h-full w-full"
+              preserveAspectRatio="xMidYMid meet"
+              onClick={() => {
+                if (interactive && onSelect) pick(null);
+              }}
+            >
             <rect
               x={X(0)}
               y={Y(project.planHeight)}
@@ -871,20 +885,18 @@ export function SlabPreview({
                             {endCap(sxB, syB, sxA, syA, `b-${si}`)}
                             {seg.junctions.map((j, ji) => (
                               <g key={`j-${si}-${ji}`}>
-                                {/* Chấm hình 2: vòng + kim cương tại giao khoảng rải ∩ thép sàn */}
+                                {/* Chấm hình 2: vòng trắng + kim cương tại giao khoảng rải ∩ thép sàn */}
                                 <circle
                                   cx={X(j.x)}
                                   cy={Y(j.y)}
                                   r={jr}
-                                  fill="#ffffff"
+                                  fill="none"
                                   stroke="#ffffff"
-                                  strokeWidth="1.35"
+                                  strokeWidth="1.5"
                                 />
                                 <polygon
                                   points={`${X(j.x)},${Y(j.y) - jd} ${X(j.x) + jd},${Y(j.y)} ${X(j.x)},${Y(j.y) + jd} ${X(j.x) - jd},${Y(j.y)}`}
                                   fill="#ffffff"
-                                  stroke="#e5e7eb"
-                                  strokeWidth="0.6"
                                 />
                               </g>
                             ))}
@@ -910,6 +922,7 @@ export function SlabPreview({
               {project.info.thickness}mm
             </text>
           </svg>
+          </div>
         </div>
 
         {interactive && selection && editPanel && anchor && (

@@ -8,6 +8,7 @@ import {
   Download,
   FilePlus,
   FolderOpen,
+  Minus,
   Plus,
   Save,
   Trash2,
@@ -107,6 +108,8 @@ export function SlabApp() {
   const [tab, setTab] = useState<TabId>("plan");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  /** Phóng to / thu nhỏ bản vẽ preview (%). */
+  const [previewZoomPct, setPreviewZoomPct] = useState(100);
   const [error, setError] = useState<string | null>(null);
   const [zoneForm, setZoneForm] = useState<RebarZone>(() => draftZone());
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
@@ -1105,55 +1108,61 @@ export function SlabApp() {
             </div>
           </div>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              const next = createEmptyProject();
-              persist(next);
-              setZoneForm(next.zones[0] ?? draftZone());
-              setSelectedZoneId(next.zones[0]?.id ?? null);
-              setStatus("Đã tạo sàn mới.");
-            }}
-          >
-            <FilePlus /> Mới
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json,application/json"
-            className="hidden"
-            onChange={(e) => {
-              void openProjectFile(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-          <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
-            <FolderOpen /> Open
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => void saveProjectToDisk()}>
-            <Save /> Save As
-          </Button>
-          <Button
-            variant="success"
-            size="sm"
-            onClick={() => {
-              persist(project);
-              setStatus("Đã lưu trên trình duyệt.");
-            }}
-          >
-            <Save /> Lưu
-          </Button>
-          <Button size="sm" disabled={busy} onClick={() => void exportPdf()}>
-            <Download /> {busy ? "Đang xuất…" : "Xuất PDF"}
-          </Button>
-          {status && <span className="text-xs text-emerald-400">{status}</span>}
-          {error && <span className="max-w-xs text-xs text-red-400">{error}</span>}
+        <div className="ml-auto flex flex-col items-end gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                const next = createEmptyProject();
+                persist(next);
+                setZoneForm(next.zones[0] ?? draftZone());
+                setSelectedZoneId(next.zones[0]?.id ?? null);
+                setStatus("Đã tạo sàn mới.");
+              }}
+            >
+              <FilePlus /> Mới
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                void openProjectFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <FolderOpen /> Open
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => void saveProjectToDisk()}>
+              <Save /> Save As
+            </Button>
+            <Button
+              variant="success"
+              size="sm"
+              onClick={() => {
+                persist(project);
+                setStatus("Đã lưu trên trình duyệt.");
+              }}
+            >
+              <Save /> Lưu
+            </Button>
+            <Button size="sm" disabled={busy} onClick={() => void exportPdf()}>
+              <Download /> {busy ? "Đang xuất…" : "Xuất PDF"}
+            </Button>
+          </div>
+          {(status || error) && (
+            <div className="flex max-w-xl flex-col items-end gap-0.5 text-right">
+              {status && <span className="text-xs text-emerald-400">{status}</span>}
+              {error && <span className="text-xs text-red-400">{error}</span>}
+            </div>
+          )}
         </div>
       </header>
 
-      <nav className="flex gap-0.5 overflow-x-auto border-b border-zinc-800 bg-zinc-900 px-2 py-1">
+      <nav className="flex items-center gap-0.5 overflow-x-auto border-b border-zinc-800 bg-zinc-900 px-2 py-1">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -1168,6 +1177,39 @@ export function SlabApp() {
             {t.label}
           </button>
         ))}
+        {/* Zoom bản vẽ — sau «Thông tin xuất» */}
+        <div
+          className="ml-1 flex shrink-0 items-center gap-1 border-l border-zinc-600 pl-2"
+          title="Thu nhỏ / phóng to bản vẽ"
+        >
+          <button
+            type="button"
+            aria-label="Thu nhỏ"
+            className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
+            disabled={previewZoomPct <= 50}
+            onClick={() => setPreviewZoomPct((z) => Math.max(50, z - 10))}
+          >
+            <Minus className="h-3.5 w-3.5" strokeWidth={2.25} />
+          </button>
+          <button
+            type="button"
+            aria-label="Đặt lại 100%"
+            className="min-w-[3.25rem] rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 text-center text-[12px] font-medium tabular-nums text-zinc-100 hover:border-zinc-500"
+            onClick={() => setPreviewZoomPct(100)}
+            title="Nhấp để đặt lại 100%"
+          >
+            {previewZoomPct}%
+          </button>
+          <button
+            type="button"
+            aria-label="Phóng to"
+            className="inline-flex h-7 w-7 items-center justify-center rounded text-zinc-200 hover:bg-zinc-800 disabled:opacity-40"
+            disabled={previewZoomPct >= 300}
+            onClick={() => setPreviewZoomPct((z) => Math.min(300, z + 10))}
+          >
+            <Plus className="h-3.5 w-3.5" strokeWidth={2.25} />
+          </button>
+        </div>
       </nav>
 
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(140px,32vh)_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]">
@@ -2364,6 +2406,7 @@ export function SlabApp() {
             <SlabPreview
               project={project}
               show3d={project.show3d && tab === "model3d"}
+              zoomPct={previewZoomPct}
               interactive={tab === "plan" || tab === "axes" || tab === "beams" || tab === "draw"}
               insertBeamMode={insertBeamMode}
               selection={planSelection}
