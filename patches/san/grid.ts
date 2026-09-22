@@ -4,8 +4,12 @@ import { uid } from "./utils";
 /** Thụt thép sàn khỏi da dầm (fallback nếu cover chưa có). */
 export const SLAB_REBAR_FACE_INSET_MM = 50;
 
-/** Lớp bảo vệ (mm) — sắt trừ da dầm biên. */
+/** Lớp bảo vệ (mm) — sắt trừ da dầm biên. Ưu tiên cover vùng thép nếu có. */
 export function slabCoverMm(project: SlabProject): number {
+  const fromZones = (project.zones ?? [])
+    .map((z) => Number(z.cover))
+    .filter((c) => Number.isFinite(c) && c >= 0);
+  if (fromZones.length) return Math.round(Math.max(...fromZones));
   const c = Number(project.info.cover);
   return Number.isFinite(c) && c >= 0 ? Math.round(c) : SLAB_REBAR_FACE_INSET_MM;
 }
@@ -1622,8 +1626,35 @@ export function rectNearlyEquals(
   );
 }
 
-/** Chiều dài móc thép sàn trên mặt bằng (mm). */
+/** Chiều dài móc thép sàn trên mặt bằng (mm) — fallback khi zone không có. */
 export const SLAB_REBAR_HOOK_MM = 50;
+
+/**
+ * Móc trái/phải theo vùng thép phủ tâm thanh (cùng phương).
+ * 0 = không vẽ móc.
+ */
+export function hooksForRebarBar(
+  project: SlabProject,
+  bar: RebarBarSeg,
+): { left: number; right: number } {
+  const zones = project.zones ?? [];
+  const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;
+  const my = bar.dir === "X" ? bar.y : (bar.y0 + bar.y1) / 2;
+  const hits = zones.filter((z) => {
+    if (z.direction !== bar.dir) return false;
+    const zx0 = Math.min(z.x1, z.x2);
+    const zx1 = Math.max(z.x1, z.x2);
+    const zy0 = Math.min(z.y1, z.y2);
+    const zy1 = Math.max(z.y1, z.y2);
+    return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
+  });
+  const z = hits.find((h) => h.layer === "bottom") ?? hits[0];
+  if (!z) return { left: SLAB_REBAR_HOOK_MM, right: SLAB_REBAR_HOOK_MM };
+  return {
+    left: Math.max(0, Math.round(Number(z.leftHook) || 0)),
+    right: Math.max(0, Math.round(Number(z.rightHook) || 0)),
+  };
+}
 
 /** Đọc B / H / B1 từ info (kèm fallback chuỗi beamSize cũ). */
 export function beamDims(info: SlabInfo): { B: number; H: number; B1: number } {

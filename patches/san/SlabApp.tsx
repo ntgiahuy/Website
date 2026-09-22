@@ -942,7 +942,12 @@ export function SlabApp() {
 
   function addZone() {
     const z = { ...zoneForm, id: uid("zone") };
-    persist({ ...project, layoutPreset: "manual", zones: [...project.zones, z] });
+    persist({
+      ...project,
+      layoutPreset: "manual",
+      info: { ...project.info, cover: z.cover },
+      zones: [...project.zones, z],
+    });
     setSelectedZoneId(z.id);
     setStatus(`Đã thêm ${z.mark}`);
   }
@@ -952,6 +957,7 @@ export function SlabApp() {
     persist({
       ...project,
       layoutPreset: "manual",
+      info: { ...project.info, cover: zoneForm.cover },
       zones: project.zones.map((z) => (z.id === selectedZoneId ? { ...zoneForm, id: selectedZoneId } : z)),
     });
     setStatus("Đã cập nhật vùng thép.");
@@ -1239,7 +1245,15 @@ export function SlabApp() {
                     <Input
                       type="number"
                       value={project.info.cover}
-                      onChange={(e) => patchInfo({ cover: Number(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        const cover = Number(e.target.value) || 0;
+                        persist({
+                          ...project,
+                          info: { ...project.info, cover },
+                          zones: project.zones.map((z) => ({ ...z, cover })),
+                        });
+                        setZoneForm((f) => ({ ...f, cover }));
+                      }}
                     />
                   </Field>
                   <Field label="Bề rộng sàn" unit="mm">
@@ -1937,14 +1951,40 @@ export function SlabApp() {
                     <Input
                       type="number"
                       value={zoneForm.leftHook}
-                      onChange={(e) => setZoneForm({ ...zoneForm, leftHook: Number(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        const leftHook = Number(e.target.value) || 0;
+                        const nextForm = { ...zoneForm, leftHook };
+                        setZoneForm(nextForm);
+                        if (selectedZoneId) {
+                          persist({
+                            ...project,
+                            layoutPreset: "manual",
+                            zones: project.zones.map((z) =>
+                              z.id === selectedZoneId ? { ...nextForm, id: selectedZoneId } : z,
+                            ),
+                          });
+                        }
+                      }}
                     />
                   </Field>
                   <Field label="Móc thép phải" unit="mm">
                     <Input
                       type="number"
                       value={zoneForm.rightHook}
-                      onChange={(e) => setZoneForm({ ...zoneForm, rightHook: Number(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        const rightHook = Number(e.target.value) || 0;
+                        const nextForm = { ...zoneForm, rightHook };
+                        setZoneForm(nextForm);
+                        if (selectedZoneId) {
+                          persist({
+                            ...project,
+                            layoutPreset: "manual",
+                            zones: project.zones.map((z) =>
+                              z.id === selectedZoneId ? { ...nextForm, id: selectedZoneId } : z,
+                            ),
+                          });
+                        }
+                      }}
                     />
                   </Field>
                   <Field label="Ký hiệu khoảng rải">
@@ -1958,7 +1998,22 @@ export function SlabApp() {
                     <Input
                       type="number"
                       value={zoneForm.cover}
-                      onChange={(e) => setZoneForm({ ...zoneForm, cover: Number(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        const cover = Number(e.target.value) || 0;
+                        const nextForm = { ...zoneForm, cover };
+                        setZoneForm(nextForm);
+                        // Đồng bộ cover → info + zone để khoảng hở tới da dầm đúng ngay trên bản vẽ
+                        persist({
+                          ...project,
+                          info: { ...project.info, cover },
+                          layoutPreset: "manual",
+                          zones: selectedZoneId
+                            ? project.zones.map((z) =>
+                                z.id === selectedZoneId ? { ...nextForm, id: selectedZoneId } : z,
+                              )
+                            : project.zones.map((z) => ({ ...z, cover })),
+                        });
+                      }}
                     />
                   </Field>
                   <Field label="Lớp thép">

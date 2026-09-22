@@ -27,7 +27,7 @@ import {
   stripRebarPressMarks,
   slabDistRangeForBar,
   buildMergedDistRanges,
-  SLAB_REBAR_HOOK_MM,
+  hooksForRebarBar,
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarZone, SlabProject } from "../types";
 import { buildBeamFrameScene, projectSceneToSvg } from "../view3d";
@@ -853,18 +853,26 @@ function drawPlan(
   }
 
   // —— Thép sàn (chỉ nét đỏ) + vòng STT + Øa ——
-  const hook = SLAB_REBAR_HOOK_MM;
   const pressAmber = rgb(0.9, 0.55, 0.1);
   const bars = stripRebarBarSegments(project, axesX, axesY);
   for (const bar of bars) {
+    const { left: leftHook, right: rightHook } = hooksForRebarBar(project, bar);
     if (bar.dir === "X") {
       line(ctx, toX(bar.x0), toY(bar.y), toX(bar.x1), toY(bar.y), 0.55, REBAR_RED);
-      line(ctx, toX(bar.x0), toY(bar.y), toX(bar.x0), toY(bar.y - hook), 0.55, REBAR_RED);
-      line(ctx, toX(bar.x1), toY(bar.y), toX(bar.x1), toY(bar.y - hook), 0.55, REBAR_RED);
+      if (leftHook > 0) {
+        line(ctx, toX(bar.x0), toY(bar.y), toX(bar.x0), toY(bar.y - leftHook), 0.55, REBAR_RED);
+      }
+      if (rightHook > 0) {
+        line(ctx, toX(bar.x1), toY(bar.y), toX(bar.x1), toY(bar.y - rightHook), 0.55, REBAR_RED);
+      }
     } else {
       line(ctx, toX(bar.x), toY(bar.y0), toX(bar.x), toY(bar.y1), 0.55, REBAR_RED);
-      line(ctx, toX(bar.x), toY(bar.y0), toX(bar.x + hook), toY(bar.y0), 0.55, REBAR_RED);
-      line(ctx, toX(bar.x), toY(bar.y1), toX(bar.x + hook), toY(bar.y1), 0.55, REBAR_RED);
+      if (leftHook > 0) {
+        line(ctx, toX(bar.x), toY(bar.y0), toX(bar.x + leftHook), toY(bar.y0), 0.55, REBAR_RED);
+      }
+      if (rightHook > 0) {
+        line(ctx, toX(bar.x), toY(bar.y1), toX(bar.x + rightHook), toY(bar.y1), 0.55, REBAR_RED);
+      }
     }
   }
   const tick = 70;

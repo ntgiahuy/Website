@@ -19,7 +19,7 @@ import {
   stripRebarBarSegments,
   stripRebarPressMarks,
   buildMergedDistRanges,
-  SLAB_REBAR_HOOK_MM,
+  hooksForRebarBar,
 } from "@/lib/grid";
 import type { PlanSelection, SlabProject } from "@/lib/types";
 import { buildBeamFrameScene, projectSceneToSvg } from "@/lib/view3d";
@@ -707,13 +707,13 @@ export function SlabPreview({
             {beamNodes}
             {(() => {
               const bars = stripRebarBarSegments(project, axesX, axesY);
-              const hook = SLAB_REBAR_HOOK_MM;
               const stroke = "#ef4444";
               const pressMarks = stripRebarPressMarks(project, axesX, axesY);
               const tick = 70;
               return (
                 <>
                   {bars.map((bar, i) => {
+                    const { left: leftHook, right: rightHook } = hooksForRebarBar(project, bar);
                     if (bar.dir === "X") {
                       return (
                         <g key={`rebar-x-${i}`} pointerEvents="none">
@@ -726,24 +726,28 @@ export function SlabPreview({
                             strokeWidth="1.6"
                             opacity="0.95"
                           />
-                          <line
-                            x1={X(bar.x0)}
-                            y1={Y(bar.y)}
-                            x2={X(bar.x0)}
-                            y2={Y(bar.y - hook)}
-                            stroke={stroke}
-                            strokeWidth="1.6"
-                            opacity="0.95"
-                          />
-                          <line
-                            x1={X(bar.x1)}
-                            y1={Y(bar.y)}
-                            x2={X(bar.x1)}
-                            y2={Y(bar.y - hook)}
-                            stroke={stroke}
-                            strokeWidth="1.6"
-                            opacity="0.95"
-                          />
+                          {leftHook > 0 && (
+                            <line
+                              x1={X(bar.x0)}
+                              y1={Y(bar.y)}
+                              x2={X(bar.x0)}
+                              y2={Y(bar.y - leftHook)}
+                              stroke={stroke}
+                              strokeWidth="1.6"
+                              opacity="0.95"
+                            />
+                          )}
+                          {rightHook > 0 && (
+                            <line
+                              x1={X(bar.x1)}
+                              y1={Y(bar.y)}
+                              x2={X(bar.x1)}
+                              y2={Y(bar.y - rightHook)}
+                              stroke={stroke}
+                              strokeWidth="1.6"
+                              opacity="0.95"
+                            />
+                          )}
                         </g>
                       );
                     }
@@ -758,24 +762,28 @@ export function SlabPreview({
                           strokeWidth="1.6"
                           opacity="0.95"
                         />
-                        <line
-                          x1={X(bar.x)}
-                          y1={Y(bar.y0)}
-                          x2={X(bar.x + hook)}
-                          y2={Y(bar.y0)}
-                          stroke={stroke}
-                          strokeWidth="1.6"
-                          opacity="0.95"
-                        />
-                        <line
-                          x1={X(bar.x)}
-                          y1={Y(bar.y1)}
-                          x2={X(bar.x + hook)}
-                          y2={Y(bar.y1)}
-                          stroke={stroke}
-                          strokeWidth="1.6"
-                          opacity="0.95"
-                        />
+                        {leftHook > 0 && (
+                          <line
+                            x1={X(bar.x)}
+                            y1={Y(bar.y0)}
+                            x2={X(bar.x + leftHook)}
+                            y2={Y(bar.y0)}
+                            stroke={stroke}
+                            strokeWidth="1.6"
+                            opacity="0.95"
+                          />
+                        )}
+                        {rightHook > 0 && (
+                          <line
+                            x1={X(bar.x)}
+                            y1={Y(bar.y1)}
+                            x2={X(bar.x + rightHook)}
+                            y2={Y(bar.y1)}
+                            stroke={stroke}
+                            strokeWidth="1.6"
+                            opacity="0.95"
+                          />
+                        )}
                       </g>
                     );
                   })}
