@@ -8,6 +8,7 @@ import {
   baySlabExtent,
   beamSegSideFaces,
   beamSegments,
+  beamFaceDashStyle,
   clippedBeamFaceParts,
   getBeamSegShift,
   isBeamSegOmitted,
@@ -370,8 +371,9 @@ export function SlabPreview({
   });
 
   const beamNodes: ReactNode[] = [];
-  /** Nét da dầm preview ≈ PDF: mảnh, luôn liền (không sàn che); cắt chỗ giao. */
+  /** Nét da dầm: biên ngoài liền, da trong đứt; cắt chỗ giao. */
   const BEAM_SW = 0.85;
+  const BEAM_DASH = "4 2.5";
   const BEAM_STROKE = "#c4c4c8";
   for (const beam of project.beams ?? []) {
     const segs = beamSegments(project, beam);
@@ -411,6 +413,7 @@ export function SlabPreview({
 
       const faceLines: ReactNode[] = [];
       const pushFace = (face0: number, face1: number, key: string) => {
+        const style = beamFaceDashStyle(beam.direction, face0, face1, bleed);
         const parts = clippedBeamFaceParts(project, beam.direction, face0, face1, lo, hi);
         parts.forEach((p, i) => {
           const x1 = beam.direction === "Y" ? X(p.faceA) : X(p.alongA);
@@ -426,6 +429,7 @@ export function SlabPreview({
               y2={y2}
               stroke={active ? "#34d399" : BEAM_STROKE}
               strokeWidth={active ? 1.4 : BEAM_SW}
+              strokeDasharray={style === "dashed" ? BEAM_DASH : undefined}
               strokeLinecap="square"
               pointerEvents="none"
             />,
