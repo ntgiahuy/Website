@@ -454,13 +454,18 @@ function scheduleRowsByStt(
       groups.set(info.stt, { ...row, stt: info.stt });
       continue;
     }
+    // Gộp lớp (dưới/trên) cùng Ø+a+dài: cộng số thanh 1 CK, giữ SL CK (= số sàn)
+    const qtyEach = prev.qtyEach + row.qtyEach;
+    const qtyMembers = Math.max(prev.qtyMembers, row.qtyMembers);
+    const qtyTotal = qtyEach * qtyMembers;
+    const totalM = (prev.barLength * qtyTotal) / 1000;
     groups.set(info.stt, {
       ...prev,
-      qtyMembers: prev.qtyMembers + row.qtyMembers,
-      qtyEach: prev.qtyEach + row.qtyEach,
-      qtyTotal: prev.qtyTotal + row.qtyTotal,
-      totalM: prev.totalM + row.totalM,
-      weight: prev.weight + row.weight,
+      qtyEach,
+      qtyMembers,
+      qtyTotal,
+      totalM,
+      weight: totalM * weightPerMeter(prev.dia),
       note: [prev.note, row.note].filter(Boolean).join(" · ") || prev.note,
     });
   }
