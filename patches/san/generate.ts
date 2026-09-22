@@ -6,6 +6,7 @@ import {
   effectiveZones,
   parseBeamSize,
   weightPerMeter,
+  barsFromDistLength,
   type ComputedSlabModel,
   type ScheduleRow,
 } from "../calc";
@@ -183,7 +184,7 @@ function textInAxisBubble(ctx: Ctx, str: string, cx: number, cy: number, size = 
   textInkCentered(ctx, str, cx, cy, size, BLACK, true);
 }
 
-/** Mũi tên đầu khoảng rải (hình 2): tam giác đặc + gạch ngang dày tại tip, hướng ra ngoài. */
+/** Mũi tên đầu khoảng rải (hình 2): tam giác đặc đỉnh ra ngoài + gạch ngang dày tại tip. */
 function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fromY: number) {
   const dx = tipX - fromX;
   const dy = tipY - fromY;
@@ -192,9 +193,9 @@ function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fro
   const uy = dy / len;
   const px = -uy;
   const py = ux;
-  const ah = 5.2; // chiều cao tam giác
-  const aw = 3.2; // nửa đáy tam giác
-  const cap = 5.8; // nửa bề rộng gạch ngang
+  const ah = 6.5; // chiều cao tam giác
+  const aw = 4.0; // nửa đáy tam giác
+  const cap = 6.5; // nửa bề rộng gạch ngang
   const bx = tipX - ux * ah;
   const by = tipY - uy * ah;
   const tri =
@@ -202,9 +203,12 @@ function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fro
     `L ${bx + px * aw} ${ty(by + py * aw)} ` +
     `L ${bx - px * aw} ${ty(by - py * aw)} Z`;
   ctx.page.drawSvgPath(tri, { color: DIST_BLUE });
-  // Gạch ngang dày vuông góc tại điểm đầu/cuối
-  line(ctx, tipX - px * cap, tipY - py * cap, tipX + px * cap, tipY + py * cap, 1.55, DIST_BLUE);
+  // Gạch ngang dày qua đỉnh tam giác (vuông góc đường khoảng rải)
+  line(ctx, tipX - px * cap, tipY - py * cap, tipX + px * cap, tipY + py * cap, 1.8, DIST_BLUE);
 }
+
+/** Độ dài rút nét khoảng rải để chừa chỗ tam giác (PDF pt). */
+const DIST_END_AH = 6.5;
 
 /**
  * Số hiệu thép: vòng STT + Ødia a spacing trên 1 hàng (đỏ, không đậm).
@@ -430,6 +434,7 @@ function scheduleRowsByStt(
     x?: number;
   }>,
   zones: RebarZone[],
+  project: SlabProject,
   hookMm = 50,
 ): Array<ScheduleRow & { stt: number }> {
   const sttMap = rebarSttByMark(schedule);
@@ -452,6 +457,7 @@ function scheduleRowsByStt(
     groups.set(info.stt, {
       ...prev,
       qtyMembers: prev.qtyMembers + row.qtyMembers,
+      qtyEach: prev.qtyEach + row.qtyEach,
       qtyTotal: prev.qtyTotal + row.qtyTotal,
       totalM: prev.totalM + row.totalM,
       weight: prev.weight + row.weight,
@@ -459,8 +465,10 @@ function scheduleRowsByStt(
     });
   }
 
-  // Đếm thanh mặt bằng theo key STT
-  const barCounts = new Map<string, { count: number; dir: "X" | "Y" }>();
+  // 1 CK bổ sung / thanh ngắn: Σ (L khoảng rải / a) theo thanh mặt bằng cùng key
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  const qtyByKey = new Map<string, { qty: number; dir: "X" | "Y" }>();
   for (const bar of bars) {
     const spec = steelSpecForBar(zones, schedule, bar);
     const len = canonicalBarLengthMm(
@@ -471,18 +479,25 @@ function scheduleRowsByStt(
       bar.dir,
     );
     const key = rebarSpecKey(spec.dia, spec.spacing, len);
-    const cur = barCounts.get(key) ?? { count: 0, dir: bar.dir };
-    cur.count += 1;
+    const dist = slabDistRangeForBar(
+      project,
+      axesX,
+      axesY,
+      bar as { dir: "X"; x0: number; x1: number; y: number } | { dir: "Y"; y0: number; y1: number; x: number },
+    );
+    const n = dist ? barsFromDistLength(dist.lenMm, spec.spacing) : 1;
+    const cur = qtyByKey.get(key) ?? { qty: 0, dir: bar.dir };
+    cur.qty += n;
     cur.dir = bar.dir;
-    barCounts.set(key, cur);
+    qtyByKey.set(key, cur);
   }
 
   for (const info of registry.values()) {
     if (groups.has(info.stt)) continue;
     const key = rebarSpecKey(info.dia, info.spacing, info.lengthMm);
-    const hit = barCounts.get(key);
+    const hit = qtyByKey.get(key);
     const hook = 0;
-    const qty = Math.max(1, hit?.count ?? 1);
+    const qty = Math.max(1, hit?.qty ?? 1);
     const totalM = (info.lengthMm * qty) / 1000;
     groups.set(info.stt, {
       mark: `MB-${info.stt}`,
@@ -857,8 +872,22 @@ function drawPlan(
       const pyA = toY(seg.yA);
       const pxB = toX(seg.xB);
       const pyB = toY(seg.yB);
-      // Nét mảnh
-      line(ctx, pxA, pyA, pxB, pyB, 0.55, DIST_BLUE);
+      const dx = pxB - pxA;
+      const dy = pyB - pyA;
+      const plen = Math.hypot(dx, dy) || 1;
+      const ux = dx / plen;
+      const uy = dy / plen;
+      // Nét mảnh — rút hai đầu chừa tam giác (hình 2)
+      const inset = Math.min(DIST_END_AH, plen * 0.35);
+      line(
+        ctx,
+        pxA + ux * inset,
+        pyA + uy * inset,
+        pxB - ux * inset,
+        pyB - uy * inset,
+        0.5,
+        DIST_BLUE,
+      );
       drawDistEndCap(ctx, pxA, pyA, pxB, pyB);
       drawDistEndCap(ctx, pxB, pyB, pxA, pyA);
       const label = String(Math.round(seg.lenMm));
@@ -1116,6 +1145,7 @@ function buildPdfScheduleRows(ctx: Ctx): Array<ScheduleRow & { stt: number }> {
     registry,
     bars,
     zones,
+    project,
     project.info.cover || 50,
   );
 }

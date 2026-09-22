@@ -1,3 +1,5 @@
-# Patch: khoảng rải thép sàn (mí dầm trong − 50)
+# Patch: khoảng rải + 1 CK = L/a
 
-Đã deploy san `main`. Mỗi thanh thép có đường khoảng rải nét mảnh ⊥ qua giữa thanh; đầu/cuối = mí dầm trong trừ 50mm, kết thúc kiểu tam giác + gạch ngang (hình CAD).
+Đã deploy san `main`.
+- Đầu/cuối khoảng rải: mí dầm trong − 50mm, kết thúc tam giác + gạch ngang (hình 2).
+- **1 CK** bảng thống kê = Σ (chiều dài khoảng rải / khoảng cách a) theo từng thanh mặt bằng.

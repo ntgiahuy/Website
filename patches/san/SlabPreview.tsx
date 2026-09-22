@@ -795,9 +795,9 @@ export function SlabPreview({
                       const syA = Y(seg.yA);
                       const sxB = X(seg.xB);
                       const syB = Y(seg.yB);
-                      const ah = 7;
-                      const aw = 4.2;
-                      const cap = 7;
+                      const ah = 8;
+                      const aw = 5;
+                      const cap = 8;
                       const endCap = (tx: number, tyPt: number, fromX: number, fromY: number, key: string) => {
                         const ex = tx - fromX;
                         const ey = tyPt - fromY;
@@ -820,7 +820,8 @@ export function SlabPreview({
                               x2={tx + epX * cap}
                               y2={tyPt + epY * cap}
                               stroke="#2563eb"
-                              strokeWidth="1.6"
+                              strokeWidth="2.2"
+                              strokeLinecap="butt"
                             />
                           </g>
                         );
@@ -828,15 +829,21 @@ export function SlabPreview({
                       const midX = (sxA + sxB) / 2;
                       const midY = (syA + syB) / 2;
                       const alongY = Math.abs(seg.yB - seg.yA) >= Math.abs(seg.xB - seg.xA);
+                      const dx = sxB - sxA;
+                      const dy = syB - syA;
+                      const plen = Math.hypot(dx, dy) || 1;
+                      const ux = dx / plen;
+                      const uy = dy / plen;
+                      const inset = Math.min(ah, plen * 0.35);
                       return (
                         <g key={`dist-${bi}`} pointerEvents="none">
                           <line
-                            x1={sxA}
-                            y1={syA}
-                            x2={sxB}
-                            y2={syB}
+                            x1={sxA + ux * inset}
+                            y1={syA + uy * inset}
+                            x2={sxB - ux * inset}
+                            y2={syB - uy * inset}
                             stroke="#2563eb"
-                            strokeWidth="1.05"
+                            strokeWidth="1.0"
                           />
                           {endCap(sxA, syA, sxB, syB, `a-${bi}`)}
                           {endCap(sxB, syB, sxA, syA, `b-${bi}`)}
