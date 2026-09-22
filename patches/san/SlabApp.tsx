@@ -197,9 +197,13 @@ export function SlabApp() {
     const ys = sortAxes(project.axesY);
     const { ix, iy } = planSelection;
     if (ix < 0 || ix >= xs.length - 1 || iy < 0 || iy >= ys.length - 1) return null;
+    // Kích thước ô sàn đã chọn = lòng sàn giữa da dầm (baySlabExtent), không phải tim–tim trục
+    const e = baySlabExtent(project, xs, ys, ix, iy);
     return {
-      lx: xs[ix + 1].pos - xs[ix].pos,
-      ly: ys[iy + 1].pos - ys[iy].pos,
+      lx: e.x1 - e.x0,
+      ly: e.y1 - e.y0,
+      axisLx: xs[ix + 1].pos - xs[ix].pos,
+      axisLy: ys[iy + 1].pos - ys[iy].pos,
       name: `${xs[ix].name}-${xs[ix + 1].name} / ${ys[iy].name}-${ys[iy + 1].name}`,
     };
   }
@@ -253,7 +257,13 @@ export function SlabApp() {
 
   function patchSelectedBaySpan(which: "lx" | "ly", value: number) {
     if (planSelection?.kind !== "bay") return;
-    const v = Math.max(500, Math.round(value) || 500);
+    const spans = selectedBaySpans();
+    if (!spans) return;
+    // Ô nhập = kích thước lòng ô; đổi nhịp trục = giá trị mới + phần da dầm hai bên
+    const clear = which === "lx" ? spans.lx : spans.ly;
+    const axis = which === "lx" ? spans.axisLx : spans.axisLy;
+    const inset = Math.max(0, axis - clear);
+    const v = Math.max(500, Math.round(value) + inset);
     if (which === "lx") {
       persist(applyAxesToProject({ ...project, axesX: setAxisSpan(project.axesX, planSelection.ix + 1, v) }));
     } else {
@@ -855,11 +865,13 @@ export function SlabApp() {
       if (!spans) return;
       const next = applyAxesToProject({
         ...project,
-        axesX: equalizeAxisSpans(project.axesX, spans.lx),
-        axesY: equalizeAxisSpans(project.axesY, spans.ly),
+        axesX: equalizeAxisSpans(project.axesX, spans.axisLx),
+        axesY: equalizeAxisSpans(project.axesY, spans.axisLy),
       });
       persist(next);
-      setStatus(`Đã áp dụng Lx=${Math.round(spans.lx)}, Ly=${Math.round(spans.ly)} cho mọi ô sàn.`);
+      setStatus(
+        `Đã áp dụng Lx=${Math.round(spans.lx)}, Ly=${Math.round(spans.ly)} (lòng ô) cho mọi ô sàn.`,
+      );
       return;
     }
     const info = selectedBeamInfo();
@@ -2208,8 +2220,8 @@ export function SlabApp() {
                       })}
                     </div>
                     {selectedBayKind() === "low" && (
-                      <div className="mt-2">
-                        <div className="mb-1 text-[11px] text-zinc-500">Thép sàn thấp</div>
+                      <div className="mt-2 rounded border border-zinc-700/80 bg-zinc-950/50 p-2">
+                        <div className="mb-1.5 text-[11px] text-zinc-500">Thép sàn thấp</div>
                         <div className="flex flex-wrap gap-1.5">
                           {(
                             [
@@ -2225,12 +2237,22 @@ export function SlabApp() {
                                 variant={active ? "default" : "secondary"}
                                 className={active ? "bg-amber-700 text-white hover:bg-amber-600" : undefined}
                                 onClick={() => setSelectedLowRebarMode(mode)}
+                                title={
+                                  mode === "press"
+                                    ? "Thép chạy như sàn thường; nhấn xuống tại dầm quanh ô bằng chênh cao độ"
+                                    : "Tách với sàn thường; vẫn bố trí thép trong ô thấp và lên thân dầm quanh ô"
+                                }
                               >
                                 {label}
                               </Button>
                             );
                           })}
                         </div>
+                        <p className="mt-1.5 text-[10px] leading-snug text-zinc-500">
+                          {selectedLowRebarMode() === "press"
+                            ? "Nhấn: thép đi thẳng xuyên ô; tại dầm quanh ô nhấn xuống bằng chênh cao độ sàn thấp."
+                            : "Cắt: tách với sàn thường; thép trong ô thấp + lên thân dầm, lệch ½ khoảng rải để không chồng sắt."}
+                        </p>
                       </div>
                     )}
                   </div>
