@@ -907,7 +907,7 @@ function drawPlan(
   }
 
   // —— Khoảng rải: ô kề nhau cùng số hiệu → 1 đường từ đầu dải đến cuối dải ——
-  const showDist = zones.some((z) => z.showSpacing);
+  const showDist = project.info.showDistRange !== false && zones.some((z) => z.showSpacing);
   if (showDist) {
     const markKeyOf = (bar: (typeof bars)[number]) => {
       const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;

@@ -1943,8 +1943,16 @@ export function SlabApp() {
                 </div>
                 <label className="mt-2 flex items-center gap-2 text-xs text-zinc-300">
                   <Checkbox
-                    checked={zoneForm.showSpacing}
-                    onCheckedChange={(v) => setZoneForm({ ...zoneForm, showSpacing: Boolean(v) })}
+                    checked={project.info.showDistRange !== false}
+                    onCheckedChange={(v) => {
+                      const on = Boolean(v);
+                      setZoneForm({ ...zoneForm, showSpacing: on });
+                      persist({
+                        ...project,
+                        info: { ...project.info, showDistRange: on },
+                        zones: project.zones.map((z) => ({ ...z, showSpacing: on })),
+                      });
+                    }}
                   />
                   Hiện / Ẩn khoảng rải thép sàn
                 </label>

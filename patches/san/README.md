@@ -1,6 +1,3 @@
-# Patch: gộp khoảng rải cùng số hiệu
+# Patch: Hiện/Ẩn khoảng rải thép sàn
 
-Đã deploy san `main`.
-- Ô sàn kề nhau liên tiếp cùng số hiệu → **1 đường khoảng rải** từ đầu dải đến cuối dải
-- 1 CK = L khoảng rải (đã gộp) / a
-- Đầu/cuối: mí dầm trong − 50mm; chấm giao thanh thép
+Đã deploy san `main`. Bỏ chọn checkbox → không vẽ khoảng rải trên mặt bằng minh họa và PDF (`info.showDistRange = false`).
