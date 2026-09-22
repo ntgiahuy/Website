@@ -28,6 +28,7 @@ import {
   slabDistRangeForBar,
   buildMergedDistRanges,
   hooksForRebarBar,
+  rebarHookSegments,
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarZone, SlabProject } from "../types";
 import { buildBeamFrameScene, projectSceneToSvg } from "../view3d";
@@ -860,20 +861,17 @@ function drawPlan(
     const { left: leftHook, right: rightHook } = hooksForRebarBar(project, bar, rebarZones);
     if (bar.dir === "X") {
       line(ctx, toX(bar.x0), toY(bar.y), toX(bar.x1), toY(bar.y), 0.55, REBAR_RED);
-      if (leftHook > 0) {
-        line(ctx, toX(bar.x0), toY(bar.y), toX(bar.x0), toY(bar.y - leftHook), 0.55, REBAR_RED);
-      }
-      if (rightHook > 0) {
-        line(ctx, toX(bar.x1), toY(bar.y), toX(bar.x1), toY(bar.y - rightHook), 0.55, REBAR_RED);
-      }
     } else {
       line(ctx, toX(bar.x), toY(bar.y0), toX(bar.x), toY(bar.y1), 0.55, REBAR_RED);
-      if (leftHook > 0) {
-        line(ctx, toX(bar.x), toY(bar.y0), toX(bar.x + leftHook), toY(bar.y0), 0.55, REBAR_RED);
-      }
-      if (rightHook > 0) {
-        line(ctx, toX(bar.x), toY(bar.y1), toX(bar.x + rightHook), toY(bar.y1), 0.55, REBAR_RED);
-      }
+    }
+    for (const h of rebarHookSegments(
+      bar,
+      leftHook,
+      rightHook,
+      project.planWidth,
+      project.planHeight,
+    )) {
+      line(ctx, toX(h.x1), toY(h.y1), toX(h.x2), toY(h.y2), 0.55, REBAR_RED);
     }
   }
   const tick = 70;

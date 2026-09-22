@@ -21,6 +21,7 @@ import {
   stripRebarPressMarks,
   buildMergedDistRanges,
   hooksForRebarBar,
+  rebarHookSegments,
 } from "@/lib/grid";
 import type { PlanSelection, SlabProject } from "@/lib/types";
 import { buildBeamFrameScene, projectSceneToSvg } from "@/lib/view3d";
@@ -716,6 +717,13 @@ export function SlabPreview({
                 <>
                   {bars.map((bar, i) => {
                     const { left: leftHook, right: rightHook } = hooksForRebarBar(project, bar, zones);
+                    const hooks = rebarHookSegments(
+                      bar,
+                      leftHook,
+                      rightHook,
+                      project.planWidth,
+                      project.planHeight,
+                    );
                     if (bar.dir === "X") {
                       return (
                         <g key={`rebar-x-${i}`} pointerEvents="none">
@@ -726,30 +734,22 @@ export function SlabPreview({
                             y2={Y(bar.y)}
                             stroke={stroke}
                             strokeWidth="1.6"
+                            strokeLinecap="butt"
                             opacity="0.95"
                           />
-                          {leftHook > 0 && (
+                          {hooks.map((h, hi) => (
                             <line
-                              x1={X(bar.x0)}
-                              y1={Y(bar.y)}
-                              x2={X(bar.x0)}
-                              y2={Y(bar.y - leftHook)}
+                              key={`hx-${i}-${hi}`}
+                              x1={X(h.x1)}
+                              y1={Y(h.y1)}
+                              x2={X(h.x2)}
+                              y2={Y(h.y2)}
                               stroke={stroke}
                               strokeWidth="1.6"
+                              strokeLinecap="butt"
                               opacity="0.95"
                             />
-                          )}
-                          {rightHook > 0 && (
-                            <line
-                              x1={X(bar.x1)}
-                              y1={Y(bar.y)}
-                              x2={X(bar.x1)}
-                              y2={Y(bar.y - rightHook)}
-                              stroke={stroke}
-                              strokeWidth="1.6"
-                              opacity="0.95"
-                            />
-                          )}
+                          ))}
                         </g>
                       );
                     }
@@ -762,30 +762,22 @@ export function SlabPreview({
                           y2={Y(bar.y1)}
                           stroke={stroke}
                           strokeWidth="1.6"
+                          strokeLinecap="butt"
                           opacity="0.95"
                         />
-                        {leftHook > 0 && (
+                        {hooks.map((h, hi) => (
                           <line
-                            x1={X(bar.x)}
-                            y1={Y(bar.y0)}
-                            x2={X(bar.x + leftHook)}
-                            y2={Y(bar.y0)}
+                            key={`hy-${i}-${hi}`}
+                            x1={X(h.x1)}
+                            y1={Y(h.y1)}
+                            x2={X(h.x2)}
+                            y2={Y(h.y2)}
                             stroke={stroke}
                             strokeWidth="1.6"
+                            strokeLinecap="butt"
                             opacity="0.95"
                           />
-                        )}
-                        {rightHook > 0 && (
-                          <line
-                            x1={X(bar.x)}
-                            y1={Y(bar.y1)}
-                            x2={X(bar.x + rightHook)}
-                            y2={Y(bar.y1)}
-                            stroke={stroke}
-                            strokeWidth="1.6"
-                            opacity="0.95"
-                          />
-                        )}
+                        ))}
                       </g>
                     );
                   })}

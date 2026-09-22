@@ -157,11 +157,79 @@ export function SlabApp() {
           setZoneForm(parsed.zones[0]);
           setSelectedZoneId(parsed.zones[0].id);
         }
+      } else if (project.zones[0]) {
+        setZoneForm(project.zones[0]);
+        setSelectedZoneId(project.zones[0].id);
       }
     } catch {
       /* keep sample */
     }
+    // chỉ hydrate một lần khi mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * Đảm bảo đang ở chế độ manual với đủ zone (X/Y) lấy từ effectiveZones,
+   * rồi gán Móc thép trái/phải — luôn phản ánh lên mặt bằng.
+   */
+  function persistZoneHooks(partial: { leftHook?: number; rightHook?: number }) {
+    const nextForm = {
+      ...zoneForm,
+      ...partial,
+      leftHook:
+        partial.leftHook !== undefined
+          ? Math.max(0, Math.round(partial.leftHook) || 0)
+          : zoneForm.leftHook,
+      rightHook:
+        partial.rightHook !== undefined
+          ? Math.max(0, Math.round(partial.rightHook) || 0)
+          : zoneForm.rightHook,
+    };
+    setZoneForm(nextForm);
+
+    const seeded =
+      project.layoutPreset === "manual" && (project.zones?.length ?? 0) > 0
+        ? project.zones
+        : effectiveZones(project).map((z) => ({ ...z, id: z.id || uid("zone") }));
+
+    let targetId = selectedZoneId;
+    if (!targetId || !seeded.some((z) => z.id === targetId)) {
+      targetId = seeded.find((z) => z.direction === nextForm.direction)?.id ?? seeded[0]?.id ?? null;
+    }
+
+    const zones = seeded.map((z) => {
+      if (targetId && z.id === targetId) return { ...nextForm, id: targetId };
+      // Cùng lớp + phương: đồng bộ móc để mọi thanh cùng hướng cập nhật
+      if (z.layer === nextForm.layer && z.direction === nextForm.direction) {
+        return {
+          ...z,
+          leftHook: nextForm.leftHook,
+          rightHook: nextForm.rightHook,
+        };
+      }
+      return z;
+    });
+
+    if (targetId) setSelectedZoneId(targetId);
+    persist({
+      ...project,
+      layoutPreset: "manual",
+      zones,
+      // Đồng bộ móc preset để tab 2 lớp không lệch
+      simple2: {
+        ...project.simple2,
+        bottomHook:
+          nextForm.layer === "bottom" ? nextForm.leftHook : project.simple2.bottomHook,
+        topHook: nextForm.layer === "top" ? nextForm.leftHook : project.simple2.topHook,
+      },
+      economy2: {
+        ...project.economy2,
+        bottomHook:
+          nextForm.layer === "bottom" ? nextForm.leftHook : project.economy2.bottomHook,
+        topHook: nextForm.layer === "top" ? nextForm.leftHook : project.economy2.topHook,
+      },
+    });
+  }
 
   function persist(next: SlabProject) {
     // Dầm cắt qua ô phải có trục — tránh chọn ô sàn dính liền băng qua dầm
@@ -2020,40 +2088,14 @@ export function SlabApp() {
                     <Input
                       type="number"
                       value={zoneForm.leftHook}
-                      onChange={(e) => {
-                        const leftHook = Number(e.target.value) || 0;
-                        const nextForm = { ...zoneForm, leftHook };
-                        setZoneForm(nextForm);
-                        if (selectedZoneId) {
-                          persist({
-                            ...project,
-                            layoutPreset: "manual",
-                            zones: project.zones.map((z) =>
-                              z.id === selectedZoneId ? { ...nextForm, id: selectedZoneId } : z,
-                            ),
-                          });
-                        }
-                      }}
+                      onChange={(e) => persistZoneHooks({ leftHook: Number(e.target.value) || 0 })}
                     />
                   </Field>
                   <Field label="Móc thép phải" unit="mm">
                     <Input
                       type="number"
                       value={zoneForm.rightHook}
-                      onChange={(e) => {
-                        const rightHook = Number(e.target.value) || 0;
-                        const nextForm = { ...zoneForm, rightHook };
-                        setZoneForm(nextForm);
-                        if (selectedZoneId) {
-                          persist({
-                            ...project,
-                            layoutPreset: "manual",
-                            zones: project.zones.map((z) =>
-                              z.id === selectedZoneId ? { ...nextForm, id: selectedZoneId } : z,
-                            ),
-                          });
-                        }
-                      }}
+                      onChange={(e) => persistZoneHooks({ rightHook: Number(e.target.value) || 0 })}
                     />
                   </Field>
                   <Field label="Ký hiệu khoảng rải">

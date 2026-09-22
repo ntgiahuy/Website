@@ -1662,15 +1662,19 @@ export function hooksForRebarBar(
   const list = zones ?? project.zones ?? [];
   const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;
   const my = bar.dir === "X" ? bar.y : (bar.y0 + bar.y1) / 2;
-  const hits = list.filter((z) => {
-    if (z.direction !== bar.dir) return false;
+  const sameDir = list.filter((z) => z.direction === bar.dir);
+  const hits = sameDir.filter((z) => {
     const zx0 = Math.min(z.x1, z.x2);
     const zx1 = Math.max(z.x1, z.x2);
     const zy0 = Math.min(z.y1, z.y2);
     const zy1 = Math.max(z.y1, z.y2);
     return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
   });
-  const z = hits.find((h) => h.layer === "bottom") ?? hits[0];
+  const z =
+    hits.find((h) => h.layer === "bottom") ??
+    hits[0] ??
+    sameDir.find((h) => h.layer === "bottom") ??
+    sameDir[0];
   if (!z) {
     const h = presetHookFallbackMm(project);
     return { left: h, right: h };
@@ -1679,6 +1683,45 @@ export function hooksForRebarBar(
     left: Math.max(0, Math.round(Number(z.leftHook) || 0)),
     right: Math.max(0, Math.round(Number(z.rightHook) || 0)),
   };
+}
+
+/**
+ * Đoạn móc vuông góc với thanh thép (mm mặt bằng).
+ * Chiều dài đúng bằng Móc thép trái / Móc thép phải.
+ * Hướng móc hướng vào trong sàn (về tâm) để luôn thấy rõ trên mặt bằng.
+ */
+export function rebarHookSegments(
+  bar: RebarBarSeg,
+  leftMm: number,
+  rightMm: number,
+  planWidth: number,
+  planHeight: number,
+): Array<{ x1: number; y1: number; x2: number; y2: number }> {
+  const out: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+  const left = Math.max(0, Math.round(leftMm) || 0);
+  const right = Math.max(0, Math.round(rightMm) || 0);
+  if (bar.dir === "X") {
+    // Thanh ngang → móc thẳng đứng (⊥)
+    const midY = planHeight / 2;
+    const sign = bar.y <= midY ? 1 : -1;
+    if (left > 0) {
+      out.push({ x1: bar.x0, y1: bar.y, x2: bar.x0, y2: bar.y + sign * left });
+    }
+    if (right > 0) {
+      out.push({ x1: bar.x1, y1: bar.y, x2: bar.x1, y2: bar.y + sign * right });
+    }
+  } else {
+    // Thanh đứng → móc ngang (⊥)
+    const midX = planWidth / 2;
+    const sign = bar.x <= midX ? 1 : -1;
+    if (left > 0) {
+      out.push({ x1: bar.x, y1: bar.y0, x2: bar.x + sign * left, y2: bar.y0 });
+    }
+    if (right > 0) {
+      out.push({ x1: bar.x, y1: bar.y1, x2: bar.x + sign * right, y2: bar.y1 });
+    }
+  }
+  return out;
 }
 
 /** Đọc B / H / B1 từ info (kèm fallback chuỗi beamSize cũ). */
