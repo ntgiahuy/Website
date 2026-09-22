@@ -23,6 +23,7 @@ import {
   sortAxes,
   stripRebarBarSegments,
   stripRebarPressMarks,
+  slabDistRangeForBar,
   SLAB_REBAR_HOOK_MM,
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarZone, SlabProject } from "../types";
@@ -182,24 +183,27 @@ function textInAxisBubble(ctx: Ctx, str: string, cx: number, cy: number, size = 
   textInkCentered(ctx, str, cx, cy, size, BLACK, true);
 }
 
-/** Mũi tên đầu đường khoảng rải (hướng từ tip về phía thân). tip=(tx,ty) → về (hx,hy). */
-function drawDistArrow(ctx: Ctx, tipX: number, tipY: number, towardX: number, towardY: number) {
-  const dx = towardX - tipX;
-  const dy = towardY - tipY;
+/** Mũi tên đầu khoảng rải (hình 2): tam giác đặc + gạch ngang dày tại tip, hướng ra ngoài. */
+function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fromY: number) {
+  const dx = tipX - fromX;
+  const dy = tipY - fromY;
   const len = Math.hypot(dx, dy) || 1;
   const ux = dx / len;
   const uy = dy / len;
-  const ah = 5.5;
-  const aw = 3.2;
-  const bx = tipX + ux * ah;
-  const by = tipY + uy * ah;
   const px = -uy;
   const py = ux;
-  const path =
+  const ah = 4.2; // chiều cao tam giác
+  const aw = 2.6; // nửa đáy tam giác
+  const cap = 4.5; // nửa bề rộng gạch ngang
+  const bx = tipX - ux * ah;
+  const by = tipY - uy * ah;
+  const tri =
     `M ${tipX} ${ty(tipY)} ` +
     `L ${bx + px * aw} ${ty(by + py * aw)} ` +
     `L ${bx - px * aw} ${ty(by - py * aw)} Z`;
-  ctx.page.drawSvgPath(path, { color: DIST_BLUE });
+  ctx.page.drawSvgPath(tri, { color: DIST_BLUE });
+  // Gạch ngang dày vuông góc tại điểm đầu/cuối
+  line(ctx, tipX - px * cap, tipY - py * cap, tipX + px * cap, tipY + py * cap, 1.35, DIST_BLUE);
 }
 
 /**
@@ -842,82 +846,28 @@ function drawPlan(
     }
   }
 
-  // —— Khoảng rải thép sàn: đường xanh ⊥ phương thanh (đầu mũi tên) ——
-  const distZones = zones.filter((z) => z.showSpacing);
-  for (let zi = 0; zi < distZones.length; zi++) {
-    const z = distZones[zi];
-    const zx0 = Math.min(z.x1, z.x2);
-    const zx1 = Math.max(z.x1, z.x2);
-    const zy0 = Math.min(z.y1, z.y2);
-    const zy1 = Math.max(z.y1, z.y2);
-    const nudge =
-      (z.layer === "top" ? 1 : z.layer === "structural" ? -1 : 0) * 120 + (zi % 3) * 40;
-    let xA: number;
-    let yA: number;
-    let xB: number;
-    let yB: number;
-    let lenMm: number;
-    if (z.direction === "X") {
-      // Thanh ngang → khoảng rải dọc Y
-      const mx = (zx0 + zx1) / 2 + nudge;
-      xA = mx;
-      yA = zy0;
-      xB = mx;
-      yB = zy1;
-      lenMm = zy1 - zy0;
-    } else {
-      // Thanh đứng → khoảng rải ngang X
-      const my = (zy0 + zy1) / 2 + nudge;
-      xA = zx0;
-      yA = my;
-      xB = zx1;
-      yB = my;
-      lenMm = zx1 - zx0;
-    }
-    if (!(lenMm > 1)) continue;
-    const pxA = toX(xA);
-    const pyA = toY(yA);
-    const pxB = toX(xB);
-    const pyB = toY(yB);
-    line(ctx, pxA, pyA, pxB, pyB, 1.1, DIST_BLUE);
-    drawDistArrow(ctx, pxA, pyA, pxB, pyB);
-    drawDistArrow(ctx, pxB, pyB, pxA, pyA);
-    // Chấm trắng tại giao với thanh thép cùng zone (giống bản CAD)
-    for (const bar of bars) {
-      if (bar.dir === "X" && z.direction === "X") {
-        // Thanh ngang cắt đường khoảng rải đứng tại (mx, bar.y)
-        if (bar.y < zy0 - 1 || bar.y > zy1 + 1) continue;
-        const bx0 = Math.min(bar.x0, bar.x1);
-        const bx1 = Math.max(bar.x0, bar.x1);
-        if (xA < bx0 - 1 || xA > bx1 + 1) continue;
-        ctx.page.drawCircle({
-          x: toX(xA),
-          y: ty(toY(bar.y)),
-          size: 2.0,
-          color: rgb(1, 1, 1),
-          borderColor: DIST_BLUE,
-          borderWidth: 0.65,
-        });
-      } else if (bar.dir === "Y" && z.direction === "Y") {
-        if (bar.x < zx0 - 1 || bar.x > zx1 + 1) continue;
-        const by0 = Math.min(bar.y0, bar.y1);
-        const by1 = Math.max(bar.y0, bar.y1);
-        if (yA < by0 - 1 || yA > by1 + 1) continue;
-        ctx.page.drawCircle({
-          x: toX(bar.x),
-          y: ty(toY(yA)),
-          size: 2.0,
-          color: rgb(1, 1, 1),
-          borderColor: DIST_BLUE,
-          borderWidth: 0.65,
-        });
+  // —— Khoảng rải thép sàn: mỗi thanh 1 nét mảnh ⊥ giữa thanh; đầu/cuối = mí dầm trong − 50 ——
+  const showDist = zones.some((z) => z.showSpacing);
+  if (showDist) {
+    for (let bi = 0; bi < bars.length; bi++) {
+      const bar = bars[bi];
+      const seg = slabDistRangeForBar(project, axesX, axesY, bar);
+      if (!seg) continue;
+      const pxA = toX(seg.xA);
+      const pyA = toY(seg.yA);
+      const pxB = toX(seg.xB);
+      const pyB = toY(seg.yB);
+      // Nét mảnh
+      line(ctx, pxA, pyA, pxB, pyB, 0.55, DIST_BLUE);
+      drawDistEndCap(ctx, pxA, pyA, pxB, pyB);
+      drawDistEndCap(ctx, pxB, pyB, pxA, pyA);
+      const label = String(Math.round(seg.lenMm));
+      const alongY = Math.abs(seg.yB - seg.yA) >= Math.abs(seg.xB - seg.xA);
+      if (alongY) {
+        textSimple(ctx, label, (pxA + pxB) / 2 + 5, (pyA + pyB) / 2, 5.5, false, "left", DIST_BLUE);
+      } else {
+        textSimple(ctx, label, (pxA + pxB) / 2, (pyA + pyB) / 2 - 6, 5.5, false, "center", DIST_BLUE);
       }
-    }
-    const label = String(Math.round(lenMm));
-    if (z.direction === "X") {
-      textSimple(ctx, label, (pxA + pxB) / 2 + 6, (pyA + pyB) / 2, 6.5, true, "left", DIST_BLUE);
-    } else {
-      textSimple(ctx, label, (pxA + pxB) / 2, (pyA + pyB) / 2 - 8, 6.5, true, "center", DIST_BLUE);
     }
   }
 

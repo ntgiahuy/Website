@@ -16,6 +16,7 @@ import {
   sortAxes,
   stripRebarBarSegments,
   stripRebarPressMarks,
+  slabDistRangeForBar,
   SLAB_REBAR_HOOK_MM,
 } from "@/lib/grid";
 import type { PlanSelection, SlabProject } from "@/lib/types";
@@ -158,17 +159,6 @@ export function SlabPreview({
             <pattern id="lowHatch3d" patternUnits="userSpaceOnUse" width="6" height="6">
               <circle cx="1.2" cy="1.2" r="0.7" fill="#9ca3af" />
             </pattern>
-            <marker
-              id="distArrow"
-              viewBox="0 0 10 10"
-              refX="5"
-              refY="5"
-              markerWidth="4.5"
-              markerHeight="4.5"
-              orient="auto-start-reverse"
-            >
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb" />
-            </marker>
           </defs>
           {view.polygons.map((poly, i) => (
             <polygon
@@ -796,110 +786,69 @@ export function SlabPreview({
                       </text>
                     </g>
                   ))}
-                  {/* Khoảng rải thép sàn: đường xanh ⊥ phương thanh, đầu mũi tên */}
-                  {zones
-                    .filter((z) => z.showSpacing)
-                    .map((z, zi) => {
-                      const zx0 = Math.min(z.x1, z.x2);
-                      const zx1 = Math.max(z.x1, z.x2);
-                      const zy0 = Math.min(z.y1, z.y2);
-                      const zy1 = Math.max(z.y1, z.y2);
-                      // Lệch nhẹ theo lớp để không chồng nhiều số hiệu
-                      const nudge =
-                        (z.layer === "top" ? 1 : z.layer === "structural" ? -1 : 0) * 120 +
-                        (zi % 3) * 40;
-                      let xA: number;
-                      let yA: number;
-                      let xB: number;
-                      let yB: number;
-                      let lenMm: number;
-                      if (z.direction === "X") {
-                        // Thanh ngang → khoảng rải dọc Y
-                        const mx = (zx0 + zx1) / 2 + nudge;
-                        xA = mx;
-                        yA = zy0;
-                        xB = mx;
-                        yB = zy1;
-                        lenMm = zy1 - zy0;
-                      } else {
-                        // Thanh đứng → khoảng rải ngang X
-                        const my = (zy0 + zy1) / 2 + nudge;
-                        xA = zx0;
-                        yA = my;
-                        xB = zx1;
-                        yB = my;
-                        lenMm = zx1 - zx0;
-                      }
-                      if (!(lenMm > 1)) return null;
-                      const midX = (X(xA) + X(xB)) / 2;
-                      const midY = (Y(yA) + Y(yB)) / 2;
+                  {/* Khoảng rải: mỗi thanh 1 nét mảnh ⊥ giữa thanh; đầu/cuối = mí dầm trong − 50 */}
+                  {zones.some((z) => z.showSpacing) &&
+                    bars.map((bar, bi) => {
+                      const seg = slabDistRangeForBar(project, axesX, axesY, bar);
+                      if (!seg) return null;
+                      const sxA = X(seg.xA);
+                      const syA = Y(seg.yA);
+                      const sxB = X(seg.xB);
+                      const syB = Y(seg.yB);
+                      const ah = 5.5;
+                      const aw = 3.4;
+                      const cap = 5.5;
+                      const endCap = (tx: number, tyPt: number, fromX: number, fromY: number, key: string) => {
+                        const ex = tx - fromX;
+                        const ey = tyPt - fromY;
+                        const el = Math.hypot(ex, ey) || 1;
+                        const euX = ex / el;
+                        const euY = ey / el;
+                        const epX = -euY;
+                        const epY = euX;
+                        const bx = tx - euX * ah;
+                        const by = tyPt - euY * ah;
+                        return (
+                          <g key={key}>
+                            <polygon
+                              points={`${tx},${tyPt} ${bx + epX * aw},${by + epY * aw} ${bx - epX * aw},${by - epY * aw}`}
+                              fill="#2563eb"
+                            />
+                            <line
+                              x1={tx - epX * cap}
+                              y1={tyPt - epY * cap}
+                              x2={tx + epX * cap}
+                              y2={tyPt + epY * cap}
+                              stroke="#2563eb"
+                              strokeWidth="1.6"
+                            />
+                          </g>
+                        );
+                      };
+                      const midX = (sxA + sxB) / 2;
+                      const midY = (syA + syB) / 2;
+                      const alongY = Math.abs(seg.yB - seg.yA) >= Math.abs(seg.xB - seg.xA);
                       return (
-                        <g key={`dist-${z.id}`} pointerEvents="none">
+                        <g key={`dist-${bi}`} pointerEvents="none">
                           <line
-                            x1={X(xA)}
-                            y1={Y(yA)}
-                            x2={X(xB)}
-                            y2={Y(yB)}
+                            x1={sxA}
+                            y1={syA}
+                            x2={sxB}
+                            y2={syB}
                             stroke="#2563eb"
-                            strokeWidth="1.8"
-                            markerStart="url(#distArrow)"
-                            markerEnd="url(#distArrow)"
+                            strokeWidth="1.05"
                           />
-                          {/* Chấm trắng tại giao với thanh cùng zone */}
-                          {bars.flatMap((b, bi) => {
-                            if (b.dir === "X" && z.direction === "X") {
-                              if (
-                                b.y < zy0 - 1 ||
-                                b.y > zy1 + 1 ||
-                                xA < Math.min(b.x0, b.x1) - 1 ||
-                                xA > Math.max(b.x0, b.x1) + 1
-                              ) {
-                                return [];
-                              }
-                              return [
-                                <circle
-                                  key={`dist-dot-${z.id}-${bi}`}
-                                  cx={X(xA)}
-                                  cy={Y(b.y)}
-                                  r="2.2"
-                                  fill="#fff"
-                                  stroke="#2563eb"
-                                  strokeWidth="1"
-                                />,
-                              ];
-                            }
-                            if (b.dir === "Y" && z.direction === "Y") {
-                              if (
-                                b.x < zx0 - 1 ||
-                                b.x > zx1 + 1 ||
-                                yA < Math.min(b.y0, b.y1) - 1 ||
-                                yA > Math.max(b.y0, b.y1) + 1
-                              ) {
-                                return [];
-                              }
-                              return [
-                                <circle
-                                  key={`dist-dot-${z.id}-${bi}`}
-                                  cx={X(b.x)}
-                                  cy={Y(yA)}
-                                  r="2.2"
-                                  fill="#fff"
-                                  stroke="#2563eb"
-                                  strokeWidth="1"
-                                />,
-                              ];
-                            }
-                            return [];
-                          })}
+                          {endCap(sxA, syA, sxB, syB, `a-${bi}`)}
+                          {endCap(sxB, syB, sxA, syA, `b-${bi}`)}
                           <text
-                            x={midX + (z.direction === "X" ? 8 : 0)}
-                            y={midY + (z.direction === "X" ? 0 : -8)}
+                            x={midX + (alongY ? 7 : 0)}
+                            y={midY + (alongY ? 0 : -7)}
                             fill="#2563eb"
-                            fontSize="10"
-                            fontWeight="700"
-                            textAnchor={z.direction === "X" ? "start" : "middle"}
+                            fontSize="9"
+                            fontWeight="600"
+                            textAnchor={alongY ? "start" : "middle"}
                           >
-                            {Math.round(lenMm)}
+                            {Math.round(seg.lenMm)}
                           </text>
                         </g>
                       );
