@@ -1,0 +1,3 @@
+# Patch: số hiệu đỏ; STT theo Ø + a + chiều dài
+
+Đã deploy san `main`. Chữ/vòng số hiệu đỏ. Cùng Ø+a+chiều dài → cùng STT; khác dài hoặc khác Ø → 1, 2, 3…
