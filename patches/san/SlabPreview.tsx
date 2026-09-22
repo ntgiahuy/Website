@@ -795,9 +795,9 @@ export function SlabPreview({
                       const syA = Y(seg.yA);
                       const sxB = X(seg.xB);
                       const syB = Y(seg.yB);
-                      const ah = 5.5;
-                      const aw = 3.4;
-                      const cap = 5.5;
+                      const ah = 7;
+                      const aw = 4.2;
+                      const cap = 7;
                       const endCap = (tx: number, tyPt: number, fromX: number, fromY: number, key: string) => {
                         const ex = tx - fromX;
                         const ey = tyPt - fromY;

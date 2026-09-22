@@ -192,9 +192,9 @@ function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fro
   const uy = dy / len;
   const px = -uy;
   const py = ux;
-  const ah = 4.2; // chiều cao tam giác
-  const aw = 2.6; // nửa đáy tam giác
-  const cap = 4.5; // nửa bề rộng gạch ngang
+  const ah = 5.2; // chiều cao tam giác
+  const aw = 3.2; // nửa đáy tam giác
+  const cap = 5.8; // nửa bề rộng gạch ngang
   const bx = tipX - ux * ah;
   const by = tipY - uy * ah;
   const tri =
@@ -203,7 +203,7 @@ function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fro
     `L ${bx - px * aw} ${ty(by - py * aw)} Z`;
   ctx.page.drawSvgPath(tri, { color: DIST_BLUE });
   // Gạch ngang dày vuông góc tại điểm đầu/cuối
-  line(ctx, tipX - px * cap, tipY - py * cap, tipX + px * cap, tipY + py * cap, 1.35, DIST_BLUE);
+  line(ctx, tipX - px * cap, tipY - py * cap, tipX + px * cap, tipY + py * cap, 1.55, DIST_BLUE);
 }
 
 /**
