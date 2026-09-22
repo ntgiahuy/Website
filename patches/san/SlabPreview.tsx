@@ -487,28 +487,49 @@ export function SlabPreview({
             }`;
 
   const zoom = Math.min(300, Math.max(50, zoomPct));
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const sync = () => {
+      setViewport({ w: el.clientWidth, h: el.clientHeight });
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [show3d]);
+
+  const scale = zoom / 100;
+  const canvasW = Math.max(1, Math.round(viewport.w * scale));
+  const canvasH = Math.max(1, Math.round(viewport.h * scale));
+  // Vùng cuộn ≥ viewport khi phóng to; khi thu nhỏ vẫn đủ chỗ căn giữa
+  const scrollW = Math.max(viewport.w, canvasW);
+  const scrollH = Math.max(viewport.h, canvasH);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-zinc-950">
       <div ref={wrapRef} className="relative min-h-0 flex-1 overflow-auto">
-        <div className="flex min-h-full min-w-full items-center justify-center p-1 sm:p-2">
-          <div
-            className="relative"
-            style={{
-              width: `${zoom}%`,
-              height: `${zoom}%`,
-              minWidth: zoom < 100 ? undefined : "100%",
-              minHeight: zoom < 100 ? undefined : "100%",
+        <div
+          className="box-border flex items-center justify-center p-1 sm:p-2"
+          style={{
+            width: scrollW || "100%",
+            height: scrollH || "100%",
+            minWidth: "100%",
+            minHeight: "100%",
+          }}
+        >
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            width={viewport.w ? canvasW : "100%"}
+            height={viewport.h ? canvasH : "100%"}
+            className="block shrink-0"
+            preserveAspectRatio="xMidYMid meet"
+            onClick={() => {
+              if (interactive && onSelect) pick(null);
             }}
           >
-            <svg
-              viewBox={`0 0 ${W} ${H}`}
-              className="h-full w-full"
-              preserveAspectRatio="xMidYMid meet"
-              onClick={() => {
-                if (interactive && onSelect) pick(null);
-              }}
-            >
             <rect
               x={X(0)}
               y={Y(project.planHeight)}
@@ -922,7 +943,6 @@ export function SlabPreview({
               {project.info.thickness}mm
             </text>
           </svg>
-          </div>
         </div>
 
         {interactive && selection && editPanel && anchor && (

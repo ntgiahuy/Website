@@ -2402,7 +2402,7 @@ export function SlabApp() {
               )}
             </div>
           )}
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-auto">
             <SlabPreview
               project={project}
               show3d={project.show3d && tab === "model3d"}
