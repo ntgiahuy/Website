@@ -806,10 +806,10 @@ export function SlabPreview({
                         return `${bar.dir}|10|150`;
                       };
                       const merged = buildMergedDistRanges(project, axesX, axesY, bars, markKeyOf);
-                      const ah = 14;
-                      const aw = 7;
-                      const capHalf = 11;
-                      const capThick = 4.2;
+                      const ah = 7; // ×0.5
+                      const aw = 3.5;
+                      const capHalf = 5.5;
+                      const capThick = 2.1;
                       const endCap = (tx: number, tyPt: number, fromX: number, fromY: number, key: string) => {
                         const ex = tx - fromX;
                         const ey = tyPt - fromY;

@@ -198,10 +198,10 @@ function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fro
   const uy = dy / len;
   const px = -uy;
   const py = ux;
-  const ah = 11; // chiều cao tam giác
-  const aw = 5.5; // nửa đáy tam giác
-  const capHalf = 9; // nửa bề rộng gạch ngang
-  const capThick = 3.4; // bề dày gạch ngang (hình chữ nhật đặc)
+  const ah = 5.5; // chiều cao tam giác (×0.5)
+  const aw = 2.75; // nửa đáy tam giác
+  const capHalf = 4.5; // nửa bề rộng gạch ngang
+  const capThick = 1.7; // bề dày gạch ngang (hình chữ nhật đặc)
 
   // Gạch ngang dày: hình chữ nhật đặc, mép trong tại tip, kéo ra ngoài
   const ox = ux * capThick;
@@ -224,7 +224,7 @@ function drawDistEndCap(ctx: Ctx, tipX: number, tipY: number, fromX: number, fro
 }
 
 /** Chiều cao tam giác đầu khoảng rải — dùng rút nét thân. */
-const DIST_END_AH = 11;
+const DIST_END_AH = 5.5;
 
 /**
  * Chấm giao khoảng rải ∩ thanh thép (hình mẫu): kim cương trắng trong vòng tròn.
