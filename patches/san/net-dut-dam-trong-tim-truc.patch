@@ -1,0 +1,225 @@
+From 891af49ac284605523898061fad8dfd9abf95038 Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Tue, 22 Sep 2026 10:25:10 +0000
+Subject: [PATCH] PDF plan: dashed inner beam faces; continuous dash-dot axes
+
+Inner beam edges use even dashes; axis centerlines use dash-dot through the plan; outer perimeter stays solid.
+---
+ components/slab/SlabPreview.tsx |  8 +--
+ lib/pdf/generate.ts             | 89 +++++++++++++++++++++++----------
+ 2 files changed, 66 insertions(+), 31 deletions(-)
+
+diff --git a/components/slab/SlabPreview.tsx b/components/slab/SlabPreview.tsx
+index 5154339..5961a72 100644
+--- a/components/slab/SlabPreview.tsx
++++ b/components/slab/SlabPreview.tsx
+@@ -517,7 +517,7 @@ export function SlabPreview({
+               const interior = axisInteriorSegmentsX(project, axesX, axesY, ax.pos);
+               return (
+                 <g key={`ax-${ax.id}`}>
+-                  {/* Tim chỉ trong lòng ô sàn — không vẽ xuyên / chạm thân dầm */}
++                  {/* Tim trục: gạch–chấm liên tục trong lòng ô */}
+                   {interior.map((span, i) => (
+                     <line
+                       key={`ax-span-${ax.id}-${i}`}
+@@ -527,7 +527,7 @@ export function SlabPreview({
+                       y2={Y(span.lo)}
+                       stroke={stroke}
+                       strokeWidth={sw}
+-                      strokeDasharray="3 3"
++                      strokeDasharray="7 2 1.5 2"
+                       pointerEvents="none"
+                     />
+                   ))}
+@@ -583,7 +583,7 @@ export function SlabPreview({
+               const interior = axisInteriorSegmentsY(project, axesX, axesY, ay.pos);
+               return (
+                 <g key={`ay-${ay.id}`}>
+-                  {/* Tim chỉ trong lòng ô sàn — không vẽ xuyên / chạm thân dầm */}
++                  {/* Tim trục: gạch–chấm liên tục trong lòng ô */}
+                   {interior.map((span, i) => (
+                     <line
+                       key={`ay-span-${ay.id}-${i}`}
+@@ -593,7 +593,7 @@ export function SlabPreview({
+                       y2={cy}
+                       stroke={stroke}
+                       strokeWidth={sw}
+-                      strokeDasharray="3 3"
++                      strokeDasharray="7 2 1.5 2"
+                       pointerEvents="none"
+                     />
+                   ))}
+diff --git a/lib/pdf/generate.ts b/lib/pdf/generate.ts
+index f395b62..af23e8a 100644
+--- a/lib/pdf/generate.ts
++++ b/lib/pdf/generate.ts
+@@ -9,8 +9,6 @@ import {
+   type ScheduleRow,
+ } from "../calc";
+ import {
+-  axisInteriorSegmentsX,
+-  axisInteriorSegmentsY,
+   beamSegSideFaces,
+   beamSegments,
+   isBeamSegOmitted,
+@@ -29,7 +27,7 @@ const PAGE_W = 1684;
+ const PAGE_H = 1191;
+ const BLACK = rgb(0, 0, 0);
+ const GRAY = rgb(0.45, 0.45, 0.45);
+-const AXIS_DASH = rgb(0.35, 0.35, 0.35);
++const AXIS_LINE = rgb(0.28, 0.28, 0.28);
+ /** Chỉ thép dùng nét đỏ; dầm / khung / tim trục = đen. */
+ const REBAR_RED = rgb(0.86, 0.15, 0.15);
+ const REBAR_MARK_R = 5.2;
+@@ -37,6 +35,10 @@ const REBAR_MARK_R = 5.2;
+ const AXIS_BUBBLE_R = 5.5;
+ const AXIS_BUBBLE_GAP = 10;
+ const AXIS_BUBBLE_OFFSET = AXIS_BUBBLE_R + AXIS_BUBBLE_GAP;
++/** Da dầm phía trong (hướng vào ô sàn): nét đứt đều. */
++const BEAM_INNER_DASH = [3.5, 2.2];
++/** Tim trục: gạch–chấm–gạch–chấm liên tục. */
++const AXIS_CENTERLINE_DASH = [7, 1.6, 1.2, 1.6];
+ 
+ type KitFont = {
+   unitsPerEm: number;
+@@ -301,21 +303,15 @@ function drawPlan(
+   const edgeBottom = toY(bleed.yMin);
+   const edgeTop = toY(bleed.yMax);
+ 
+-  // Khung ngoài sàn (da dầm biên) — nét đậm như bản vẽ minh họa
++  // Khung ngoài sàn (da dầm biên) — nét liền đậm
+   rect(ctx, edgeLeft, edgeTop, edgeRight - edgeLeft, edgeBottom - edgeTop, 1.35);
+ 
+-  // —— Tim trục: nét gạch đứt (trục giữa xuyên sàn; biên chỉ đường dẫn vòng) ——
++  // —— Tim trục: nét gạch–chấm liên tục xuyên mặt bằng ——
+   for (let i = 0; i < axesX.length; i++) {
+     const ax = axesX[i];
+     const x = toX(ax.pos);
+     const by = edgeBottom + AXIS_BUBBLE_OFFSET;
+-    const isEdge = i === 0 || i === axesX.length - 1;
+-    if (!isEdge) {
+-      line(ctx, x, edgeTop, x, edgeBottom, 0.4, AXIS_DASH, [3.5, 2.2]);
+-    }
+-    for (const span of axisInteriorSegmentsX(project, axesX, axesY, ax.pos)) {
+-      line(ctx, x, toY(span.hi), x, toY(span.lo), 0.45, AXIS_DASH, [3.5, 2.2]);
+-    }
++    line(ctx, x, edgeTop, x, edgeBottom, 0.4, AXIS_LINE, AXIS_CENTERLINE_DASH);
+     line(ctx, x, by - AXIS_BUBBLE_R, x, edgeBottom, 0.35, BLACK, [2, 1.5]);
+     ctx.page.drawCircle({
+       x,
+@@ -330,13 +326,7 @@ function drawPlan(
+     const ay = axesY[i];
+     const y = toY(ay.pos);
+     const bx = edgeLeft - AXIS_BUBBLE_OFFSET;
+-    const isEdge = i === 0 || i === axesY.length - 1;
+-    if (!isEdge) {
+-      line(ctx, edgeLeft, y, edgeRight, y, 0.4, AXIS_DASH, [3.5, 2.2]);
+-    }
+-    for (const span of axisInteriorSegmentsY(project, axesX, axesY, ay.pos)) {
+-      line(ctx, toX(span.lo), y, toX(span.hi), y, 0.45, AXIS_DASH, [3.5, 2.2]);
+-    }
++    line(ctx, edgeLeft, y, edgeRight, y, 0.4, AXIS_LINE, AXIS_CENTERLINE_DASH);
+     line(ctx, bx + AXIS_BUBBLE_R, y, edgeLeft, y, 0.35, BLACK, [2, 1.5]);
+     ctx.page.drawCircle({
+       x: bx,
+@@ -348,9 +338,9 @@ function drawPlan(
+     textInAxisBubble(ctx, ay.name, bx, y);
+   }
+ 
+-  // —— Dầm: 2 nét đen theo da (đúng bề rộng B), không dùng đỏ ——
++  // —— Dầm: da ngoài (biên sàn) nét liền; da trong (vào ô) nét đứt ——
+   for (const b of project.beams) {
+-    drawBeam(ctx, b, toX, toY);
++    drawBeam(ctx, b, toX, toY, bleed);
+   }
+ 
+   for (const ls of project.lowSlabs ?? []) {
+@@ -442,19 +432,21 @@ function drawPlan(
+ }
+ 
+ /**
+- * Vẽ dầm đúng bề rộng B: 2 nét đen theo da (có lệch/xéo) + nhãn Name(BxH).
++ * Vẽ dầm đúng bề rộng B: da ngoài nét liền, da trong (vào ô sàn) nét đứt + nhãn.
+  */
+ function drawBeam(
+   ctx: Ctx,
+   b: PlanBeam,
+   toX: (mm: number) => number,
+   toY: (mm: number) => number,
++  bleed: { xMin: number; xMax: number; yMin: number; yMax: number },
+ ) {
+   const { project } = ctx;
+   const segs = beamSegments(project, b);
+   let labelX = 0;
+   let labelY = 0;
+   let labelN = 0;
++  const eps = 2; // mm — nhận diện da trùng biên sàn
+ 
+   for (const seg of segs) {
+     if (isBeamSegOmitted(b, seg.a0.id, seg.a1.id)) continue;
+@@ -462,14 +454,57 @@ function drawBeam(
+     const lo = seg.lo;
+     const hi = seg.hi;
+     if (b.direction === "Y") {
+-      // Hai da dọc theo thân (2 nét = đúng bề rộng B)
+-      line(ctx, toX(lo0), toY(lo), toX(lo1), toY(hi), 0.9, BLACK);
+-      line(ctx, toX(hi0), toY(lo), toX(hi1), toY(hi), 0.9, BLACK);
++      const loMid = (lo0 + lo1) / 2;
++      const hiMid = (hi0 + hi1) / 2;
++      const loOuter = Math.abs(loMid - bleed.xMin) <= eps;
++      const hiOuter = Math.abs(hiMid - bleed.xMax) <= eps;
++      line(
++        ctx,
++        toX(lo0),
++        toY(lo),
++        toX(lo1),
++        toY(hi),
++        0.85,
++        BLACK,
++        loOuter ? undefined : BEAM_INNER_DASH,
++      );
++      line(
++        ctx,
++        toX(hi0),
++        toY(lo),
++        toX(hi1),
++        toY(hi),
++        0.85,
++        BLACK,
++        hiOuter ? undefined : BEAM_INNER_DASH,
++      );
+       labelX += toX(Math.max(hi0, hi1)) + 6;
+       labelY += (toY(lo) + toY(hi)) / 2;
+     } else {
+-      line(ctx, toX(lo), toY(lo0), toX(hi), toY(lo1), 0.9, BLACK);
+-      line(ctx, toX(lo), toY(hi0), toX(hi), toY(hi1), 0.9, BLACK);
++      const loMid = (lo0 + lo1) / 2;
++      const hiMid = (hi0 + hi1) / 2;
++      const loOuter = Math.abs(loMid - bleed.yMin) <= eps;
++      const hiOuter = Math.abs(hiMid - bleed.yMax) <= eps;
++      line(
++        ctx,
++        toX(lo),
++        toY(lo0),
++        toX(hi),
++        toY(lo1),
++        0.85,
++        BLACK,
++        loOuter ? undefined : BEAM_INNER_DASH,
++      );
++      line(
++        ctx,
++        toX(lo),
++        toY(hi0),
++        toX(hi),
++        toY(hi1),
++        0.85,
++        BLACK,
++        hiOuter ? undefined : BEAM_INNER_DASH,
++      );
+       labelX += (toX(lo) + toX(hi)) / 2;
+       labelY += toY(Math.max(hi0, hi1)) - 6;
+     }
+-- 
+2.43.0
+
