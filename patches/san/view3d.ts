@@ -360,11 +360,14 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
   for (const s of solids) {
     const c = solidCenter(s);
     const forceDashed = s.id.startsWith("col-below-");
-    const preferSolid = s.id.startsWith("col-above-") || s.id.startsWith("beam-");
+    const forceSolid = s.id.startsWith("col-above-");
+    const preferSolid = forceSolid || s.id.startsWith("beam-");
     for (const ed of s.edgeDefs) {
       let style0: "solid" | "dashed" = forceDashed
         ? "dashed"
-        : classifyEdge(ed.a, ed.b, s.faces[ed.f0], s.faces[ed.f1], c, occluderFaces);
+        : forceSolid
+          ? "solid"
+          : classifyEdge(ed.a, ed.b, s.faces[ed.f0], s.faces[ed.f1], c, occluderFaces);
       // Phần nổi (cột trên sàn) / cạnh trước dầm: ưu tiên nét liền nếu không bị che.
       if (preferSolid && style0 === "dashed" && !forceDashed) {
         const mid = lerp(ed.a, ed.b, 0.5);
