@@ -249,6 +249,31 @@ export const SlabPreview = memo(function SlabPreview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection?.kind, selection && "beamId" in selection ? selection.beamId : null, selection && "segIndex" in selection ? selection.segIndex : null, selection && "axisId" in selection ? selection.axisId : null, selection && "ix" in selection ? selection.ix : null, selection && "iy" in selection ? selection.iy : null]);
 
+  // Hooks phải gọi trước mọi early return (show3d) — tránh React #300.
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    let raf = 0;
+    const sync = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const w = Math.round(el.clientWidth);
+        const h = Math.round(el.clientHeight);
+        // Tránh vòng lặp scrollbar ↔ ResizeObserver (nháy liên tục).
+        setViewport((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+      });
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [show3d]);
+
   if (show3d) {
     const scene = buildBeamFrameScene(project);
     const view = projectSceneToSvg(scene, { width: 920, height: 540, pad: 40 });
@@ -620,30 +645,6 @@ export const SlabPreview = memo(function SlabPreview({
             }`;
 
   const zoom = Math.min(300, Math.max(50, zoomPct));
-  const [viewport, setViewport] = useState({ w: 0, h: 0 });
-
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    let raf = 0;
-    const sync = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const w = Math.round(el.clientWidth);
-        const h = Math.round(el.clientHeight);
-        // Tránh vòng lặp scrollbar ↔ ResizeObserver (nháy liên tục).
-        setViewport((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
-      });
-    };
-    sync();
-    const ro = new ResizeObserver(sync);
-    ro.observe(el);
-    return () => {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
-    };
-  }, [show3d]);
-
   const scale = zoom / 100;
   const canvasW = Math.max(1, Math.round(viewport.w * scale));
   const canvasH = Math.max(1, Math.round(viewport.h * scale));
