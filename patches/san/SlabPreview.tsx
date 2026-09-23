@@ -470,10 +470,12 @@ export function SlabPreview({
   });
 
   const beamNodes: ReactNode[] = [];
-  /** Nét da dầm: biên ngoài liền, da trong đứt; cắt chỗ giao. */
+  /** Nét da dầm: biên ngoài = xanh khung (theo da thật, kể cả lệch/xéo); da trong đứt xám. */
   const BEAM_SW = 0.85;
+  const BEAM_OUTER_SW = 1.5;
   const BEAM_DASH = "4 2.5";
   const BEAM_STROKE = "#c4c4c8";
+  const BEAM_OUTER_STROKE = "#79b8ff";
   for (const beam of project.beams ?? []) {
     const segs = beamSegments(project, beam);
 
@@ -523,6 +525,7 @@ export function SlabPreview({
           const y1 = beam.direction === "Y" ? Y(p.alongA) : Y(p.faceA);
           const x2 = beam.direction === "Y" ? X(p.faceB) : X(p.alongB);
           const y2 = beam.direction === "Y" ? Y(p.alongB) : Y(p.faceB);
+          const isOuter = style === "solid";
           faceLines.push(
             <line
               key={`${key}-${i}`}
@@ -530,9 +533,9 @@ export function SlabPreview({
               y1={y1}
               x2={x2}
               y2={y2}
-              stroke={active ? "#34d399" : BEAM_STROKE}
-              strokeWidth={active ? 1.4 : BEAM_SW}
-              strokeDasharray={style === "dashed" ? BEAM_DASH : undefined}
+              stroke={active ? "#34d399" : isOuter ? BEAM_OUTER_STROKE : BEAM_STROKE}
+              strokeWidth={active ? 1.4 : isOuter ? BEAM_OUTER_SW : BEAM_SW}
+              strokeDasharray={isOuter ? undefined : BEAM_DASH}
               strokeLinecap="square"
               pointerEvents="none"
             />,
@@ -659,14 +662,14 @@ export function SlabPreview({
               if (interactive && onSelect) pick(null);
             }}
           >
+            {/* Nền vùng da dầm — không stroke: đường xanh khung = đúng da dầm ngoài (beamNodes) */}
             <rect
               x={X(outerLeft)}
               y={Y(outerTop)}
               width={(outerRight - outerLeft) * s}
               height={(outerTop - outerBottom) * s}
               fill="#111113"
-              stroke="#79b8ff"
-              strokeWidth="1.5"
+              stroke="none"
               pointerEvents="none"
             />
             {bayNodes}

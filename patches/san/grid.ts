@@ -521,6 +521,7 @@ export function clippedBeamFaceParts(
 /**
  * Da dầm biên ngoài cùng (trùng bleed) → nét liền (không sàn che phía ngoài);
  * da trong hướng vào ô sàn → nét đứt.
+ * Dầm xéo/lệch: nếu một đầu da sát biên bleed thì cả đoạn coi là da ngoài.
  */
 export function beamFaceDashStyle(
   beamDir: PlanBeam["direction"],
@@ -529,11 +530,14 @@ export function beamFaceDashStyle(
   bleed: { xMin: number; xMax: number; yMin: number; yMax: number },
   epsMm = 2,
 ): BeamFaceStrokeStyle {
-  const mid = (face0 + face1) / 2;
+  const lo = Math.min(face0, face1);
+  const hi = Math.max(face0, face1);
   if (beamDir === "Y") {
-    if (Math.abs(mid - bleed.xMin) <= epsMm || Math.abs(mid - bleed.xMax) <= epsMm) return "solid";
-  } else if (Math.abs(mid - bleed.yMin) <= epsMm || Math.abs(mid - bleed.yMax) <= epsMm) {
-    return "solid";
+    if (Math.abs(lo - bleed.xMin) <= epsMm || Math.abs(hi - bleed.xMin) <= epsMm) return "solid";
+    if (Math.abs(lo - bleed.xMax) <= epsMm || Math.abs(hi - bleed.xMax) <= epsMm) return "solid";
+  } else {
+    if (Math.abs(lo - bleed.yMin) <= epsMm || Math.abs(hi - bleed.yMin) <= epsMm) return "solid";
+    if (Math.abs(lo - bleed.yMax) <= epsMm || Math.abs(hi - bleed.yMax) <= epsMm) return "solid";
   }
   return "dashed";
 }
