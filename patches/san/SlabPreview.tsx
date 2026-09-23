@@ -338,9 +338,9 @@ export const SlabPreview = memo(function SlabPreview({
                   y1={ln.y1}
                   x2={ln.x2}
                   y2={ln.y2}
-                  stroke="#6b7280"
-                  strokeWidth={1}
-                  strokeDasharray="6 4"
+                  stroke="#0a0a0a"
+                  strokeWidth={1.35}
+                  strokeLinecap="round"
                 />
               ))}
               {view.marks.map((m, i) => (

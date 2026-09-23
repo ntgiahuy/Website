@@ -1257,7 +1257,7 @@ function drawPhốiCảnh(ctx: Ctx, x: number, y: number, maxW: number, maxH: nu
   }
 
   for (const ln of view.lines) {
-    line(ctx, ox + ln.x1, oy + ln.y1, ox + ln.x2, oy + ln.y2, 0.65, GRAY, [4, 3]);
+    line(ctx, ox + ln.x1, oy + ln.y1, ox + ln.x2, oy + ln.y2, 0.95, BLACK);
   }
 
   for (const m of view.marks) {
