@@ -26,12 +26,15 @@ import {
   buildMergedDistRanges,
   hooksForRebarBar,
   rebarHookSegments,
-  typicalRebarBars,
+  typicalLayeredRebarBars,
   faceChainAlongX,
   faceChainAlongY,
   hookDrawMm,
+  zoneForRebarBar,
+  slabLayerPlanGapMm,
+  type RebarBarSeg,
 } from "../grid";
-import type { GridAxis, PlanBeam, RebarZone, SlabProject } from "../types";
+import type { GridAxis, PlanBeam, RebarLayer, RebarZone, SlabProject } from "../types";
 import { buildBeamFrameScene, projectSceneToSvg } from "../view3d";
 
 const PAGE_W = 1684;
@@ -571,23 +574,22 @@ function scheduleRowsByStt(
   return [...groups.values()].sort((a, b) => a.stt - b.stt);
 }
 
-/** Ø+a cho một thanh: zone cùng phương phủ tâm thanh. */
+/** Ø+a cho một thanh: zone cùng phương phủ tâm thanh (ưu tiên đúng lớp nếu có). */
 function steelSpecForBar(
   zones: RebarZone[],
   schedule: ScheduleRow[],
-  bar: { dir: "X" | "Y"; x0?: number; x1?: number; y?: number; y0?: number; y1?: number; x?: number },
+  bar: {
+    dir: "X" | "Y";
+    x0?: number;
+    x1?: number;
+    y?: number;
+    y0?: number;
+    y1?: number;
+    x?: number;
+    layer?: RebarLayer;
+  },
 ): { dia: number; spacing: number } {
-  const mx = bar.dir === "X" ? ((bar.x0 ?? 0) + (bar.x1 ?? 0)) / 2 : (bar.x ?? 0);
-  const my = bar.dir === "X" ? (bar.y ?? 0) : ((bar.y0 ?? 0) + (bar.y1 ?? 0)) / 2;
-  const hits = zones.filter((z) => {
-    if (z.direction !== bar.dir) return false;
-    const zx0 = Math.min(z.x1, z.x2);
-    const zx1 = Math.max(z.x1, z.x2);
-    const zy0 = Math.min(z.y1, z.y2);
-    const zy1 = Math.max(z.y1, z.y2);
-    return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
-  });
-  const z = hits.find((h) => h.layer === "bottom") ?? hits[0];
+  const z = zoneForRebarBar({ zones } as SlabProject, bar as RebarBarSeg, zones);
   if (z) return { dia: z.dia, spacing: z.spacing };
   const row = schedule.find((r) => r.direction === bar.dir) ?? schedule[0];
   return { dia: row?.dia ?? 10, spacing: row?.spacing ?? 150 };
@@ -803,8 +805,8 @@ function drawPlan(
   const pressAmber = rgb(0.9, 0.55, 0.1);
   const bars = stripRebarBarSegments(project, axesX, axesY);
   const rebarZones = effectiveZones(project);
-  /** Chỉ vẽ / ghi số hiệu 1 cây điển hình / dải thanh giống nhau kề nhau. */
-  const drawBars = typicalRebarBars(project, bars, rebarZones);
+  /** 2 lớp cùng phương → 2 cây điển hình/phương (lệch dày sàn − BV). */
+  const drawBars = typicalLayeredRebarBars(project, bars, rebarZones);
   for (const bar of drawBars) {
     const { left: leftHook, right: rightHook } = hooksForRebarBar(project, bar, rebarZones);
     if (bar.dir === "X") {
@@ -891,9 +893,13 @@ function drawPlan(
       undefined,
       rebarZones,
     );
-    const typicalSet = new Set(
-      drawBars.map((b) => (b.dir === "X" ? `X:${Math.round(b.y)}` : `Y:${Math.round(b.x)}`)),
-    );
+    const typicalTol = slabLayerPlanGapMm(project) / 2 + 2;
+    const nearTypical = (dir: "X" | "Y", pos: number) =>
+      drawBars.some((b) => {
+        if (b.dir !== dir) return false;
+        const barPos = b.dir === "X" ? b.y : b.x;
+        return Math.abs(barPos - pos) <= typicalTol;
+      });
     for (const seg of merged) {
       const pxA = toX(seg.xA);
       const pyA = toY(seg.yA);
@@ -918,9 +924,7 @@ function drawPlan(
       drawDistEndCap(ctx, pxB, pyB, pxA, pyA);
       for (const j of seg.junctions) {
         const keep =
-          seg.dir === "X"
-            ? typicalSet.has(`X:${Math.round(j.y)}`)
-            : typicalSet.has(`Y:${Math.round(j.x)}`);
+          seg.dir === "X" ? nearTypical("X", j.y) : nearTypical("Y", j.x);
         if (keep) drawDistBarJunction(ctx, toX(j.x), toY(j.y));
       }
       const label = String(Math.round(seg.lenMm));

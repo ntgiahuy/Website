@@ -3,6 +3,7 @@ import type {
   BeamTypeDef,
   GridAxis,
   PlanBeam,
+  RebarLayer,
   RebarZone,
   SlabInfo,
   SlabProject,
@@ -611,8 +612,8 @@ export function subtract1D(
 }
 
 export type RebarBarSeg =
-  | { dir: "X"; x0: number; x1: number; y: number }
-  | { dir: "Y"; y0: number; y1: number; x: number };
+  | { dir: "X"; x0: number; x1: number; y: number; layer?: RebarLayer }
+  | { dir: "Y"; y0: number; y1: number; x: number; layer?: RebarLayer };
 
 /**
  * Thép ô sàn: từ da dầm biên trừ lớp BV; cắt tại ô thủng / sàn thấp chế độ cắt.
@@ -1779,11 +1780,12 @@ function presetHookFallbackMm(project: SlabProject): number {
  * Truyền `zones` = effectiveZones(project) để đúng Móc thép trái/phải (kể cả preset).
  * 0 = không vẽ móc.
  */
-export function hooksForRebarBar(
+/** Chọn zone cùng phương phủ tâm thanh; ưu tiên đúng `bar.layer` nếu có. */
+export function zoneForRebarBar(
   project: SlabProject,
   bar: RebarBarSeg,
   zones?: RebarZone[],
-): { left: number; right: number } {
+): RebarZone | undefined {
   const list = zones ?? project.zones ?? [];
   const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;
   const my = bar.dir === "X" ? bar.y : (bar.y0 + bar.y1) / 2;
@@ -1795,11 +1797,31 @@ export function hooksForRebarBar(
     const zy1 = Math.max(z.y1, z.y2);
     return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
   });
-  const z =
+  const prefer = bar.layer;
+  if (prefer) {
+    return (
+      hits.find((h) => h.layer === prefer) ??
+      sameDir.find((h) => h.layer === prefer) ??
+      hits.find((h) => h.layer === "bottom") ??
+      hits[0] ??
+      sameDir.find((h) => h.layer === "bottom") ??
+      sameDir[0]
+    );
+  }
+  return (
     hits.find((h) => h.layer === "bottom") ??
     hits[0] ??
     sameDir.find((h) => h.layer === "bottom") ??
-    sameDir[0];
+    sameDir[0]
+  );
+}
+
+export function hooksForRebarBar(
+  project: SlabProject,
+  bar: RebarBarSeg,
+  zones?: RebarZone[],
+): { left: number; right: number } {
+  const z = zoneForRebarBar(project, bar, zones);
   if (!z) {
     const h = presetHookFallbackMm(project);
     return { left: h, right: h };
@@ -1861,17 +1883,7 @@ export function rebarBarIdentityKey(
       ? Math.round(bar.x1 - bar.x0)
       : Math.round(bar.y1 - bar.y0);
   const hooks = hooksForRebarBar(project, bar, list);
-  const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;
-  const my = bar.dir === "X" ? bar.y : (bar.y0 + bar.y1) / 2;
-  const hits = list.filter((z) => {
-    if (z.direction !== bar.dir) return false;
-    const zx0 = Math.min(z.x1, z.x2);
-    const zx1 = Math.max(z.x1, z.x2);
-    const zy0 = Math.min(z.y1, z.y2);
-    const zy1 = Math.max(z.y1, z.y2);
-    return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
-  });
-  const z = hits.find((h) => h.layer === "bottom") ?? hits[0];
+  const z = zoneForRebarBar(project, bar, list);
   const dia = z ? Math.round(Number(z.dia) || 0) : 0;
   return `${bar.dir}|L${len}|Ø${dia}|H${hooks.left}/${hooks.right}`;
 }
@@ -1934,6 +1946,75 @@ export function typicalRebarBars(
   zones?: RebarZone[],
 ): RebarBarSeg[] {
   return groupTypicalRebarBars(project, bars, zones).map((g) => g.typical);
+}
+
+/**
+ * Khoảng cách mặt bằng giữa lớp dưới và lớp trên (mm) =
+ * bề dày sàn − dày lớp bảo vệ.
+ */
+export function slabLayerPlanGapMm(project: SlabProject): number {
+  const thickness = Math.max(0, Math.round(Number(project.info?.thickness) || 0));
+  return Math.max(0, thickness - slabCoverMm(project));
+}
+
+/**
+ * Phương nằm dưới trước ở lớp dưới: phương nhịp ngắn
+ * (cạnh sàn nhỏ hơn — W≤H → X, ngược lại → Y).
+ */
+export function bottomUnderDir(project: SlabProject): "X" | "Y" {
+  const W = Math.max(0, Number(project.planWidth) || 0);
+  const H = Math.max(0, Number(project.planHeight) || 0);
+  return W <= H ? "X" : "Y";
+}
+
+function offsetBarPerp(bar: RebarBarSeg, deltaMm: number): RebarBarSeg {
+  if (bar.dir === "X") return { ...bar, y: bar.y + deltaMm };
+  return { ...bar, x: bar.x + deltaMm };
+}
+
+/**
+ * Cây điển hình theo lớp: khi cùng phương có cả lớp dưới + lớp trên
+ * → hiện 2 thanh (mỗi lớp 1), lệch ⊥ một khoảng = dày sàn − lớp BV.
+ * Lớp dưới: phương nhịp ngắn nằm dưới trước; lớp trên đảo ngược thứ tự vẽ.
+ * Không đủ 2 lớp cùng phương → giữ 1 cây như `typicalRebarBars`.
+ */
+export function typicalLayeredRebarBars(
+  project: SlabProject,
+  bars: RebarBarSeg[],
+  zones?: RebarZone[],
+): RebarBarSeg[] {
+  const list = zones ?? project.zones ?? [];
+  const base = typicalRebarBars(project, bars, list);
+  const gap = slabLayerPlanGapMm(project);
+  const underBot = bottomUnderDir(project);
+  const underTop: "X" | "Y" = underBot === "X" ? "Y" : "X";
+
+  const layerOf = (dir: "X" | "Y", layer: "bottom" | "top") =>
+    list.some((z) => z.direction === dir && z.layer === layer);
+
+  const out: RebarBarSeg[] = [];
+  for (const bar of base) {
+    const hasBot = layerOf(bar.dir, "bottom");
+    const hasTop = layerOf(bar.dir, "top");
+    if (hasBot && hasTop) {
+      // Căn quanh vị trí hình học: dưới −gap/2, trên +gap/2
+      const half = gap / 2;
+      out.push({ ...offsetBarPerp(bar, -half), layer: "bottom" });
+      out.push({ ...offsetBarPerp(bar, half), layer: "top" });
+    } else if (hasTop && !hasBot) {
+      out.push({ ...bar, layer: "top" });
+    } else {
+      out.push({ ...bar, layer: "bottom" });
+    }
+  }
+
+  const rank = (b: RebarBarSeg): number => {
+    const layer = b.layer === "top" ? 1 : 0;
+    const under = b.layer === "top" ? underTop : underBot;
+    const dirRank = b.dir === under ? 0 : 1;
+    return layer * 10 + dirRank;
+  };
+  return out.sort((a, b) => rank(a) - rank(b));
 }
 
 /** Đọc B / H / B1 từ info (kèm fallback chuỗi beamSize cũ). */

@@ -22,10 +22,11 @@ import {
   buildMergedDistRanges,
   hooksForRebarBar,
   rebarHookSegments,
-  typicalRebarBars,
+  typicalLayeredRebarBars,
   faceChainAlongX,
   faceChainAlongY,
   hookDrawMm,
+  slabLayerPlanGapMm,
 } from "@/lib/grid";
 import type { PlanSelection, SlabProject } from "@/lib/types";
 import { buildBeamFrameScene, projectSceneToSvg } from "@/lib/view3d";
@@ -860,8 +861,8 @@ export const SlabPreview = memo(function SlabPreview({
             {beamNodes}
             {(() => {
               const bars = stripRebarBarSegments(project, axesX, axesY);
-              /** Chỉ vẽ 1 cây điển hình / dải thanh giống nhau kề nhau. */
-              const drawBars = typicalRebarBars(project, bars, zones);
+              /** 2 lớp cùng phương → 2 cây điển hình/phương (lệch dày sàn − BV). */
+              const drawBars = typicalLayeredRebarBars(project, bars, zones);
               const stroke = "#ef4444";
               const pressMarks = stripRebarPressMarks(project, axesX, axesY);
               const tick = 70;
@@ -878,7 +879,7 @@ export const SlabPreview = memo(function SlabPreview({
                     );
                     if (bar.dir === "X") {
                       return (
-                        <g key={`rebar-x-${i}`} pointerEvents="none">
+                        <g key={`rebar-x-${bar.layer ?? "b"}-${i}`} pointerEvents="none">
                           <line
                             x1={X(bar.x0)}
                             y1={Y(bar.y)}
@@ -906,7 +907,7 @@ export const SlabPreview = memo(function SlabPreview({
                       );
                     }
                     return (
-                      <g key={`rebar-y-${i}`} pointerEvents="none">
+                      <g key={`rebar-y-${bar.layer ?? "b"}-${i}`} pointerEvents="none">
                         <line
                           x1={X(bar.x)}
                           y1={Y(bar.y0)}
@@ -1032,11 +1033,13 @@ export const SlabPreview = memo(function SlabPreview({
                         undefined,
                         zones,
                       );
-                      const typicalSet = new Set(
-                        drawBars.map((b) =>
-                          b.dir === "X" ? `X:${Math.round(b.y)}` : `Y:${Math.round(b.x)}`,
-                        ),
-                      );
+                      const typicalTol = slabLayerPlanGapMm(project) / 2 + 2;
+                      const nearTypical = (dir: "X" | "Y", pos: number) =>
+                        drawBars.some((b) => {
+                          if (b.dir !== dir) return false;
+                          const barPos = b.dir === "X" ? b.y : b.x;
+                          return Math.abs(barPos - pos) <= typicalTol;
+                        });
                       const ah = 7; // ×0.5
                       const aw = 3.5;
                       const capHalf = 5.5;
@@ -1090,9 +1093,7 @@ export const SlabPreview = memo(function SlabPreview({
                         const jd = jr * 0.72;
                         // Chỉ chấm tại cây điển hình (không chấm thanh đã ẩn)
                         const junctions = seg.junctions.filter((j) =>
-                          seg.dir === "X"
-                            ? typicalSet.has(`X:${Math.round(j.y)}`)
-                            : typicalSet.has(`Y:${Math.round(j.x)}`),
+                          seg.dir === "X" ? nearTypical("X", j.y) : nearTypical("Y", j.x),
                         );
                         return (
                           <g key={`dist-${si}`} pointerEvents="none">
