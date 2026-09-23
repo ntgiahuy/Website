@@ -177,7 +177,7 @@ export function SlabPreview({
   // Chừa chỗ: dầm nhô ngoài plan + vòng số hiệu + chuỗi dim (da dầm + tim trục)
   const DIM_GAP = 14;
   /** Khoảng hở mép vòng số hiệu → đường dim đầu (tránh đè số lên bubble). */
-  const DIM_AFTER_BUBBLE = 16;
+  const DIM_AFTER_BUBBLE = 22;
   const DIM_CHAINS = 2; // face + axis
   const dimBand = DIM_AFTER_BUBBLE + DIM_GAP * DIM_CHAINS + 10;
   const pad = Math.max(
