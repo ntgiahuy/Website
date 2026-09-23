@@ -1378,6 +1378,8 @@ export type MergedDistRange = DistRangeSeg & {
 type DistRangePiece = DistRangeSeg & {
   dir: "X" | "Y";
   markKey: string;
+  /** Khóa đồng nhất dài+Ø+móc — chỉ gộp khoảng rải khi trùng. */
+  identityKey: string;
   /** Chỉ số ô dọc theo phương khoảng rải (ix với thanh Y; iy với thanh X). */
   bayIndex: number;
   /** Hàng/cột vuông góc — chỉ gộp trong cùng strip. */
@@ -1449,8 +1451,9 @@ function bayIndexForBar(
 }
 
 /**
- * Gộp khoảng rải: ô sàn kề nhau liên tiếp cùng số hiệu → 1 đường
- * từ điểm đầu khoảng rải đầu tiên đến điểm cuối khoảng rải cuối.
+ * Gộp khoảng rải: ô sàn kề nhau liên tiếp cùng loại thép
+ * (cùng chiều dài + Ø + móc) → 1 đường từ đầu dải đến cuối dải.
+ * Khác dài / Ø / móc → không gộp (mỗi loại một khoảng rải riêng).
  */
 export function buildMergedDistRanges(
   project: SlabProject,
@@ -1459,7 +1462,9 @@ export function buildMergedDistRanges(
   bars: RebarBarSeg[],
   markKeyOf: (bar: RebarBarSeg) => string,
   insetMm: number = SLAB_DIST_RANGE_INSET_MM,
+  zones?: RebarZone[],
 ): MergedDistRange[] {
+  const list = zones ?? project.zones ?? [];
   const pieces: DistRangePiece[] = [];
   for (const bar of bars) {
     const seg = slabDistRangeForBar(project, axesX, axesY, bar, insetMm);
@@ -1468,6 +1473,7 @@ export function buildMergedDistRanges(
     if (!idx) continue;
     const markKey = markKeyOf(bar);
     if (!markKey) continue;
+    const identityKey = rebarBarIdentityKey(project, bar, list);
     const junction =
       bar.dir === "X"
         ? { x: (bar.x0 + bar.x1) / 2, y: bar.y }
@@ -1476,16 +1482,17 @@ export function buildMergedDistRanges(
       ...seg,
       dir: bar.dir,
       markKey,
+      identityKey,
       bayIndex: idx.bayIndex,
       stripKey: idx.stripKey,
       junction,
     });
   }
 
-  // Nhóm theo phương + số hiệu + strip (cùng hàng/cột)
+  // Nhóm theo phương + loại thép (dài/Ø/móc) + strip (cùng hàng/cột)
   const groups = new Map<string, DistRangePiece[]>();
   for (const p of pieces) {
-    const key = `${p.dir}|${p.markKey}|${p.stripKey}`;
+    const key = `${p.dir}|${p.identityKey}|${p.stripKey}`;
     const arr = groups.get(key) ?? [];
     arr.push(p);
     groups.set(key, arr);
@@ -1494,12 +1501,11 @@ export function buildMergedDistRanges(
   const out: MergedDistRange[] = [];
   for (const group of groups.values()) {
     group.sort((a, b) => a.bayIndex - b.bayIndex);
-    // Chạy liên tiếp theo bayIndex
+    // Chạy liên tiếp theo bayIndex (cùng identity đã nhóm sẵn)
     let run: DistRangePiece[] = [];
     const flush = () => {
       if (!run.length) return;
       const first = run[0];
-      const last = run[run.length - 1];
       let xA: number;
       let yA: number;
       let xB: number;

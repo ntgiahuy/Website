@@ -336,7 +336,15 @@ export function qtyEachFromDistRanges(
     if (mx < zx0 - 1 || mx > zx1 + 1 || my < zy0 - 1 || my > zy1 + 1) return "";
     return zoneKey;
   };
-  const merged = buildMergedDistRanges(project, axesX, axesY, segs, markKeyOf);
+  const merged = buildMergedDistRanges(
+    project,
+    axesX,
+    axesY,
+    segs,
+    markKeyOf,
+    undefined,
+    effectiveZones(project),
+  );
   const mine = merged.filter((m) => m.markKey === zoneKey);
   if (mine.length) {
     return Math.max(

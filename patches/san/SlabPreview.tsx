@@ -874,7 +874,15 @@ export function SlabPreview({
                         if (z) return `${z.mark}|${z.dia}|${z.spacing}|${z.direction}`;
                         return `${bar.dir}|10|150`;
                       };
-                      const merged = buildMergedDistRanges(project, axesX, axesY, bars, markKeyOf);
+                      const merged = buildMergedDistRanges(
+                        project,
+                        axesX,
+                        axesY,
+                        bars,
+                        markKeyOf,
+                        undefined,
+                        zones,
+                      );
                       const typicalSet = new Set(
                         drawBars.map((b) =>
                           b.dir === "X" ? `X:${Math.round(b.y)}` : `Y:${Math.round(b.x)}`,

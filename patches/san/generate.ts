@@ -937,7 +937,15 @@ function drawPlan(
       const spec = steelSpecForBar(zones, ctx.model.schedule, bar);
       return `${bar.dir}|${spec.dia}|${spec.spacing}`;
     };
-    const merged = buildMergedDistRanges(project, axesX, axesY, bars, markKeyOf);
+    const merged = buildMergedDistRanges(
+      project,
+      axesX,
+      axesY,
+      bars,
+      markKeyOf,
+      undefined,
+      rebarZones,
+    );
     const typicalSet = new Set(
       drawBars.map((b) => (b.dir === "X" ? `X:${Math.round(b.y)}` : `Y:${Math.round(b.x)}`)),
     );
