@@ -1984,7 +1984,12 @@ export function typicalLayeredRebarBars(
   zones?: RebarZone[],
 ): RebarBarSeg[] {
   const list = zones ?? project.zones ?? [];
-  const groups = groupTypicalRebarBars(project, bars, list);
+  /** Chỉ vẽ phương đã có vùng thép — thêm vùng → minh họa cập nhật ngay. */
+  if (!list.length) return [];
+
+  const groups = groupTypicalRebarBars(project, bars, list).filter((g) =>
+    list.some((z) => z.direction === g.typical.dir),
+  );
   const gap = slabLayerPlanGapMm(project);
   const underBot = bottomUnderDir(project);
   const underTop: "X" | "Y" = underBot === "X" ? "Y" : "X";
@@ -1997,6 +2002,8 @@ export function typicalLayeredRebarBars(
     const dir = g.typical.dir;
     const hasBot = layerOf(dir, "bottom");
     const hasTop = layerOf(dir, "top");
+    /** Có zone structural-only vẫn hiện 1 thanh điển hình. */
+    if (!hasBot && !hasTop && !list.some((z) => z.direction === dir)) continue;
     if (hasBot && hasTop) {
       if (g.bars.length >= 2) {
         const i0 = Math.floor((g.bars.length - 1) / 3);

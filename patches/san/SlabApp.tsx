@@ -270,11 +270,16 @@ export function SlabApp() {
   function persist(next: SlabProject) {
     // Dầm cắt qua ô phải có trục — tránh chọn ô sàn dính liền băng qua dầm
     // Tên dầm mặt bằng chỉ trong Danh sách dầm
-    // Đồng bộ tên vùng thép theo lớp (Lớp dưới / Lớp trên)
-    const withMarks: SlabProject = {
-      ...next,
-      zones: (next.zones ?? []).map((z) => ({ ...z, mark: rebarLayerMark(z.layer) })),
-    };
+    // Đồng bộ tên vùng thép theo lớp; mỗi (lớp, phương) chỉ giữ 1 vùng
+    const seen = new Set<string>();
+    const zones: RebarZone[] = [];
+    for (const z of next.zones ?? []) {
+      const key = `${z.layer}|${z.direction}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      zones.push({ ...z, mark: rebarLayerMark(z.layer) });
+    }
+    const withMarks: SlabProject = { ...next, zones };
     const normalized = clampPlanBeamNamesToCatalog(ensureBeamsSplitBays(withMarks));
     setProject(normalized);
     try {
@@ -1118,44 +1123,106 @@ export function SlabApp() {
     }
   }
 
-  function addZone() {
-    const layer = zoneForm.layer;
-    const z = { ...zoneForm, id: uid("zone"), mark: rebarLayerMark(layer), layer };
-    persist({
-      ...project,
-      layoutPreset: "manual",
-      info: { ...project.info, cover: z.cover },
-      zones: [...project.zones, z],
-    });
-    setSelectedZoneId(z.id);
-    setZoneForm(z);
-    setStatus(`Đã thêm ${z.mark}`);
+  function zonePlanBox(coverMm: number) {
+    const pad = Math.max(
+      ...(project.beams ?? []).map((b) => parseBeamSize(b.size).b / 2),
+      110,
+    );
+    const cover = Math.max(0, Math.round(Number(coverMm) || 0));
+    return {
+      x1: pad,
+      y1: pad,
+      x2: Math.max(pad + 1, project.planWidth - pad),
+      y2: Math.max(pad + 1, project.planHeight - pad),
+      cover,
+    };
   }
 
-  function editZone() {
-    if (!selectedZoneId) return;
-    const nextForm = {
+  /** Vùng đang dùng trên UI (manual hoặc preset). */
+  function listedZones(): RebarZone[] {
+    return project.layoutPreset === "manual" ? project.zones : zones;
+  }
+
+  function hasLayerDir(layer: RebarLayer, direction: RebarDir, exceptId?: string | null) {
+    return listedZones().some(
+      (z) => z.layer === layer && z.direction === direction && z.id !== exceptId,
+    );
+  }
+
+  function addZone() {
+    const layer = zoneForm.layer;
+    const direction = zoneForm.direction;
+    if (hasLayerDir(layer, direction)) {
+      setStatus(
+        `Đã có ${rebarLayerMark(layer)} phương ${direction}. Chỉ được Sửa hoặc Xóa rồi thêm lại.`,
+      );
+      return;
+    }
+    const base =
+      project.layoutPreset === "manual" && (project.zones?.length ?? 0) > 0
+        ? project.zones
+        : effectiveZones(project).map((z) => ({ ...z, id: z.id || uid("zone") }));
+    const box = zonePlanBox(zoneForm.cover);
+    const z: RebarZone = {
       ...zoneForm,
-      id: selectedZoneId,
-      mark: rebarLayerMark(zoneForm.layer),
+      ...box,
+      id: uid("zone"),
+      mark: rebarLayerMark(layer),
+      layer,
+      direction,
     };
     persist({
       ...project,
       layoutPreset: "manual",
+      info: { ...project.info, cover: z.cover },
+      zones: [...base.filter((b) => !(b.layer === layer && b.direction === direction)), z],
+    });
+    setSelectedZoneId(z.id);
+    setZoneForm(z);
+    setStatus(`Đã thêm ${z.mark} · ${direction} — đã cập nhật mặt bằng.`);
+  }
+
+  function editZone() {
+    if (!selectedZoneId) return;
+    if (hasLayerDir(zoneForm.layer, zoneForm.direction, selectedZoneId)) {
+      setStatus(
+        `Đã có ${rebarLayerMark(zoneForm.layer)} phương ${zoneForm.direction}. Chọn lớp/phương khác hoặc Xóa vùng trùng.`,
+      );
+      return;
+    }
+    const box = zonePlanBox(zoneForm.cover);
+    const nextForm: RebarZone = {
+      ...zoneForm,
+      ...box,
+      id: selectedZoneId,
+      mark: rebarLayerMark(zoneForm.layer),
+    };
+    const base =
+      project.layoutPreset === "manual" && (project.zones?.length ?? 0) > 0
+        ? project.zones
+        : effectiveZones(project).map((z) => ({ ...z, id: z.id || uid("zone") }));
+    persist({
+      ...project,
+      layoutPreset: "manual",
       info: { ...project.info, cover: nextForm.cover },
-      zones: project.zones.map((z) => (z.id === selectedZoneId ? nextForm : z)),
+      zones: base.map((z) => (z.id === selectedZoneId ? nextForm : z)),
     });
     setZoneForm(nextForm);
-    setStatus("Đã cập nhật vùng thép.");
+    setStatus("Đã cập nhật vùng thép — đã làm mới mặt bằng.");
   }
 
   function delZone() {
     if (!selectedZoneId) return;
-    const next = project.zones.filter((z) => z.id !== selectedZoneId);
+    const base =
+      project.layoutPreset === "manual" && (project.zones?.length ?? 0) > 0
+        ? project.zones
+        : effectiveZones(project).map((z) => ({ ...z, id: z.id || uid("zone") }));
+    const next = base.filter((z) => z.id !== selectedZoneId);
     persist({ ...project, layoutPreset: "manual", zones: next });
     setSelectedZoneId(next[0]?.id ?? null);
     if (next[0]) setZoneForm(next[0]);
-    setStatus("Đã xóa vùng thép.");
+    else setZoneForm(draftZone());
+    setStatus("Đã xóa vùng thép — đã cập nhật mặt bằng.");
   }
 
   function applySimple2() {
@@ -2237,7 +2304,17 @@ export function SlabApp() {
                   Hiện / Ẩn khoảng rải thép sàn
                 </label>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" onClick={addZone}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={addZone}
+                    disabled={hasLayerDir(zoneForm.layer, zoneForm.direction)}
+                    title={
+                      hasLayerDir(zoneForm.layer, zoneForm.direction)
+                        ? `Đã có ${rebarLayerMark(zoneForm.layer)} phương ${zoneForm.direction}`
+                        : "Thêm vùng thép mới"
+                    }
+                  >
                     <Plus /> Thêm vùng
                   </Button>
                   <Button size="sm" variant="secondary" onClick={editZone} disabled={!selectedZoneId}>
@@ -2247,6 +2324,12 @@ export function SlabApp() {
                     <Trash2 /> Xóa
                   </Button>
                 </div>
+                {hasLayerDir(zoneForm.layer, zoneForm.direction) && (
+                  <p className="mt-1.5 text-[11px] text-amber-400/90">
+                    Đã có {rebarLayerMark(zoneForm.layer)} phương {zoneForm.direction} — chỉ Sửa
+                    hoặc Xóa rồi thêm lại.
+                  </p>
+                )}
               </Panel>
               <Panel title="Danh sách vùng thép" className="min-w-0 w-full">
                 <ul className="max-h-48 space-y-1 overflow-auto text-xs">
