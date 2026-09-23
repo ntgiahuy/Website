@@ -1,4 +1,4 @@
-# Patch: Điển hình theo dải ô + thống kê Xa/Xb/Xc
+# Patch: Móc thép trong da dầm (lớp BV)
 
-- Mặt bằng: 1 thanh Y / nhịp trục X (1–2, 2–3…); 1 thanh X / nhịp trục Y
-- Thống kê: dải biến thiên → Aa/Ab/Ac (≤3 bậc, lớn→bé); dải đều → một số hiệu
+- Sau lệch ⊥ 2 lớp trên mặt bằng, neo lại đầu thanh = da ngoài ± Dày lớp bảo vệ tại đúng trạm
+- Tránh móc rơi ngoài dầm khi dầm biên lệch/xéo

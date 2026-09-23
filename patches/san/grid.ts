@@ -2181,6 +2181,42 @@ function offsetBarPerp(bar: RebarBarSeg, deltaMm: number): RebarBarSeg {
 }
 
 /**
+ * Đặt lại đầu thanh vào da ngoài ± lớp BV tại đúng trạm (sau khi lệch ⊥ 2 lớp).
+ * Dầm lệch/xéo: mặt ngoài đổi theo vị trí — lệch Y/X mà giữ nguyên đầu cũ → móc rơi ngoài dầm.
+ */
+export function reanchorBarEndsToCover(project: SlabProject, bar: RebarBarSeg): RebarBarSeg {
+  const cover = slabCoverMm(project);
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  if (axesX.length < 2 || axesY.length < 2) return bar;
+
+  if (bar.dir === "X") {
+    const left = beamOuterFacesAtAlong(project, "Y", axesX[0]!, bar.y);
+    const right = beamOuterFacesAtAlong(project, "Y", axesX[axesX.length - 1]!, bar.y);
+    const x0 = left.lo + cover;
+    const x1 = right.hi - cover;
+    if (!(x1 - x0 > 1)) return bar;
+    return { ...bar, x0, x1 };
+  }
+
+  const bottom = beamOuterFacesAtAlong(project, "X", axesY[0]!, bar.x);
+  const top = beamOuterFacesAtAlong(project, "X", axesY[axesY.length - 1]!, bar.x);
+  const y0 = bottom.lo + cover;
+  const y1 = top.hi - cover;
+  if (!(y1 - y0 > 1)) return bar;
+  return { ...bar, y0, y1 };
+}
+
+/** Lệch ⊥ minh họa 2 lớp + neo đầu thép lại theo lớp BV tại trạm mới. */
+function offsetBarPerpReanchored(
+  project: SlabProject,
+  bar: RebarBarSeg,
+  deltaMm: number,
+): RebarBarSeg {
+  return reanchorBarEndsToCover(project, offsetBarPerp(bar, deltaMm));
+}
+
+/**
  * Cắt thanh điển hình theo các vùng lớp trên (thép mũ):
  * mỗi vùng mũ → một đoạn ngắn từ tim dầm ± L/n, không chạy full nhịp.
  */
@@ -2251,14 +2287,16 @@ export function typicalLayeredRebarBars(
     if (!hasBot && !hasTop && !list.some((z) => z.direction === dir)) continue;
     if (hasBot && hasTop) {
       // Căn quanh cây giữa dải: dưới −half, trên +half (tách rõ 2 lớp)
+      // Neo lại đầu ± BV tại trạm mới — tránh móc rơi ngoài da dầm khi dầm xéo.
       const mid = g.typical;
-      out.push({ ...offsetBarPerp(mid, -half), layer: "bottom" });
-      const topBase = offsetBarPerp(mid, half);
+      out.push({ ...offsetBarPerpReanchored(project, mid, -half), layer: "bottom" });
+      const topBase = offsetBarPerpReanchored(project, mid, half);
+      // Thép mũ: clip theo vùng — không neo lại mép biên (đầu nằm trên dầm trong).
       out.push(...clipBarToTopZones(topBase, list));
     } else if (hasTop && !hasBot) {
       out.push(...clipBarToTopZones(g.typical, list));
     } else {
-      out.push({ ...g.typical, layer: "bottom" });
+      out.push({ ...reanchorBarEndsToCover(project, g.typical), layer: "bottom" });
     }
   }
 
