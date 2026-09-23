@@ -1,4 +1,4 @@
-# Patch: Dim kích thước mặt bằng minh họa
+# Patch: Thép sàn biến thiên khi dầm lệch/xéo
 
-Đã bổ sung chuỗi dim da dầm + lòng sàn và tim trục trên ảnh minh họa (SlabPreview), giống PDF/CAD.
-`faceChainAlongX/Y` xuất từ `grid.ts`; PDF dùng chung.
+Bố trí thép theo khoảng a; đầu/cuối clip da dầm tại đúng vị trí thanh.
+Dầm biên lệch → nhiều dạng chiều dài (lớn → bé) trên phương X và Y.

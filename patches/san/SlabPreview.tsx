@@ -277,86 +277,108 @@ export const SlabPreview = memo(function SlabPreview({
   if (show3d) {
     const scene = buildBeamFrameScene(project);
     const view = projectSceneToSvg(scene, { width: 920, height: 540, pad: 40 });
+    const zoom3d = Math.min(300, Math.max(50, zoomPct));
+    const scale3d = zoom3d / 100;
+    const canvasW3d = Math.max(1, Math.round(viewport.w * scale3d));
+    const canvasH3d = Math.max(1, Math.round(viewport.h * scale3d));
+    const atDefaultZoom3d = Math.abs(scale3d - 1) < 0.001;
+    const scrollW3d = atDefaultZoom3d ? undefined : Math.max(viewport.w, canvasW3d);
+    const scrollH3d = atDefaultZoom3d ? undefined : Math.max(viewport.h, canvasH3d);
     return (
-      <div className="flex h-full min-h-0 items-center justify-center bg-zinc-900 p-3">
-        <svg
-          viewBox={`0 0 ${view.width} ${view.height}`}
-          className="h-full w-full max-h-full rounded border border-zinc-700 bg-white"
-          role="img"
-          aria-label={view.title}
-        >
-          <defs>
-            <pattern id="lowHatch3d" patternUnits="userSpaceOnUse" width="6" height="6">
-              <circle cx="1.2" cy="1.2" r="0.7" fill="#9ca3af" />
-            </pattern>
-          </defs>
-          {view.polygons.map((poly, i) => (
-            <polygon
-              key={`f-${i}`}
-              points={poly.points}
-              fill={poly.kind === "hatch" ? "url(#lowHatch3d)" : "#ffffff"}
-              stroke="none"
-            />
-          ))}
-          {view.edges.map((e, i) => (
-            <line
-              key={`e-${i}`}
-              x1={e.x1}
-              y1={e.y1}
-              x2={e.x2}
-              y2={e.y2}
-              stroke={e.style === "solid" ? "#0a0a0a" : "#9ca3af"}
-              strokeWidth={e.style === "solid" ? 1.45 : 0.55}
-              strokeDasharray={e.style === "dashed" ? "3.5 2.2" : undefined}
-              strokeLinecap="round"
-            />
-          ))}
-          {view.lines.map((ln, i) => (
-            <line
-              key={`x-${i}`}
-              x1={ln.x1}
-              y1={ln.y1}
-              x2={ln.x2}
-              y2={ln.y2}
-              stroke="#6b7280"
-              strokeWidth={1}
-              strokeDasharray="6 4"
-            />
-          ))}
-          {view.marks.map((m, i) => (
-            <g key={`m-${i}`} transform={`translate(${m.x}, ${m.y})`}>
-              <polygon points="-7,0 7,0 0,-10" fill="#111" />
-              <line x1={0} y1={0} x2={0} y2={14} stroke="#111" strokeWidth={1} />
-              <text x={10} y={-2} fill="#111" fontSize="11" fontWeight="700" fontFamily="sans-serif">
-                {m.elevText}
-              </text>
-              <text x={10} y={12} fill="#374151" fontSize="10" fontFamily="sans-serif">
-                {m.hsText}
-              </text>
-            </g>
-          ))}
-          <text
-            x={view.width / 2}
-            y={view.height - 22}
-            textAnchor="middle"
-            fill="#111"
-            fontSize="13"
-            fontWeight="700"
-            fontFamily="sans-serif"
+      <div className="flex h-full min-h-0 flex-col bg-zinc-950">
+        <div ref={wrapRef} className="relative min-h-0 flex-1 overflow-auto">
+          <div
+            className="box-border flex items-center justify-center bg-zinc-900 p-2 sm:p-3"
+            style={{
+              width: scrollW3d ?? "100%",
+              height: scrollH3d ?? "100%",
+              minWidth: "100%",
+              minHeight: "100%",
+            }}
           >
-            {view.title}
-          </text>
-          <text
-            x={view.width / 2}
-            y={view.height - 8}
-            textAnchor="middle"
-            fill="#4b5563"
-            fontSize="11"
-            fontFamily="sans-serif"
-          >
-            {view.subtitle}
-          </text>
-        </svg>
+            <svg
+              viewBox={`0 0 ${view.width} ${view.height}`}
+              width={atDefaultZoom3d || !viewport.w ? "100%" : canvasW3d}
+              height={atDefaultZoom3d || !viewport.h ? "100%" : canvasH3d}
+              className="block shrink-0 rounded border border-zinc-700 bg-white"
+              preserveAspectRatio="xMidYMid meet"
+              role="img"
+              aria-label={view.title}
+            >
+              <defs>
+                <pattern id="lowHatch3d" patternUnits="userSpaceOnUse" width="6" height="6">
+                  <circle cx="1.2" cy="1.2" r="0.7" fill="#9ca3af" />
+                </pattern>
+              </defs>
+              {view.polygons.map((poly, i) => (
+                <polygon
+                  key={`f-${i}`}
+                  points={poly.points}
+                  fill={poly.kind === "hatch" ? "url(#lowHatch3d)" : "#ffffff"}
+                  stroke="none"
+                />
+              ))}
+              {view.edges.map((e, i) => (
+                <line
+                  key={`e-${i}`}
+                  x1={e.x1}
+                  y1={e.y1}
+                  x2={e.x2}
+                  y2={e.y2}
+                  stroke={e.style === "solid" ? "#0a0a0a" : "#9ca3af"}
+                  strokeWidth={e.style === "solid" ? 1.45 : 0.55}
+                  strokeDasharray={e.style === "dashed" ? "3.5 2.2" : undefined}
+                  strokeLinecap="round"
+                />
+              ))}
+              {view.lines.map((ln, i) => (
+                <line
+                  key={`x-${i}`}
+                  x1={ln.x1}
+                  y1={ln.y1}
+                  x2={ln.x2}
+                  y2={ln.y2}
+                  stroke="#0a0a0a"
+                  strokeWidth={1.35}
+                  strokeLinecap="round"
+                />
+              ))}
+              {view.marks.map((m, i) => (
+                <g key={`m-${i}`} transform={`translate(${m.x}, ${m.y})`}>
+                  <polygon points="-7,0 7,0 0,-10" fill="#111" />
+                  <line x1={0} y1={0} x2={0} y2={14} stroke="#111" strokeWidth={1} />
+                  <text x={10} y={-2} fill="#111" fontSize="11" fontWeight="700" fontFamily="sans-serif">
+                    {m.elevText}
+                  </text>
+                  <text x={10} y={12} fill="#374151" fontSize="10" fontFamily="sans-serif">
+                    {m.hsText}
+                  </text>
+                </g>
+              ))}
+              <text
+                x={view.width / 2}
+                y={view.height - 22}
+                textAnchor="middle"
+                fill="#111"
+                fontSize="13"
+                fontWeight="700"
+                fontFamily="sans-serif"
+              >
+                {view.title}
+              </text>
+              <text
+                x={view.width / 2}
+                y={view.height - 8}
+                textAnchor="middle"
+                fill="#4b5563"
+                fontSize="11"
+                fontFamily="sans-serif"
+              >
+                {view.subtitle}
+              </text>
+            </svg>
+          </div>
+        </div>
       </div>
     );
   }

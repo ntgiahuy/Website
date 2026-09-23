@@ -1436,10 +1436,14 @@ export function SlabApp() {
             {t.label}
           </button>
         ))}
-        {/* Zoom bản vẽ — sau «Thông tin xuất» */}
+        {/* Zoom bản vẽ / phối cảnh 3D — sau «Thông tin xuất» */}
         <div
           className="ml-1 flex shrink-0 items-center gap-1 border-l border-zinc-600 pl-2"
-          title="Thu nhỏ / phóng to bản vẽ"
+          title={
+            tab === "model3d"
+              ? "Thu nhỏ / phóng to phối cảnh 3D"
+              : "Thu nhỏ / phóng to bản vẽ"
+          }
         >
           <button
             type="button"
@@ -2599,7 +2603,10 @@ export function SlabApp() {
           {tab === "model3d" && (
             <Panel title="Mô hình 3D" className="max-w-xl">
               <p className="mb-2 text-[11px] text-zinc-400">
-                Phối cảnh isometric: cạnh nhìn thấy nét liền; cạnh che khuất (dưới sàn) nét đứt mảnh; đoạn line xuyên chỗ dầm chồng nhau được xoá.
+                Phối cảnh sàn: <b className="text-zinc-200">đà biên nét liền</b>;
+                dầm trong <b className="text-zinc-200">nét đứt</b>;
+                <b className="text-zinc-200"> cột tại giao dầm / 4 góc nét liền</b>; ô thủng khung + chéo.
+                Dùng <b className="text-zinc-200">− / % / +</b> để thu nhỏ·phóng to (50–300%).
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button

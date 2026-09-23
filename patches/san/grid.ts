@@ -814,6 +814,8 @@ export function expandCutsByCover(
 /**
  * Thép liên tục từ dầm biên đầu → dầm biên cuối:
  * điểm đầu/cuối = da dầm ngoài ± lớp bảo vệ (cover), theo đúng vị trí dầm lệch/xéo tại tim thanh.
+ * Bố trí theo khoảng a trên toàn dải — mỗi thanh clip theo da dầm tại đúng vị trí
+ * (biến thiên chiều dài khi dầm biên lệch/xéo).
  * Cắt tại ô thủng / sàn thấp chế độ cắt: mép = mí da ± cover.
  * Sàn thấp nhấn: thép chạy xuyên ô như sàn thường (nhấn tại dầm quanh ô).
  * Không bố trí thép trên dầm độc lập (cả hai bên đều không có thép liên tục).
@@ -832,80 +834,145 @@ export function stripRebarBarSegments(
   const axLast = axesX[axesX.length - 1];
   const ayFirst = axesY[0];
   const ayLast = axesY[axesY.length - 1];
+  const spaceX = stripRebarSpacingMm(project, "X");
+  const spaceY = stripRebarSpacingMm(project, "Y");
 
-  // Thanh ngang (phương X): mỗi hàng ô — đầu/cuối móc theo da dầm biên tại Y = tim thanh
-  for (let iy = 0; iy < axesY.length - 1; iy++) {
+  // —— Thanh ngang (X): trạm theo Y trên toàn lòng sàn (da trong ± inset) ——
+  {
     let yLo = Infinity;
     let yHi = -Infinity;
-    for (let ix = 0; ix < axesX.length - 1; ix++) {
-      const slab = baySlabExtent(project, axesX, axesY, ix, iy);
-      yLo = Math.min(yLo, slab.y0);
-      yHi = Math.max(yHi, slab.y1);
+    for (let iy = 0; iy < axesY.length - 1; iy++) {
+      for (let ix = 0; ix < axesX.length - 1; ix++) {
+        const slab = baySlabExtent(project, axesX, axesY, ix, iy);
+        yLo = Math.min(yLo, slab.y0);
+        yHi = Math.max(yHi, slab.y1);
+      }
     }
-    if (!(yHi > yLo)) continue;
-    const my = (yLo + yHi) / 2;
-    const leftOuter = beamOuterFacesAtAlong(project, "Y", axFirst, my).lo;
-    const rightOuter = beamOuterFacesAtAlong(project, "Y", axLast, my).hi;
-    const xBarLo = leftOuter + cover;
-    const xBarHi = rightOuter - cover;
-    if (!(xBarHi - xBarLo > 1)) continue;
-    const bandLo = yLo + 1;
-    const bandHi = yHi - 1;
-    const obstacleCuts = expandCutsByCover(
-      cuts
-        .filter((r) => Math.min(r.y1, r.y0) < bandHi && Math.max(r.y1, r.y0) > bandLo)
-        .map((r) => ({ lo: Math.min(r.x0, r.x1), hi: Math.max(r.x0, r.x1) })),
-      cover,
-    );
-    // Chỉ cắt hết thân dầm khi cả hai bên đều không có sàn thường
-    const indep = independentBeamGaps(project, axesX, axesY, "X", iy);
-    const normals = normalBaySpansAlongStrip(project, axesX, axesY, "X", iy);
-    const segs = keepSegmentsTouchingNormalBays(
-      dropSegmentsInsideGaps(subtract1D(xBarLo, xBarHi, [...obstacleCuts, ...indep]), indep),
-      normals,
-    );
-    for (const s of segs) {
-      out.push({ dir: "X", x0: s.lo, x1: s.hi, y: my });
+    if (yHi > yLo) {
+      const bandLo = yLo + SLAB_DIST_RANGE_INSET_MM;
+      const bandHi = yHi - SLAB_DIST_RANGE_INSET_MM;
+      for (const my of rebarStationsAlong(bandLo, bandHi, spaceX)) {
+        const leftOuter = beamOuterFacesAtAlong(project, "Y", axFirst, my).lo;
+        const rightOuter = beamOuterFacesAtAlong(project, "Y", axLast, my).hi;
+        const xBarLo = leftOuter + cover;
+        const xBarHi = rightOuter - cover;
+        if (!(xBarHi - xBarLo > 1)) continue;
+        const obstacleCuts = expandCutsByCover(
+          cuts
+            .filter((r) => Math.min(r.y1, r.y0) < my + 1 && Math.max(r.y1, r.y0) > my - 1)
+            .map((r) => ({ lo: Math.min(r.x0, r.x1), hi: Math.max(r.x0, r.x1) })),
+          cover,
+        );
+        // Cắt thân dầm độc lập theo hàng ô chứa my
+        let iyHit = -1;
+        for (let iy = 0; iy < axesY.length - 1; iy++) {
+          const s = baySlabExtent(project, axesX, axesY, 0, iy);
+          if (my >= s.y0 - 1 && my <= s.y1 + 1) {
+            iyHit = iy;
+            break;
+          }
+        }
+        const indep =
+          iyHit >= 0 ? independentBeamGaps(project, axesX, axesY, "X", iyHit) : [];
+        const normals =
+          iyHit >= 0 ? normalBaySpansAlongStrip(project, axesX, axesY, "X", iyHit) : [];
+        const segs = keepSegmentsTouchingNormalBays(
+          dropSegmentsInsideGaps(subtract1D(xBarLo, xBarHi, [...obstacleCuts, ...indep]), indep),
+          normals.length ? normals : [{ lo: xBarLo, hi: xBarHi }],
+        );
+        for (const s of segs) {
+          out.push({ dir: "X", x0: s.lo, x1: s.hi, y: my });
+        }
+      }
     }
   }
 
-  // Thanh đứng (phương Y): mỗi cột ô — đầu/cuối móc theo da dầm biên tại X = tim thanh
-  for (let ix = 0; ix < axesX.length - 1; ix++) {
+  // —— Thanh đứng (Y): trạm theo X trên toàn lòng sàn ——
+  {
     let xLo = Infinity;
     let xHi = -Infinity;
     for (let iy = 0; iy < axesY.length - 1; iy++) {
-      const slab = baySlabExtent(project, axesX, axesY, ix, iy);
-      xLo = Math.min(xLo, slab.x0);
-      xHi = Math.max(xHi, slab.x1);
+      for (let ix = 0; ix < axesX.length - 1; ix++) {
+        const slab = baySlabExtent(project, axesX, axesY, ix, iy);
+        xLo = Math.min(xLo, slab.x0);
+        xHi = Math.max(xHi, slab.x1);
+      }
     }
-    if (!(xHi > xLo)) continue;
-    const mx = (xLo + xHi) / 2;
-    const bottomOuter = beamOuterFacesAtAlong(project, "X", ayFirst, mx).lo;
-    const topOuter = beamOuterFacesAtAlong(project, "X", ayLast, mx).hi;
-    const yBarLo = bottomOuter + cover;
-    const yBarHi = topOuter - cover;
-    if (!(yBarHi - yBarLo > 1)) continue;
-    const bandLo = xLo + 1;
-    const bandHi = xHi - 1;
-    const obstacleCuts = expandCutsByCover(
-      cuts
-        .filter((r) => Math.min(r.x1, r.x0) < bandHi && Math.max(r.x1, r.x0) > bandLo)
-        .map((r) => ({ lo: Math.min(r.y0, r.y1), hi: Math.max(r.y0, r.y1) })),
-      cover,
-    );
-    const indep = independentBeamGaps(project, axesX, axesY, "Y", ix);
-    const normals = normalBaySpansAlongStrip(project, axesX, axesY, "Y", ix);
-    const segs = keepSegmentsTouchingNormalBays(
-      dropSegmentsInsideGaps(subtract1D(yBarLo, yBarHi, [...obstacleCuts, ...indep]), indep),
-      normals,
-    );
-    for (const s of segs) {
-      out.push({ dir: "Y", y0: s.lo, y1: s.hi, x: mx });
+    if (xHi > xLo) {
+      const bandLo = xLo + SLAB_DIST_RANGE_INSET_MM;
+      const bandHi = xHi - SLAB_DIST_RANGE_INSET_MM;
+      for (const mx of rebarStationsAlong(bandLo, bandHi, spaceY)) {
+        const bottomOuter = beamOuterFacesAtAlong(project, "X", ayFirst, mx).lo;
+        const topOuter = beamOuterFacesAtAlong(project, "X", ayLast, mx).hi;
+        const yBarLo = bottomOuter + cover;
+        const yBarHi = topOuter - cover;
+        if (!(yBarHi - yBarLo > 1)) continue;
+        const obstacleCuts = expandCutsByCover(
+          cuts
+            .filter((r) => Math.min(r.x1, r.x0) < mx + 1 && Math.max(r.x1, r.x0) > mx - 1)
+            .map((r) => ({ lo: Math.min(r.y0, r.y1), hi: Math.max(r.y0, r.y1) })),
+          cover,
+        );
+        let ixHit = -1;
+        for (let ix = 0; ix < axesX.length - 1; ix++) {
+          const s = baySlabExtent(project, axesX, axesY, ix, 0);
+          if (mx >= s.x0 - 1 && mx <= s.x1 + 1) {
+            ixHit = ix;
+            break;
+          }
+        }
+        const indep =
+          ixHit >= 0 ? independentBeamGaps(project, axesX, axesY, "Y", ixHit) : [];
+        const normals =
+          ixHit >= 0 ? normalBaySpansAlongStrip(project, axesX, axesY, "Y", ixHit) : [];
+        const segs = keepSegmentsTouchingNormalBays(
+          dropSegmentsInsideGaps(subtract1D(yBarLo, yBarHi, [...obstacleCuts, ...indep]), indep),
+          normals.length ? normals : [{ lo: yBarLo, hi: yBarHi }],
+        );
+        for (const s of segs) {
+          out.push({ dir: "Y", y0: s.lo, y1: s.hi, x: mx });
+        }
+      }
     }
   }
 
   // Sàn thấp chế độ cắt: bố trí thép riêng trong ô + lên thân dầm quanh ô (tách với sàn thường)
   out.push(...cutLowSlabRebarSegments(project, axesX, axesY));
+  return out;
+}
+
+/** Khoảng a bố trí thép theo phương (từ zone / preset). */
+export function stripRebarSpacingMm(project: SlabProject, dir: "X" | "Y"): number {
+  for (const z of project.zones ?? []) {
+    if (z.direction === dir && Number(z.spacing) >= 50) return Math.round(Number(z.spacing));
+  }
+  const parseSpec = (spec?: string): number | null => {
+    const s = (spec ?? "").trim().toLowerCase().replace(/ø/g, "").replace(/\s+/g, "");
+    const m = s.match(/^(\d{1,2})[a\/x×-](\d{2,4})$/i);
+    if (!m) return null;
+    const sp = Number(m[2]);
+    return Number.isFinite(sp) && sp >= 50 ? sp : null;
+  };
+  if (project.layoutPreset === "simple2") {
+    return parseSpec(project.simple2?.bottomSpec) ?? 150;
+  }
+  if (project.layoutPreset === "economy2") {
+    return parseSpec(project.economy2?.bottomSpec) ?? 200;
+  }
+  return 150;
+}
+
+/**
+ * Các vị trí đặt thanh trong [lo, hi] theo khoảng a (tâm khe đều ≈ round(L/a) thanh).
+ */
+export function rebarStationsAlong(lo: number, hi: number, spacing: number): number[] {
+  const a = Math.max(50, Math.round(spacing) || 150);
+  const span = hi - lo;
+  if (!(span > 1)) return [];
+  const n = Math.max(1, Math.round(span / a));
+  const step = span / n;
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) out.push(lo + (i + 0.5) * step);
   return out;
 }
 
@@ -1913,17 +1980,27 @@ export function rebarHookSegments(
   return out;
 }
 
-/** Khóa đồng nhất: chiều dài + Ø + móc trái/phải (+ phương). */
+/** Khóa đồng nhất: chiều dài (làm tròn 100mm — nhóm biến thiên) + Ø + móc (+ phương). */
+/** Làm tròn chiều dài để gộp dạng thép biến thiên (~3 bậc trên nhịp lệch vừa). */
+export const REBAR_LEN_BUCKET_MM = 400;
+
+export function rebarBarStraightLenMm(bar: RebarBarSeg): number {
+  return bar.dir === "X" ? Math.round(bar.x1 - bar.x0) : Math.round(bar.y1 - bar.y0);
+}
+
+/** Làm tròn chiều dài để gộp dạng thép biến thiên (lớn → bé). */
+export function rebarLenBucketMm(lenMm: number, bucket = REBAR_LEN_BUCKET_MM): number {
+  const b = Math.max(50, Math.round(bucket) || 100);
+  return Math.max(b, Math.round(lenMm / b) * b);
+}
+
 export function rebarBarIdentityKey(
   project: SlabProject,
   bar: RebarBarSeg,
   zones?: RebarZone[],
 ): string {
   const list = zones ?? project.zones ?? [];
-  const len =
-    bar.dir === "X"
-      ? Math.round(bar.x1 - bar.x0)
-      : Math.round(bar.y1 - bar.y0);
+  const len = rebarLenBucketMm(rebarBarStraightLenMm(bar));
   const hooks = hooksForRebarBar(project, bar, list);
   const z = zoneForRebarBar(project, bar, list);
   const dia = z ? Math.round(Number(z.dia) || 0) : 0;

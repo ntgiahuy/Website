@@ -7,6 +7,9 @@ import type {
 import { rebarLayerMark } from "./types";
 import {
   ensureAxes,
+  groupTypicalRebarBars,
+  hooksForRebarBar,
+  rebarBarStraightLenMm,
   slabDistRangeForBar,
   buildMergedDistRanges,
   sortAxes,
@@ -414,29 +417,88 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
       ? stripRebarBarSegments(project, axesX, axesY)
       : [];
   const schedule: ScheduleRow[] = [];
+  const qtyMembers = Math.max(1, project.info.quantity);
+
   for (const z of zones) {
-    const row = scheduleFromZone(z, project.info.quantity);
-    if (!row) continue;
-    // Thép mũ (economy2 top): SL theo bề rộng vùng / a — không dùng khoảng rải
-    // của thanh full-nhịp (tâm thanh không nằm trong từng dải mũ biên).
-    const qtyEach =
-      project.layoutPreset === "economy2" && z.layer === "top"
-        ? barsFromDistLength(zoneSpanMm(z).width, z.spacing)
-        : qtyEachFromDistRanges(project, z, bars);
-    const qtyMembers = Math.max(1, project.info.quantity);
-    const qtyTotal = qtyEach * qtyMembers;
-    const totalM = (row.barLength * qtyTotal) / 1000;
-    schedule.push({
-      ...row,
-      qtyEach,
-      qtyMembers,
-      qtyTotal,
-      totalM,
-      weight: totalM * weightPerMeter(row.dia),
+    // Thép mũ (economy2 top): vẫn theo vùng chữ nhật L/n — không dùng dải full-nhịp.
+    if (project.layoutPreset === "economy2" && z.layer === "top") {
+      const row = scheduleFromZone(z, project.info.quantity);
+      if (!row) continue;
+      const qtyEach = barsFromDistLength(zoneSpanMm(z).width, z.spacing);
+      const qtyTotal = qtyEach * qtyMembers;
+      const totalM = (row.barLength * qtyTotal) / 1000;
+      schedule.push({
+        ...row,
+        qtyEach,
+        qtyMembers,
+        qtyTotal,
+        totalM,
+        weight: totalM * weightPerMeter(row.dia),
+      });
+      continue;
+    }
+
+    const zx0 = Math.min(z.x1, z.x2);
+    const zx1 = Math.max(z.x1, z.x2);
+    const zy0 = Math.min(z.y1, z.y2);
+    const zy1 = Math.max(z.y1, z.y2);
+    const zoneBars = bars.filter((bar) => {
+      if (bar.dir !== z.direction) return false;
+      const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;
+      const my = bar.dir === "X" ? bar.y : (bar.y0 + bar.y1) / 2;
+      return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
     });
+
+    if (!zoneBars.length) {
+      const row = scheduleFromZone(z, project.info.quantity);
+      if (!row) continue;
+      const qtyEach = qtyEachFromDistRanges(project, z, bars);
+      const qtyTotal = qtyEach * qtyMembers;
+      const totalM = (row.barLength * qtyTotal) / 1000;
+      schedule.push({
+        ...row,
+        qtyEach,
+        qtyMembers,
+        qtyTotal,
+        totalM,
+        weight: totalM * weightPerMeter(row.dia),
+      });
+      continue;
+    }
+
+    // Mỗi nhóm chiều dài (biến thiên) → 1 dòng thống kê; SL = số thanh trong nhóm.
+    const groups = groupTypicalRebarBars(project, zoneBars, zones);
+    for (const g of groups) {
+      if (g.typical.dir !== z.direction) continue;
+      const lengths = g.bars.map(rebarBarStraightLenMm).sort((a, b) => a - b);
+      const straight = lengths[Math.floor((lengths.length - 1) / 2)] ?? rebarBarStraightLenMm(g.typical);
+      const hooks = hooksForRebarBar(project, g.typical, zones);
+      const barLength = barDevelopedLength(straight, hooks.left, hooks.right);
+      const qtyEach = Math.max(1, g.bars.length);
+      const qtyTotal = qtyEach * qtyMembers;
+      const totalM = (barLength * qtyTotal) / 1000;
+      const hooked = hooks.left > 0 || hooks.right > 0;
+      schedule.push({
+        mark: z.mark,
+        layer: z.layer,
+        direction: z.direction,
+        dia: z.dia,
+        spacing: z.spacing,
+        barLength,
+        leftHook: hooks.left,
+        rightHook: hooks.right,
+        qtyEach,
+        qtyMembers,
+        qtyTotal,
+        totalM,
+        weight: totalM * weightPerMeter(z.dia),
+        shape: hooked ? "hooked" : "straight",
+        note: z.note ?? `${z.layer} ${z.direction}`,
+      });
+    }
   }
   const merged = mergeScheduleRows(schedule);
-  merged.sort((a, b) => a.mark.localeCompare(b.mark, "vi"));
+  merged.sort((a, b) => a.mark.localeCompare(b.mark, "vi") || a.barLength - b.barLength);
 
   const byDiaMap = new Map<number, DiaSummary>();
   for (const r of merged) {
