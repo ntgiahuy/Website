@@ -215,8 +215,8 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
   const sh = project.economy2.structuralHook;
   const shortIsX = W <= H;
   const hatDir: RebarDir = project.economy2.hatAlongShort ? (shortIsX ? "X" : "Y") : shortIsX ? "Y" : "X";
-  const mid = shortIsX ? W / 2 : H / 2;
-  const hatHalf = Math.max(W, H) / project.economy2.distToCenter;
+  /** KC đến tim 1/n — từ tim dầm ra mỗi phía L/n (L = nhịp tim−tim). */
+  const n = Math.max(1, Math.round(Number(project.economy2.distToCenter) || 4));
 
   const zones: RebarZone[] = [
     {
@@ -263,44 +263,64 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
     },
   ];
 
-  if (hatDir === "X") {
-    zones.push({
-      id: "preset-economy2-hat",
-      mark: rebarLayerMark("top"),
-      layer: "top",
-      direction: "X",
-      dia: top.dia,
-      spacing: top.spacing,
-      leftHook: th,
-      rightHook: th,
-      x1: box.x1,
-      y1: box.y1,
-      x2: Math.min(box.x2, mid + hatHalf),
-      y2: box.y2,
-      cover: box.cover,
-      showSpacing: true,
-      spacingSymbol: "a",
-      note: "Thép mũ cạnh ngắn",
-    });
-  } else {
-    zones.push({
-      id: "preset-economy2-hat",
-      mark: rebarLayerMark("top"),
-      layer: "top",
-      direction: "Y",
-      dia: top.dia,
-      spacing: top.spacing,
-      leftHook: th,
-      rightHook: th,
-      x1: box.x1,
-      y1: box.y1,
-      x2: box.x2,
-      y2: Math.min(box.y2, mid + hatHalf),
-      cover: box.cover,
-      showSpacing: true,
-      spacingSymbol: "a",
-      note: "Thép mũ cạnh ngắn",
-    });
+  // Thép mũ: không trải full nhịp như lớp dưới — mỗi tim dầm (trục đỡ)
+  // kéo dài L_trái/n + L_phải/n theo phương thanh.
+  const supportAxes =
+    hatDir === "X" ? sortAxes(project.axesX ?? []) : sortAxes(project.axesY ?? []);
+  for (let i = 0; i < supportAxes.length; i++) {
+    const ax = supportAxes[i]!;
+    const prev = supportAxes[i - 1];
+    const next = supportAxes[i + 1];
+    const leftExt = prev ? (ax.pos - prev.pos) / n : 0;
+    const rightExt = next ? (next.pos - ax.pos) / n : 0;
+    if (leftExt + rightExt < 50) continue;
+
+    if (hatDir === "X") {
+      const x1 = Math.max(box.x1, ax.pos - leftExt);
+      const x2 = Math.min(box.x2, ax.pos + rightExt);
+      if (x2 - x1 < 50) continue;
+      zones.push({
+        id: `preset-economy2-hat-${i}`,
+        mark: rebarLayerMark("top"),
+        layer: "top",
+        direction: "X",
+        dia: top.dia,
+        spacing: top.spacing,
+        leftHook: th,
+        rightHook: th,
+        x1,
+        y1: box.y1,
+        x2,
+        y2: box.y2,
+        // Chiều dài mũ = đúng từ tim ± L/n (không trừ cover thêm).
+        cover: 0,
+        showSpacing: true,
+        spacingSymbol: "a",
+        note: "Thép mũ",
+      });
+    } else {
+      const y1 = Math.max(box.y1, ax.pos - leftExt);
+      const y2 = Math.min(box.y2, ax.pos + rightExt);
+      if (y2 - y1 < 50) continue;
+      zones.push({
+        id: `preset-economy2-hat-${i}`,
+        mark: rebarLayerMark("top"),
+        layer: "top",
+        direction: "Y",
+        dia: top.dia,
+        spacing: top.spacing,
+        leftHook: th,
+        rightHook: th,
+        x1: box.x1,
+        y1,
+        x2: box.x2,
+        y2,
+        cover: 0,
+        showSpacing: true,
+        spacingSymbol: "a",
+        note: "Thép mũ",
+      });
+    }
   }
   return zones;
 }
@@ -357,6 +377,34 @@ export function qtyEachFromDistRanges(
   return barsFromDistLength(width, zone.spacing);
 }
 
+/** Gộp dòng thống kê trùng số hiệu + Ø + a + L + móc (nhiều vùng mũ cùng loại). */
+function mergeScheduleRows(rows: ScheduleRow[]): ScheduleRow[] {
+  const map = new Map<string, ScheduleRow>();
+  for (const r of rows) {
+    const k = [
+      r.mark,
+      r.layer,
+      r.direction,
+      r.dia,
+      r.spacing,
+      r.barLength,
+      r.leftHook,
+      r.rightHook,
+      r.shape,
+    ].join("|");
+    const cur = map.get(k);
+    if (!cur) {
+      map.set(k, { ...r });
+      continue;
+    }
+    cur.qtyEach += r.qtyEach;
+    cur.qtyTotal += r.qtyTotal;
+    cur.totalM += r.totalM;
+    cur.weight += r.weight;
+  }
+  return [...map.values()];
+}
+
 export function computeModel(project: SlabProject): ComputedSlabModel {
   const zones = effectiveZones(project);
   const axesX = sortAxes(project.axesX ?? []);
@@ -369,8 +417,12 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
   for (const z of zones) {
     const row = scheduleFromZone(z, project.info.quantity);
     if (!row) continue;
-    // 1 CK = Σ (L khoảng rải / a) theo thanh mặt bằng
-    const qtyEach = qtyEachFromDistRanges(project, z, bars);
+    // Thép mũ (economy2 top): SL theo bề rộng vùng / a — không dùng khoảng rải
+    // của thanh full-nhịp (tâm thanh không nằm trong từng dải mũ biên).
+    const qtyEach =
+      project.layoutPreset === "economy2" && z.layer === "top"
+        ? barsFromDistLength(zoneSpanMm(z).width, z.spacing)
+        : qtyEachFromDistRanges(project, z, bars);
     const qtyMembers = Math.max(1, project.info.quantity);
     const qtyTotal = qtyEach * qtyMembers;
     const totalM = (row.barLength * qtyTotal) / 1000;
@@ -383,10 +435,11 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
       weight: totalM * weightPerMeter(row.dia),
     });
   }
-  schedule.sort((a, b) => a.mark.localeCompare(b.mark, "vi"));
+  const merged = mergeScheduleRows(schedule);
+  merged.sort((a, b) => a.mark.localeCompare(b.mark, "vi"));
 
   const byDiaMap = new Map<number, DiaSummary>();
-  for (const r of schedule) {
+  for (const r of merged) {
     const cur = byDiaMap.get(r.dia) ?? { dia: r.dia, lengthM: 0, weight: 0 };
     cur.lengthM += r.totalM;
     cur.weight += r.weight;
@@ -396,7 +449,7 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
   const totalWeight = byDia.reduce((s, d) => s + d.weight, 0);
 
   return {
-    schedule,
+    schedule: merged,
     byDia,
     totalWeight,
     planWidth: project.planWidth,

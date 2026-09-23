@@ -2028,9 +2028,41 @@ function offsetBarPerp(bar: RebarBarSeg, deltaMm: number): RebarBarSeg {
 }
 
 /**
+ * Cắt thanh điển hình theo các vùng lớp trên (thép mũ):
+ * mỗi vùng mũ → một đoạn ngắn từ tim dầm ± L/n, không chạy full nhịp.
+ */
+export function clipBarToTopZones(bar: RebarBarSeg, zones: RebarZone[]): RebarBarSeg[] {
+  const tops = zones.filter((z) => z.layer === "top" && z.direction === bar.dir);
+  if (!tops.length) return [{ ...bar, layer: "top" }];
+
+  const out: RebarBarSeg[] = [];
+  for (const z of tops) {
+    const zx0 = Math.min(z.x1, z.x2);
+    const zx1 = Math.max(z.x1, z.x2);
+    const zy0 = Math.min(z.y1, z.y2);
+    const zy1 = Math.max(z.y1, z.y2);
+    if (bar.dir === "X") {
+      if (bar.y < zy0 - 1 || bar.y > zy1 + 1) continue;
+      const x0 = Math.max(bar.x0, zx0);
+      const x1 = Math.min(bar.x1, zx1);
+      if (x1 - x0 < 50) continue;
+      out.push({ dir: "X", x0, x1, y: bar.y, layer: "top" });
+    } else {
+      if (bar.x < zx0 - 1 || bar.x > zx1 + 1) continue;
+      const y0 = Math.max(bar.y0, zy0);
+      const y1 = Math.min(bar.y1, zy1);
+      if (y1 - y0 < 50) continue;
+      out.push({ dir: "Y", y0, y1, x: bar.x, layer: "top" });
+    }
+  }
+  return out;
+}
+
+/**
  * Cây điển hình theo lớp: khi cùng phương có cả lớp dưới + lớp trên
  * → hiện 2 thanh (mỗi lớp 1), lệch ⊥ rõ ràng để không dính chùm
  * (khoảng = `slabLayerPlanVisualGapMm`).
+ * Lớp trên (mũ): cắt theo vùng top — nhiều đoạn ngắn từ tim dầm.
  * Lớp dưới: phương nhịp ngắn nằm dưới trước; lớp trên đảo ngược thứ tự vẽ.
  */
 export function typicalLayeredRebarBars(
@@ -2064,9 +2096,10 @@ export function typicalLayeredRebarBars(
       // Căn quanh cây giữa dải: dưới −half, trên +half (tách rõ 2 lớp)
       const mid = g.typical;
       out.push({ ...offsetBarPerp(mid, -half), layer: "bottom" });
-      out.push({ ...offsetBarPerp(mid, half), layer: "top" });
+      const topBase = offsetBarPerp(mid, half);
+      out.push(...clipBarToTopZones(topBase, list));
     } else if (hasTop && !hasBot) {
-      out.push({ ...g.typical, layer: "top" });
+      out.push(...clipBarToTopZones(g.typical, list));
     } else {
       out.push({ ...g.typical, layer: "bottom" });
     }
