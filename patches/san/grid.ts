@@ -1974,9 +1974,9 @@ function offsetBarPerp(bar: RebarBarSeg, deltaMm: number): RebarBarSeg {
 
 /**
  * Cây điển hình theo lớp: khi cùng phương có cả lớp dưới + lớp trên
- * → hiện 2 thanh (mỗi lớp 1), lệch ⊥ một khoảng = dày sàn − lớp BV.
+ * → hiện 2 thanh (mỗi lớp 1). Ưu tiên lấy 2 vị trí khác nhau trong dải
+ * (≈1/3 và 2/3); nếu dải chỉ 1 thanh thì lệch ⊥ = dày sàn − lớp BV.
  * Lớp dưới: phương nhịp ngắn nằm dưới trước; lớp trên đảo ngược thứ tự vẽ.
- * Không đủ 2 lớp cùng phương → giữ 1 cây như `typicalRebarBars`.
  */
 export function typicalLayeredRebarBars(
   project: SlabProject,
@@ -1984,7 +1984,7 @@ export function typicalLayeredRebarBars(
   zones?: RebarZone[],
 ): RebarBarSeg[] {
   const list = zones ?? project.zones ?? [];
-  const base = typicalRebarBars(project, bars, list);
+  const groups = groupTypicalRebarBars(project, bars, list);
   const gap = slabLayerPlanGapMm(project);
   const underBot = bottomUnderDir(project);
   const underTop: "X" | "Y" = underBot === "X" ? "Y" : "X";
@@ -1993,18 +1993,29 @@ export function typicalLayeredRebarBars(
     list.some((z) => z.direction === dir && z.layer === layer);
 
   const out: RebarBarSeg[] = [];
-  for (const bar of base) {
-    const hasBot = layerOf(bar.dir, "bottom");
-    const hasTop = layerOf(bar.dir, "top");
+  for (const g of groups) {
+    const dir = g.typical.dir;
+    const hasBot = layerOf(dir, "bottom");
+    const hasTop = layerOf(dir, "top");
     if (hasBot && hasTop) {
-      // Căn quanh vị trí hình học: dưới −gap/2, trên +gap/2
-      const half = gap / 2;
-      out.push({ ...offsetBarPerp(bar, -half), layer: "bottom" });
-      out.push({ ...offsetBarPerp(bar, half), layer: "top" });
+      if (g.bars.length >= 2) {
+        const i0 = Math.floor((g.bars.length - 1) / 3);
+        const i1 = Math.max(i0 + 1, Math.floor((2 * (g.bars.length - 1)) / 3));
+        const botBar = g.bars[i0]!;
+        const topBar = g.bars[i1]!;
+        // Lệch thêm ⊥ nửa khoảng lớp để thấy rõ 2 lớp tại chỗ giao
+        const half = gap / 2;
+        out.push({ ...offsetBarPerp(botBar, -half), layer: "bottom" });
+        out.push({ ...offsetBarPerp(topBar, half), layer: "top" });
+      } else {
+        const half = gap / 2;
+        out.push({ ...offsetBarPerp(g.typical, -half), layer: "bottom" });
+        out.push({ ...offsetBarPerp(g.typical, half), layer: "top" });
+      }
     } else if (hasTop && !hasBot) {
-      out.push({ ...bar, layer: "top" });
+      out.push({ ...g.typical, layer: "top" });
     } else {
-      out.push({ ...bar, layer: "bottom" });
+      out.push({ ...g.typical, layer: "bottom" });
     }
   }
 
