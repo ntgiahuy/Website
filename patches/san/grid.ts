@@ -305,7 +305,10 @@ export function syncBeamsToAxes(project: SlabProject): SlabProject {
         ...b,
         axis: ax.pos,
         axisId: ax.id,
-        offset: beamOffsetForAxisIndex(bw, idx, axesX.length),
+        // Giữ B1 đã chỉnh (lệch ngoài biên); chỉ gán mặc định khi chưa có
+        offset: Number.isFinite(b.offset)
+          ? (b.offset as number)
+          : beamOffsetForAxisIndex(bw, idx, axesX.length),
         start: 0,
         end: Hplan,
         segShifts: b.segShifts,
@@ -321,7 +324,9 @@ export function syncBeamsToAxes(project: SlabProject): SlabProject {
       ...b,
       axis: ay.pos,
       axisId: ay.id,
-      offset: beamOffsetForAxisIndex(bw, idx, axesY.length),
+      offset: Number.isFinite(b.offset)
+        ? (b.offset as number)
+        : beamOffsetForAxisIndex(bw, idx, axesY.length),
       start: 0,
       end: W,
       segShifts: b.segShifts,
@@ -2179,10 +2184,39 @@ export function applyBeamDimsToAll(
   dims: { beamB: number; beamH: number; beamB1: number },
 ): SlabProject {
   const size = formatBeamSize(dims.beamB, dims.beamH);
-  const beams = (project.beams?.length ? project.beams : []).map((b) => ({
-    ...b,
-    size,
-  }));
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  const peersY = (project.beams ?? [])
+    .filter((b) => b.direction === "Y" && !b.free)
+    .slice()
+    .sort((a, b) => a.axis - b.axis || a.name.localeCompare(b.name));
+  const peersX = (project.beams ?? [])
+    .filter((b) => b.direction === "X" && !b.free)
+    .slice()
+    .sort((a, b) => a.axis - b.axis || a.name.localeCompare(b.name));
+  const beams = (project.beams?.length ? project.beams : []).map((b) => {
+    if (b.free) return { ...b, size };
+    if (b.direction === "Y") {
+      const idx = resolveBeamAxisIndex(b, axesX, peersY);
+      return {
+        ...b,
+        size,
+        offset:
+          idx >= 0
+            ? beamOffsetForAxisIndex(dims.beamB, idx, axesX.length)
+            : beamOffsetForAxisIndex(dims.beamB, 0, Math.max(1, axesX.length)),
+      };
+    }
+    const idx = resolveBeamAxisIndex(b, axesY, peersX);
+    return {
+      ...b,
+      size,
+      offset:
+        idx >= 0
+          ? beamOffsetForAxisIndex(dims.beamB, idx, axesY.length)
+          : beamOffsetForAxisIndex(dims.beamB, 0, Math.max(1, axesY.length)),
+    };
+  });
   const info = syncBeamInfo({
     ...project.info,
     beamB: dims.beamB,
