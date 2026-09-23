@@ -1127,7 +1127,7 @@ function mergeAxisSpans(spans: { lo: number; hi: number }[]): { lo: number; hi: 
   return out;
 }
 
-/** Phần dầm nhô ngoài khung plan (mm) — dùng neo vòng số hiệu ngoài da dầm. */
+/** Phần dầm nhô ngoài khung plan (mm) — da ngoài cùng kể cả B1 lệch / dịch đoạn. */
 export function planBeamBleed(
   project: SlabProject,
   axesX: GridAxis[],
@@ -1137,16 +1137,58 @@ export function planBeamBleed(
   let xMax = project.planWidth;
   let yMin = 0;
   let yMax = project.planHeight;
+
+  const expandX = (lo: number, hi: number) => {
+    xMin = Math.min(xMin, Math.min(lo, hi));
+    xMax = Math.max(xMax, Math.max(lo, hi));
+  };
+  const expandY = (lo: number, hi: number) => {
+    yMin = Math.min(yMin, Math.min(lo, hi));
+    yMax = Math.max(yMax, Math.max(lo, hi));
+  };
+
+  /** Mở rộng theo da thật của dầm (B1 + dịch đoạn), không chỉ tim trục. */
+  const absorbBeam = (beam: PlanBeam) => {
+    const segs = beamSegments(project, beam);
+    let used = false;
+    for (const seg of segs) {
+      if (isBeamSegOmitted(beam, seg.a0.id, seg.a1.id)) continue;
+      const f = beamSegSideFaces(beam, seg.index);
+      if (beam.direction === "Y") {
+        expandX(f.lo0, f.hi0);
+        expandX(f.lo1, f.hi1);
+      } else {
+        expandY(f.lo0, f.hi0);
+        expandY(f.lo1, f.hi1);
+      }
+      used = true;
+    }
+    if (used) return;
+    const { b: bw } = parseSizeStr(beam.size);
+    const b1 = Number.isFinite(beam.offset) ? (beam.offset as number) : bw / 2;
+    const f = beamOuterFaces(beam.axis, { bw, b1 });
+    if (beam.direction === "Y") expandX(f.lo, f.hi);
+    else expandY(f.lo, f.hi);
+  };
+
+  for (const b of project.beams ?? []) absorbBeam(b);
+
+  // Trục chưa có dầm: fallback tiết diện mặc định
   for (const ax of axesX) {
+    if ((project.beams ?? []).some((b) => !b.free && b.direction === "Y" && (b.axisId === ax.id || Math.abs(b.axis - ax.pos) < 0.5))) {
+      continue;
+    }
     const f = beamOuterFaces(ax.pos, beamSectionOnAxis(project, "Y", ax));
-    xMin = Math.min(xMin, f.lo);
-    xMax = Math.max(xMax, f.hi);
+    expandX(f.lo, f.hi);
   }
   for (const ay of axesY) {
+    if ((project.beams ?? []).some((b) => !b.free && b.direction === "X" && (b.axisId === ay.id || Math.abs(b.axis - ay.pos) < 0.5))) {
+      continue;
+    }
     const f = beamOuterFaces(ay.pos, beamSectionOnAxis(project, "X", ay));
-    yMin = Math.min(yMin, f.lo);
-    yMax = Math.max(yMax, f.hi);
+    expandY(f.lo, f.hi);
   }
+
   return { xMin, xMax, yMin, yMax };
 }
 

@@ -168,33 +168,28 @@ export function SlabPreview({
   const W = 640;
   const H = 420;
   const bleed = useMemo(() => planBeamBleed(project, axesX, axesY), [project, axesX, axesY]);
-  const bleedMm = Math.max(
-    0,
-    -bleed.xMin,
-    -bleed.yMin,
-    bleed.xMax - project.planWidth,
-    bleed.yMax - project.planHeight,
-  );
-  // Chừa chỗ: dầm nhô ngoài plan + vòng số hiệu + chuỗi dim (da dầm + tim trục)
+  // Chừa chỗ: vòng số hiệu + chuỗi dim (da dầm + tim trục) ngoài da dầm ngoài cùng
   const DIM_GAP = 14;
   /** Khoảng hở mép vòng số hiệu → đường dim đầu (tránh đè số lên bubble). */
   const DIM_AFTER_BUBBLE = 22;
   const DIM_CHAINS = 2; // face + axis
   const dimBand = DIM_AFTER_BUBBLE + DIM_GAP * DIM_CHAINS + 10;
-  const pad = Math.max(
-    48 + dimBand,
-    AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 12 + dimBand + bleedMm * 0.04,
-  );
-  const sx = (W - pad * 2) / Math.max(project.planWidth, 1);
-  const sy = (H - pad * 2) / Math.max(project.planHeight, 1);
+  const pad = Math.max(48 + dimBand, AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 12 + dimBand);
+  /** Khung vẽ theo da dầm ngoài (kể cả dầm lệch ngoài biên), không cố định 0…plan. */
+  const extentW = Math.max(bleed.xMax - bleed.xMin, 1);
+  const extentH = Math.max(bleed.yMax - bleed.yMin, 1);
+  const sx = (W - pad * 2) / extentW;
+  const sy = (H - pad * 2) / extentH;
   const s = Math.min(sx, sy);
-  const ox = pad + (W - pad * 2 - project.planWidth * s) / 2;
-  const oy = pad + (H - pad * 2 - project.planHeight * s) / 2;
+  const ox = pad + (W - pad * 2 - extentW * s) / 2 - bleed.xMin * s;
+  const oy = pad + (H - pad * 2 - extentH * s) / 2 - (project.planHeight - bleed.yMax) * s;
   const X = (mm: number) => ox + mm * s;
   const Y = (mm: number) => oy + (project.planHeight - mm) * s;
-  /** Da dầm ngoài cùng — neo vòng số hiệu / đường dẫn (không dính thân dầm). */
+  /** Da dầm ngoài cùng — neo vòng số hiệu / đường dẫn / khung xanh. */
   const outerLeft = bleed.xMin;
+  const outerRight = bleed.xMax;
   const outerBottom = bleed.yMin;
+  const outerTop = bleed.yMax;
 
   function anchorFromSvg(svgX: number, svgY: number): Anchor {
     return {
@@ -665,10 +660,10 @@ export function SlabPreview({
             }}
           >
             <rect
-              x={X(0)}
-              y={Y(project.planHeight)}
-              width={project.planWidth * s}
-              height={project.planHeight * s}
+              x={X(outerLeft)}
+              y={Y(outerTop)}
+              width={(outerRight - outerLeft) * s}
+              height={(outerTop - outerBottom) * s}
               fill="#111113"
               stroke="#79b8ff"
               strokeWidth="1.5"
