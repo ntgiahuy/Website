@@ -1689,7 +1689,11 @@ export function buildMergedDistRanges(
     if (!idx) continue;
     const markKey = markKeyOf(bar);
     if (!markKey) continue;
-    const identityKey = rebarBarIdentityKey(project, bar, list);
+    // Khoảng rải theo dải ô + Ø/móc — không tách theo L (biến thiên vẫn 1 khoảng rải).
+    const hooks = hooksForRebarBar(project, bar, list);
+    const z = zoneForRebarBar(project, bar, list);
+    const dia = z ? Math.round(Number(z.dia) || 0) : 0;
+    const identityKey = `${bar.dir}|Ø${dia}|H${hooks.left}/${hooks.right}`;
     const junction =
       bar.dir === "X"
         ? { x: (bar.x0 + bar.x1) / 2, y: bar.y }
@@ -2012,11 +2016,78 @@ export type TypicalRebarGroup = {
   bars: RebarBarSeg[];
   /** Cây điển hình để vẽ / ghi số hiệu. */
   typical: RebarBarSeg;
+  /** Chỉ số ô theo phương vuông góc (cột ix với thanh Y; hàng iy với thanh X). */
+  stripIndex?: number;
 };
 
 /**
- * Gộp thanh kề nhau liên tiếp cùng chiều dài + Ø + móc.
- * Xen kẽ thanh khác loại → tách nhóm. Mỗi nhóm chỉ hiện 1 cây điển hình.
+ * Chỉ số dải ô chứa thanh: thanh Y → cột giữa trục X; thanh X → hàng giữa trục Y.
+ * VD: trục 1-2 → 0, trục 2-3 → 1.
+ */
+export function bayStripIndexForBar(
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+  bar: RebarBarSeg,
+): number | null {
+  if (bar.dir === "Y") {
+    const pos = bar.x;
+    for (let i = 0; i < axesX.length - 1; i++) {
+      const lo = axesX[i]!.pos;
+      const hi = axesX[i + 1]!.pos;
+      const last = i === axesX.length - 2;
+      if (last ? pos >= lo - 1 && pos <= hi + 1 : pos >= lo - 1 && pos < hi) return i;
+    }
+    return null;
+  }
+  const pos = bar.y;
+  for (let j = 0; j < axesY.length - 1; j++) {
+    const lo = axesY[j]!.pos;
+    const hi = axesY[j + 1]!.pos;
+    const last = j === axesY.length - 2;
+    if (last ? pos >= lo - 1 && pos <= hi + 1 : pos >= lo - 1 && pos < hi) return j;
+  }
+  return null;
+}
+
+/**
+ * Gộp theo dải ô (1 cây điển hình / cột với thanh Y, / hàng với thanh X).
+ * Minh họa: phương Y với 2 nhịp trục → đúng 2 thanh (1–2 và 2–3).
+ */
+export function groupTypicalRebarByBayStrip(
+  project: SlabProject,
+  bars: RebarBarSeg[],
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+  _zones?: RebarZone[],
+): TypicalRebarGroup[] {
+  const groups: TypicalRebarGroup[] = [];
+  for (const dir of ["X", "Y"] as const) {
+    const byStrip = new Map<number, RebarBarSeg[]>();
+    for (const bar of bars) {
+      if (bar.dir !== dir) continue;
+      const strip = bayStripIndexForBar(axesX, axesY, bar);
+      if (strip == null) continue;
+      const arr = byStrip.get(strip) ?? [];
+      arr.push(bar);
+      byStrip.set(strip, arr);
+    }
+    for (const strip of [...byStrip.keys()].sort((a, b) => a - b)) {
+      const stripBars = byStrip.get(strip)!;
+      stripBars.sort((a, b) => {
+        if (dir === "X" && a.dir === "X" && b.dir === "X") return a.y - b.y;
+        if (dir === "Y" && a.dir === "Y" && b.dir === "Y") return a.x - b.x;
+        return 0;
+      });
+      const mid = stripBars[Math.floor((stripBars.length - 1) / 2)]!;
+      groups.push({ bars: stripBars, typical: mid, stripIndex: strip });
+    }
+  }
+  return groups;
+}
+
+/**
+ * Gộp thanh kề nhau liên tiếp cùng chiều dài + Ø + móc (biến thiên trong dải).
+ * Dùng cho thống kê Xa/Xb/Xc — không dùng để vẽ điển hình mặt bằng.
  */
 export function groupTypicalRebarBars(
   project: SlabProject,
@@ -2058,12 +2129,17 @@ export function groupTypicalRebarBars(
   return groups;
 }
 
-/** Danh sách cây điển hình (1 thanh / nhóm liên tiếp cùng loại). */
+/** Danh sách cây điển hình (1 thanh / dải ô — mặt bằng). */
 export function typicalRebarBars(
   project: SlabProject,
   bars: RebarBarSeg[],
   zones?: RebarZone[],
 ): RebarBarSeg[] {
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  if (axesX.length >= 2 && axesY.length >= 2) {
+    return groupTypicalRebarByBayStrip(project, bars, axesX, axesY, zones).map((g) => g.typical);
+  }
   return groupTypicalRebarBars(project, bars, zones).map((g) => g.typical);
 }
 
@@ -2151,9 +2227,13 @@ export function typicalLayeredRebarBars(
   /** Chỉ vẽ phương đã có vùng thép — thêm vùng → minh họa cập nhật ngay. */
   if (!list.length) return [];
 
-  const groups = groupTypicalRebarBars(project, bars, list).filter((g) =>
-    list.some((z) => z.direction === g.typical.dir),
-  );
+  const groups = groupTypicalRebarByBayStrip(
+    project,
+    bars,
+    sortAxes(project.axesX ?? []),
+    sortAxes(project.axesY ?? []),
+    list,
+  ).filter((g) => list.some((z) => z.direction === g.typical.dir));
   const sep = slabLayerPlanVisualGapMm(project);
   const half = sep / 2;
   const underBot = bottomUnderDir(project);

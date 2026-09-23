@@ -7,7 +7,7 @@ import type {
 import { rebarLayerMark } from "./types";
 import {
   ensureAxes,
-  groupTypicalRebarBars,
+  groupTypicalRebarByBayStrip,
   hooksForRebarBar,
   rebarBarStraightLenMm,
   slabDistRangeForBar,
@@ -408,6 +408,56 @@ function mergeScheduleRows(rows: ScheduleRow[]): ScheduleRow[] {
   return [...map.values()];
 }
 
+/**
+ * Số hiệu gốc dải ô: A, B, C… (ổn định theo lớp + phương + chỉ số dải).
+ * Biến thiên chiều dài → Aa/Ab/Ac hoặc giữ A nếu chỉ 1 cỡ.
+ */
+function stripFamilyMark(
+  layer: RebarLayer,
+  dir: RebarDir,
+  stripIndex: number,
+): string {
+  const layerBase = layer === "bottom" ? 0 : layer === "top" ? 8 : 16;
+  const dirBase = dir === "Y" ? 0 : 4;
+  const idx = layerBase + dirBase + Math.max(0, stripIndex);
+  return String.fromCharCode(65 + (idx % 26)); // A..Z
+}
+
+function nextStripFamilyMark(
+  dir: RebarDir,
+  stripIndex: number,
+  layer: RebarLayer,
+): string {
+  return stripFamilyMark(layer, dir, stripIndex);
+}
+
+/**
+ * Chia thanh trong một dải ô thành ≤ maxClasses bậc chiều dài (lớn → bé).
+ * Sàn đều (ΔL nhỏ) → 1 lớp; dầm lệch → Xa/Xb/Xc.
+ */
+function partitionVaryingLengthClasses(
+  bars: RebarBarSeg[],
+  maxClasses = 3,
+): RebarBarSeg[][] {
+  if (!bars.length) return [];
+  const sorted = [...bars].sort(
+    (a, b) => rebarBarStraightLenMm(b) - rebarBarStraightLenMm(a),
+  );
+  const maxL = rebarBarStraightLenMm(sorted[0]!);
+  const minL = rebarBarStraightLenMm(sorted[sorted.length - 1]!);
+  if (maxL - minL < 80 || maxClasses <= 1) return [sorted];
+
+  const n = Math.min(maxClasses, sorted.length);
+  const classes: RebarBarSeg[][] = Array.from({ length: n }, () => []);
+  for (const bar of sorted) {
+    const L = rebarBarStraightLenMm(bar);
+    const t = (maxL - L) / Math.max(1, maxL - minL); // 0 = dài nhất
+    const idx = Math.min(n - 1, Math.floor(t * n + 1e-9));
+    classes[idx]!.push(bar);
+  }
+  return classes.filter((c) => c.length > 0);
+}
+
 export function computeModel(project: SlabProject): ComputedSlabModel {
   const zones = effectiveZones(project);
   const axesX = sortAxes(project.axesX ?? []);
@@ -466,34 +516,49 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
       continue;
     }
 
-    // Mỗi nhóm chiều dài (biến thiên) → 1 dòng thống kê; SL = số thanh trong nhóm.
-    const groups = groupTypicalRebarBars(project, zoneBars, zones);
-    for (const g of groups) {
-      if (g.typical.dir !== z.direction) continue;
-      const lengths = g.bars.map(rebarBarStraightLenMm).sort((a, b) => a - b);
-      const straight = lengths[Math.floor((lengths.length - 1) / 2)] ?? rebarBarStraightLenMm(g.typical);
-      const hooks = hooksForRebarBar(project, g.typical, zones);
-      const barLength = barDevelopedLength(straight, hooks.left, hooks.right);
-      const qtyEach = Math.max(1, g.bars.length);
-      const qtyTotal = qtyEach * qtyMembers;
-      const totalM = (barLength * qtyTotal) / 1000;
-      const hooked = hooks.left > 0 || hooks.right > 0;
-      schedule.push({
-        mark: z.mark,
-        layer: z.layer,
-        direction: z.direction,
-        dia: z.dia,
-        spacing: z.spacing,
-        barLength,
-        leftHook: hooks.left,
-        rightHook: hooks.right,
-        qtyEach,
-        qtyMembers,
-        qtyTotal,
-        totalM,
-        weight: totalM * weightPerMeter(z.dia),
-        shape: hooked ? "hooked" : "straight",
-        note: z.note ?? `${z.layer} ${z.direction}`,
+    // Mỗi dải ô (trục 1–2, 2–3…): 1 số hiệu gốc; nếu L biến thiên → Xa/Xb/Xc (≤3 bậc).
+    const stripGroups = groupTypicalRebarByBayStrip(
+      project,
+      zoneBars,
+      axesX,
+      axesY,
+      zones,
+    );
+    for (const sg of stripGroups) {
+      if (sg.typical.dir !== z.direction) continue;
+      const classes = partitionVaryingLengthClasses(sg.bars, 3);
+      const family = nextStripFamilyMark(z.direction, sg.stripIndex ?? 0, z.layer);
+      const useSuffix = classes.length > 1;
+      classes.forEach((classBars, bi) => {
+        const lengths = classBars.map(rebarBarStraightLenMm).sort((a, b) => a - b);
+        const straight =
+          lengths[Math.floor((lengths.length - 1) / 2)] ?? rebarBarStraightLenMm(sg.typical);
+        const hooks = hooksForRebarBar(project, classBars[0] ?? sg.typical, zones);
+        const barLength = barDevelopedLength(straight, hooks.left, hooks.right);
+        const qtyEach = Math.max(1, classBars.length);
+        const qtyTotal = qtyEach * qtyMembers;
+        const totalM = (barLength * qtyTotal) / 1000;
+        const hooked = hooks.left > 0 || hooks.right > 0;
+        const suffix = useSuffix ? String.fromCharCode(97 + bi) : ""; // a,b,c
+        schedule.push({
+          mark: `${family}${suffix}`,
+          layer: z.layer,
+          direction: z.direction,
+          dia: z.dia,
+          spacing: z.spacing,
+          barLength,
+          leftHook: hooks.left,
+          rightHook: hooks.right,
+          qtyEach,
+          qtyMembers,
+          qtyTotal,
+          totalM,
+          weight: totalM * weightPerMeter(z.dia),
+          shape: hooked ? "hooked" : "straight",
+          note: useSuffix
+            ? `${z.note ?? z.layer} · biến thiên ${family}${suffix}`
+            : (z.note ?? `${z.layer} ${z.direction}`),
+        });
       });
     }
   }
