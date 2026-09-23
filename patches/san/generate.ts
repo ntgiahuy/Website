@@ -31,7 +31,7 @@ import {
   faceChainAlongY,
   hookDrawMm,
   zoneForRebarBar,
-  slabLayerPlanGapMm,
+  slabLayerPlanVisualGapMm,
   type RebarBarSeg,
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarLayer, RebarZone, SlabProject } from "../types";
@@ -893,7 +893,7 @@ function drawPlan(
       undefined,
       rebarZones,
     );
-    const typicalTol = slabLayerPlanGapMm(project) / 2 + 2;
+    const typicalTol = slabLayerPlanVisualGapMm(project) / 2 + 2;
     const nearTypical = (dir: "X" | "Y", pos: number) =>
       drawBars.some((b) => {
         if (b.dir !== dir) return false;

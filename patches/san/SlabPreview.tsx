@@ -26,7 +26,7 @@ import {
   faceChainAlongX,
   faceChainAlongY,
   hookDrawMm,
-  slabLayerPlanGapMm,
+  slabLayerPlanVisualGapMm,
 } from "@/lib/grid";
 import type { PlanSelection, SlabProject } from "@/lib/types";
 import { buildBeamFrameScene, projectSceneToSvg } from "@/lib/view3d";
@@ -1033,7 +1033,7 @@ export const SlabPreview = memo(function SlabPreview({
                         undefined,
                         zones,
                       );
-                      const typicalTol = slabLayerPlanGapMm(project) / 2 + 2;
+                      const typicalTol = slabLayerPlanVisualGapMm(project) / 2 + 2;
                       const nearTypical = (dir: "X" | "Y", pos: number) =>
                         drawBars.some((b) => {
                           if (b.dir !== dir) return false;

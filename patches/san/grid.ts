@@ -1958,6 +1958,19 @@ export function slabLayerPlanGapMm(project: SlabProject): number {
 }
 
 /**
+ * Khoảng lệch ⊥ trên mặt bằng để 2 lớp không dính chùm.
+ * Lấy max(dày−BV, ~1/12 nhịp ngắn, 600mm) — đủ thấy rõ preview/PDF.
+ */
+export function slabLayerPlanVisualGapMm(project: SlabProject): number {
+  const eng = slabLayerPlanGapMm(project);
+  const W = Math.max(0, Number(project.planWidth) || 0);
+  const H = Math.max(0, Number(project.planHeight) || 0);
+  const short = Math.min(W || H, H || W);
+  const bySpan = short > 0 ? Math.round(short / 12) : 0;
+  return Math.max(eng, bySpan, 600);
+}
+
+/**
  * Phương nằm dưới trước ở lớp dưới: phương nhịp ngắn
  * (cạnh sàn nhỏ hơn — W≤H → X, ngược lại → Y).
  */
@@ -1974,8 +1987,8 @@ function offsetBarPerp(bar: RebarBarSeg, deltaMm: number): RebarBarSeg {
 
 /**
  * Cây điển hình theo lớp: khi cùng phương có cả lớp dưới + lớp trên
- * → hiện 2 thanh (mỗi lớp 1). Ưu tiên lấy 2 vị trí khác nhau trong dải
- * (≈1/3 và 2/3); nếu dải chỉ 1 thanh thì lệch ⊥ = dày sàn − lớp BV.
+ * → hiện 2 thanh (mỗi lớp 1), lệch ⊥ rõ ràng để không dính chùm
+ * (khoảng = `slabLayerPlanVisualGapMm`).
  * Lớp dưới: phương nhịp ngắn nằm dưới trước; lớp trên đảo ngược thứ tự vẽ.
  */
 export function typicalLayeredRebarBars(
@@ -1990,7 +2003,8 @@ export function typicalLayeredRebarBars(
   const groups = groupTypicalRebarBars(project, bars, list).filter((g) =>
     list.some((z) => z.direction === g.typical.dir),
   );
-  const gap = slabLayerPlanGapMm(project);
+  const sep = slabLayerPlanVisualGapMm(project);
+  const half = sep / 2;
   const underBot = bottomUnderDir(project);
   const underTop: "X" | "Y" = underBot === "X" ? "Y" : "X";
 
@@ -2005,20 +2019,10 @@ export function typicalLayeredRebarBars(
     /** Có zone structural-only vẫn hiện 1 thanh điển hình. */
     if (!hasBot && !hasTop && !list.some((z) => z.direction === dir)) continue;
     if (hasBot && hasTop) {
-      if (g.bars.length >= 2) {
-        const i0 = Math.floor((g.bars.length - 1) / 3);
-        const i1 = Math.max(i0 + 1, Math.floor((2 * (g.bars.length - 1)) / 3));
-        const botBar = g.bars[i0]!;
-        const topBar = g.bars[i1]!;
-        // Lệch thêm ⊥ nửa khoảng lớp để thấy rõ 2 lớp tại chỗ giao
-        const half = gap / 2;
-        out.push({ ...offsetBarPerp(botBar, -half), layer: "bottom" });
-        out.push({ ...offsetBarPerp(topBar, half), layer: "top" });
-      } else {
-        const half = gap / 2;
-        out.push({ ...offsetBarPerp(g.typical, -half), layer: "bottom" });
-        out.push({ ...offsetBarPerp(g.typical, half), layer: "top" });
-      }
+      // Căn quanh cây giữa dải: dưới −half, trên +half (tách rõ 2 lớp)
+      const mid = g.typical;
+      out.push({ ...offsetBarPerp(mid, -half), layer: "bottom" });
+      out.push({ ...offsetBarPerp(mid, half), layer: "top" });
     } else if (hasTop && !hasBot) {
       out.push({ ...g.typical, layer: "top" });
     } else {
