@@ -5,9 +5,13 @@
 import {
   bayKindAt,
   baySlabExtent,
+  beamFaceDashStyle,
+  beamOuterFacesAtAlong,
   beamSegSideFaces,
   beamSegments,
+  findBeamOnAxis,
   isBeamSegOmitted,
+  planBeamBleed,
   sortAxes,
 } from "./grid";
 import type { PlanBeam, SlabProject } from "./types";
@@ -274,6 +278,19 @@ function nearlySameEdge(a: Pt3, b: Pt3, c: Pt3, d: Pt3): boolean {
   return (dist2(a, c) < tol && dist2(b, d) < tol) || (dist2(a, d) < tol && dist2(b, c) < tol);
 }
 
+/** Điểm alongMm có nằm trên đoạn dầm đã omit không (giao với trục vuông góc). */
+function isBeamSegOmittedAcross(project: SlabProject, beam: PlanBeam, crossPos: number): boolean {
+  for (const seg of beamSegments(project, beam)) {
+    if (crossPos < seg.lo - 0.5 || crossPos > seg.hi + 0.5) continue;
+    return isBeamSegOmitted(beam, seg.a0.id, seg.a1.id);
+  }
+  // Ngoài thân dầm (start/end) — không đặt cột
+  const bLo = Math.min(beam.start, beam.end);
+  const bHi = Math.max(beam.start, beam.end);
+  if (crossPos < bLo - 0.5 || crossPos > bHi + 0.5) return true;
+  return false;
+}
+
 export function floorElevationM(project: SlabProject): number {
   const v = Number(project.info.floorElevationM);
   return Number.isFinite(v) ? v : 8.05;
@@ -291,26 +308,34 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
   /** Stub cột chỉ phía trên mặt sàn (+50cm) — nét liền trên phối cảnh sàn. */
   const COL_ABOVE_SLAB_MM = 500;
   const zColTop = zTop + COL_ABOVE_SLAB_MM;
+  const bleed = planBeamBleed(project, axesX, axesY);
 
+  // Cột tại giao dầm (và 4 góc khung): footprint = giao tiết diện hai dầm giao nhau.
   let ci = 0;
   for (const ax of axesX) {
     for (const ay of axesY) {
-      const beamsAt = (project.beams ?? []).filter(
-        (b) =>
-          !b.free &&
-          ((b.direction === "Y" && Math.abs(b.axis - ax.pos) < 0.5) ||
-            (b.direction === "X" && Math.abs(b.axis - ay.pos) < 0.5)),
-      );
-      if (beamsAt.length === 0) continue;
-      let half = 150;
-      for (const b of beamsAt) half = Math.max(half, parseBH(b.size).b / 2);
-      half = Math.round(half);
-      const x0 = ax.pos - half;
-      const x1 = ax.pos + half;
-      const y0 = ay.pos - half;
-      const y1 = ay.pos + half;
-      // Chỉ stub cột phía trên sàn (nét liền). Không vẽ cột dưới —
-      // tránh nét đứt đứng chồng cùng tim với cột trên trên phối cảnh sàn.
+      const beamY = findBeamOnAxis(project, "Y", ax);
+      const beamX = findBeamOnAxis(project, "X", ay);
+      if (!beamY || !beamX) continue;
+      if (isBeamSegOmittedAcross(project, beamY, ay.pos)) continue;
+      if (isBeamSegOmittedAcross(project, beamX, ax.pos)) continue;
+      const fx = beamOuterFacesAtAlong(project, "Y", ax, ay.pos);
+      const fy = beamOuterFacesAtAlong(project, "X", ay, ax.pos);
+      let x0 = Math.min(fx.lo, fx.hi);
+      let x1 = Math.max(fx.lo, fx.hi);
+      let y0 = Math.min(fy.lo, fy.hi);
+      let y1 = Math.max(fy.lo, fy.hi);
+      // Fallback nếu da trùng (dầm omit): ô vuông quanh giao tim.
+      if (x1 - x0 < 40) {
+        const half = Math.max(150, Math.round(parseBH(beamY.size).b / 2));
+        x0 = ax.pos - half;
+        x1 = ax.pos + half;
+      }
+      if (y1 - y0 < 40) {
+        const half = Math.max(150, Math.round(parseBH(beamX.size).b / 2));
+        y0 = ay.pos - half;
+        y1 = ay.pos + half;
+      }
       if (COL_ABOVE_SLAB_MM > 1) {
         solids.push(rectSolid(`col-above-${ci}`, x0, y0, x1, y1, zTop, zColTop));
       }
@@ -318,7 +343,41 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
     }
   }
 
+  // Đảm bảo 4 góc khung dầm (bleed) có stub cột nếu chưa có giao trục.
+  const cornerPts: Array<[number, number]> = [
+    [bleed.xMin, bleed.yMin],
+    [bleed.xMax, bleed.yMin],
+    [bleed.xMin, bleed.yMax],
+    [bleed.xMax, bleed.yMax],
+  ];
+  for (const [cx, cy] of cornerPts) {
+    const already = solids.some(
+      (s) =>
+        s.id.startsWith("col-above-") &&
+        cx >= s.min.x - 2 &&
+        cx <= s.max.x + 2 &&
+        cy >= s.min.y - 2 &&
+        cy <= s.max.y + 2,
+    );
+    if (already) continue;
+    // Góc bleed: tìm dầm biên gần nhất để lấy bề rộng
+    let bw = 300;
+    for (const b of project.beams ?? []) {
+      if (b.free) continue;
+      bw = Math.max(bw, parseBH(b.size).b);
+    }
+    const half = Math.round(bw / 2);
+    // Đặt footprint nằm trong khung (không tràn ra ngoài da biên)
+    const x0 = cx <= bleed.xMin + 1 ? cx : cx - Math.min(half * 2, bw);
+    const x1 = cx <= bleed.xMin + 1 ? cx + Math.min(half * 2, bw) : cx;
+    const y0 = cy <= bleed.yMin + 1 ? cy : cy - Math.min(half * 2, bw);
+    const y1 = cy <= bleed.yMin + 1 ? cy + Math.min(half * 2, bw) : cy;
+    solids.push(rectSolid(`col-above-${ci++}`, x0, y0, x1, y1, zTop, zColTop));
+  }
+
   let bi = 0;
+  /** beamId → solid ids; style theo da biên (ngoài liền / trong đứt). */
+  const beamSolidMeta = new Map<string, { beam: PlanBeam; loSolid: boolean; hiSolid: boolean }>();
   for (const beam of project.beams ?? []) {
     const { h } = parseBH(beam.size);
     const z0 = zTop - h;
@@ -327,13 +386,21 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
       if (isBeamSegOmitted(beam, seg.a0.id, seg.a1.id)) continue;
       const { lo0, hi0, lo1, hi1 } = beamSegSideFaces(beam, seg.index);
       const lo = seg.lo, hi = seg.hi;
+      const loStyle = beamFaceDashStyle(beam.direction, lo0, lo1, bleed);
+      const hiStyle = beamFaceDashStyle(beam.direction, hi0, hi1, bleed);
+      const id = `beam-${bi++}`;
+      beamSolidMeta.set(id, {
+        beam,
+        loSolid: loStyle === "solid",
+        hiSolid: hiStyle === "solid",
+      });
       if (beam.direction === "Y") {
-        solids.push(makeSolid(`beam-${bi++}`,
+        solids.push(makeSolid(id,
           [{ x: lo0, y: lo, z: z0 }, { x: hi0, y: lo, z: z0 }, { x: hi1, y: hi, z: z0 }, { x: lo1, y: hi, z: z0 }],
           [{ x: lo0, y: lo, z: z1 }, { x: hi0, y: lo, z: z1 }, { x: hi1, y: hi, z: z1 }, { x: lo1, y: hi, z: z1 }],
         ));
       } else {
-        solids.push(makeSolid(`beam-${bi++}`,
+        solids.push(makeSolid(id,
           [{ x: lo, y: lo0, z: z0 }, { x: hi, y: lo0, z: z0 }, { x: hi, y: hi1, z: z0 }, { x: lo, y: hi1, z: z0 }],
           [{ x: lo, y: lo0, z: z1 }, { x: hi, y: lo0, z: z1 }, { x: hi, y: hi1, z: z1 }, { x: lo, y: hi1, z: z1 }],
         ));
@@ -359,12 +426,14 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
   for (const s of solids) {
     const isBeam = s.id.startsWith("beam-");
     const isColAbove = s.id.startsWith("col-above-");
+    const meta = isBeam ? beamSolidMeta.get(s.id) : undefined;
+    // Đà biên (có da ngoài trùng bleed) → toàn bộ nét liền; dầm trong → đứt.
+    const edgeBeamSolid = !!(meta && (meta.loSolid || meta.hiSolid));
     for (const ed of s.edgeDefs) {
-      // Phối cảnh sàn: không vẽ cạnh đứng thân dầm — tránh nét đứt đứng cạnh stub cột.
+      // Không vẽ cạnh đứng thân dầm — stub cột đã là nét liền tại giao.
       if (isBeam && isVerticalEdge(ed.a, ed.b)) continue;
-      // Mọi dầm → đứt (sàn nằm trên); cột trên → liền.
       let style0: "solid" | "dashed";
-      if (isBeam) style0 = "dashed";
+      if (isBeam) style0 = edgeBeamSolid ? "solid" : "dashed";
       else if (isColAbove) style0 = "solid";
       else {
         const c = solidCenter(s);
@@ -373,7 +442,13 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
       const parts = clipEdgeOutsideSolids(ed.a, ed.b, solids, s.id);
       for (const [p0, p1] of parts) {
         let style: "solid" | "dashed" = style0;
-        if (style === "solid" && !isColAbove && isPointOccluded(lerp(p0, p1, 0.5), occluderFaces)) {
+        // Cột trên + đà biên giữ nét liền (không hạ đứt vì occlusion).
+        if (
+          style === "solid" &&
+          !isColAbove &&
+          !edgeBeamSolid &&
+          isPointOccluded(lerp(p0, p1, 0.5), occluderFaces)
+        ) {
           style = "dashed";
         }
         rawEdges.push({ a: p0, b: p1, style });
