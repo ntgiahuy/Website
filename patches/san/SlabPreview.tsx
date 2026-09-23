@@ -20,13 +20,13 @@ import {
   stripRebarBarSegments,
   stripRebarPressMarks,
   buildMergedDistRanges,
+  distRangeJunctionsOnBars,
   hooksForRebarBar,
   rebarHookSegments,
   typicalLayeredRebarBars,
   faceChainAlongX,
   faceChainAlongY,
   hookDrawMm,
-  slabLayerPlanVisualGapMm,
 } from "@/lib/grid";
 import type { PlanSelection, SlabProject } from "@/lib/types";
 import { buildBeamFrameScene, projectSceneToSvg } from "@/lib/view3d";
@@ -1033,13 +1033,6 @@ export const SlabPreview = memo(function SlabPreview({
                         undefined,
                         zones,
                       );
-                      const typicalTol = slabLayerPlanVisualGapMm(project) / 2 + 2;
-                      const nearTypical = (dir: "X" | "Y", pos: number) =>
-                        drawBars.some((b) => {
-                          if (b.dir !== dir) return false;
-                          const barPos = b.dir === "X" ? b.y : b.x;
-                          return Math.abs(barPos - pos) <= typicalTol;
-                        });
                       const ah = 7; // ×0.5
                       const aw = 3.5;
                       const capHalf = 5.5;
@@ -1089,12 +1082,12 @@ export const SlabPreview = memo(function SlabPreview({
                         const ux = dx / plen;
                         const uy = dy / plen;
                         const inset = Math.min(ah, plen * 0.35);
-                        const jr = 3.2;
+                        /** Minh họa: nhỏ gấp 32 so với r=3.2 cũ. */
+                        const jr = 3.2 / 32;
                         const jd = jr * 0.72;
-                        // Chỉ chấm tại cây điển hình (không chấm thanh đã ẩn)
-                        const junctions = seg.junctions.filter((j) =>
-                          seg.dir === "X" ? nearTypical("X", j.y) : nearTypical("Y", j.x),
-                        );
+                        const jStroke = 1.5 / 32;
+                        // Chấm đúng giao khoảng rải ∩ cây điển hình (đã lệch lớp)
+                        const junctions = distRangeJunctionsOnBars(seg, drawBars);
                         return (
                           <g key={`dist-${si}`} pointerEvents="none">
                             <line
@@ -1109,14 +1102,13 @@ export const SlabPreview = memo(function SlabPreview({
                             {endCap(sxB, syB, sxA, syA, `b-${si}`)}
                             {junctions.map((j, ji) => (
                               <g key={`j-${si}-${ji}`}>
-                                {/* Chấm hình 2: vòng trắng + kim cương tại giao khoảng rải ∩ thép sàn */}
                                 <circle
                                   cx={X(j.x)}
                                   cy={Y(j.y)}
                                   r={jr}
                                   fill="none"
                                   stroke="#ffffff"
-                                  strokeWidth="1.5"
+                                  strokeWidth={jStroke}
                                 />
                                 <polygon
                                   points={`${X(j.x)},${Y(j.y) - jd} ${X(j.x) + jd},${Y(j.y)} ${X(j.x)},${Y(j.y) + jd} ${X(j.x) - jd},${Y(j.y)}`}

@@ -1482,6 +1482,48 @@ export type MergedDistRange = DistRangeSeg & {
   markKey: string;
 };
 
+/**
+ * Điểm giao đúng đường khoảng rải ∩ thanh điển hình (đã lệch lớp).
+ * Thanh X + khoảng rải đứng → (x đường, y thanh); thanh Y + khoảng rải ngang → (x thanh, y đường).
+ */
+export function distRangeJunctionsOnBars(
+  seg: Pick<MergedDistRange, "dir" | "xA" | "yA" | "xB" | "yB">,
+  bars: RebarBarSeg[],
+): Array<{ x: number; y: number }> {
+  const out: Array<{ x: number; y: number }> = [];
+  const tol = 1;
+  if (seg.dir === "X") {
+    // Khoảng rải ⊥ thanh X = đường đứng (x ≈ const)
+    const xLine = (seg.xA + seg.xB) / 2;
+    const yLo = Math.min(seg.yA, seg.yB);
+    const yHi = Math.max(seg.yA, seg.yB);
+    for (const bar of bars) {
+      if (bar.dir !== "X") continue;
+      const y = bar.y;
+      if (y < yLo - tol || y > yHi + tol) continue;
+      const x0 = Math.min(bar.x0, bar.x1);
+      const x1 = Math.max(bar.x0, bar.x1);
+      if (xLine < x0 - tol || xLine > x1 + tol) continue;
+      out.push({ x: xLine, y });
+    }
+  } else {
+    // Khoảng rải ⊥ thanh Y = đường ngang (y ≈ const)
+    const yLine = (seg.yA + seg.yB) / 2;
+    const xLo = Math.min(seg.xA, seg.xB);
+    const xHi = Math.max(seg.xA, seg.xB);
+    for (const bar of bars) {
+      if (bar.dir !== "Y") continue;
+      const x = bar.x;
+      if (x < xLo - tol || x > xHi + tol) continue;
+      const y0 = Math.min(bar.y0, bar.y1);
+      const y1 = Math.max(bar.y0, bar.y1);
+      if (yLine < y0 - tol || yLine > y1 + tol) continue;
+      out.push({ x, y: yLine });
+    }
+  }
+  return out;
+}
+
 type DistRangePiece = DistRangeSeg & {
   dir: "X" | "Y";
   markKey: string;

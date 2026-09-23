@@ -31,7 +31,7 @@ import {
   faceChainAlongY,
   hookDrawMm,
   zoneForRebarBar,
-  slabLayerPlanVisualGapMm,
+  distRangeJunctionsOnBars,
   type RebarBarSeg,
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarLayer, RebarZone, SlabProject } from "../types";
@@ -237,18 +237,19 @@ const DIST_END_AH = 5.5;
  * (cx,cy) = tọa độ PDF top-left → ty khi vẽ.
  */
 function drawDistBarJunction(ctx: Ctx, cx: number, cy: number) {
-  const r = 2.8;
+  /** PDF: nhỏ gấp 3 so với kích thước cũ (r=2.8 → size 5.6). */
+  const r = 2.8 / 3;
   const d = r * 0.72;
   const cyPdf = ty(cy);
-  // Vòng chỉ viền (pdf-lib size = đường kính)
+  // Giữ neo tâm như trước (x/y = tâm vòng theo convention hiện có)
   ctx.page.drawCircle({
     x: cx,
     y: cyPdf,
     size: r * 2,
     borderColor: BLACK,
-    borderWidth: 0.85,
+    borderWidth: 0.85 / 3,
   });
-  // Kim cương đặc (vuông xoay 45°)
+  // Kim cương đặc — tâm đúng giao khoảng rải ∩ thép
   const path =
     `M ${cx} ${ty(cy - d)} ` +
     `L ${cx + d} ${ty(cy)} ` +
@@ -989,13 +990,6 @@ function drawPlan(
       undefined,
       rebarZones,
     );
-    const typicalTol = slabLayerPlanVisualGapMm(project) / 2 + 2;
-    const nearTypical = (dir: "X" | "Y", pos: number) =>
-      drawBars.some((b) => {
-        if (b.dir !== dir) return false;
-        const barPos = b.dir === "X" ? b.y : b.x;
-        return Math.abs(barPos - pos) <= typicalTol;
-      });
     for (const seg of merged) {
       const pxA = toX(seg.xA);
       const pyA = toY(seg.yA);
@@ -1018,10 +1012,8 @@ function drawPlan(
       );
       drawDistEndCap(ctx, pxA, pyA, pxB, pyB);
       drawDistEndCap(ctx, pxB, pyB, pxA, pyA);
-      for (const j of seg.junctions) {
-        const keep =
-          seg.dir === "X" ? nearTypical("X", j.y) : nearTypical("Y", j.x);
-        if (keep) drawDistBarJunction(ctx, toX(j.x), toY(j.y));
+      for (const j of distRangeJunctionsOnBars(seg, drawBars)) {
+        drawDistBarJunction(ctx, toX(j.x), toY(j.y));
       }
       const label = String(Math.round(seg.lenMm));
       const alongY = Math.abs(seg.yB - seg.yA) >= Math.abs(seg.xB - seg.xA);
