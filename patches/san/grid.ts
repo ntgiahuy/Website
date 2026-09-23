@@ -881,7 +881,10 @@ export function stripRebarBarSegments(
           normals.length ? normals : [{ lo: xBarLo, hi: xBarHi }],
         );
         for (const s of segs) {
-          out.push({ dir: "X", x0: s.lo, x1: s.hi, y: my });
+          // Cắt theo bao da ± BV (dầm xéo / hình thang) — tránh đầu thép rơi ngoài
+          const clipped = clipSpanToCoverEnvelope(project, "X", my, s.lo, s.hi, cover);
+          if (!clipped) continue;
+          out.push({ dir: "X", x0: clipped.lo, x1: clipped.hi, y: my });
         }
       }
     }
@@ -930,7 +933,9 @@ export function stripRebarBarSegments(
           normals.length ? normals : [{ lo: yBarLo, hi: yBarHi }],
         );
         for (const s of segs) {
-          out.push({ dir: "Y", y0: s.lo, y1: s.hi, x: mx });
+          const clipped = clipSpanToCoverEnvelope(project, "Y", mx, s.lo, s.hi, cover);
+          if (!clipped) continue;
+          out.push({ dir: "Y", y0: clipped.lo, y1: clipped.hi, x: mx });
         }
       }
     }
@@ -1491,7 +1496,8 @@ export type DistRangeSeg = {
 /**
  * Đường khoảng rải thép sàn cho một thanh: nét ⊥ qua giữa thanh;
  * đầu/cuối = mí dầm trong ± inset (mặc định 50mm vào lòng sàn).
- * Thanh X → khoảng rải theo Y (ô chứa thanh); thanh Y → theo X.
+ * Thanh X → khoảng rải theo Y; thanh Y → theo X.
+ * Ô liền qua dầm đã xóa (không còn thân) → gộp 1 khoảng để đầu/cuối chạm nhau.
  */
 export function slabDistRangeForBar(
   project: SlabProject,
@@ -1503,6 +1509,43 @@ export function slabDistRangeForBar(
   if (axesX.length < 2 || axesY.length < 2) return null;
   const inset = Math.max(0, Math.round(insetMm));
 
+  /** Lan ô theo phương `along` khi dầm vuông góc giữa ô đã mất thân. */
+  const expandContiguous = (
+    ix0: number,
+    iy0: number,
+    along: "X" | "Y",
+  ): { lo: number; hi: number } => {
+    const s0 = baySlabExtent(project, axesX, axesY, ix0, iy0);
+    if (along === "Y") {
+      let y0 = s0.y0;
+      let y1 = s0.y1;
+      for (let iy = iy0 - 1; iy >= 0; iy--) {
+        if (beamCoversOrthogonalSpan(project, "X", axesY[iy + 1]!, ix0)) break;
+        const u = baySlabExtent(project, axesX, axesY, ix0, iy);
+        y0 = Math.min(y0, u.y0);
+      }
+      for (let iy = iy0 + 1; iy < axesY.length - 1; iy++) {
+        if (beamCoversOrthogonalSpan(project, "X", axesY[iy]!, ix0)) break;
+        const u = baySlabExtent(project, axesX, axesY, ix0, iy);
+        y1 = Math.max(y1, u.y1);
+      }
+      return { lo: y0, hi: y1 };
+    }
+    let x0 = s0.x0;
+    let x1 = s0.x1;
+    for (let ix = ix0 - 1; ix >= 0; ix--) {
+      if (beamCoversOrthogonalSpan(project, "Y", axesX[ix + 1]!, iy0)) break;
+      const u = baySlabExtent(project, axesX, axesY, ix, iy0);
+      x0 = Math.min(x0, u.x0);
+    }
+    for (let ix = ix0 + 1; ix < axesX.length - 1; ix++) {
+      if (beamCoversOrthogonalSpan(project, "Y", axesX[ix]!, iy0)) break;
+      const u = baySlabExtent(project, axesX, axesY, ix, iy0);
+      x1 = Math.max(x1, u.x1);
+    }
+    return { lo: x0, hi: x1 };
+  };
+
   if (bar.dir === "X") {
     const mx = (bar.x0 + bar.x1) / 2;
     let yLo = Infinity;
@@ -1511,8 +1554,9 @@ export function slabDistRangeForBar(
       for (let ix = 0; ix < axesX.length - 1; ix++) {
         const s = baySlabExtent(project, axesX, axesY, ix, iy);
         if (bar.y >= s.y0 - 1 && bar.y <= s.y1 + 1) {
-          yLo = Math.min(yLo, s.y0);
-          yHi = Math.max(yHi, s.y1);
+          const e = expandContiguous(ix, iy, "Y");
+          yLo = Math.min(yLo, e.lo);
+          yHi = Math.max(yHi, e.hi);
         }
       }
     }
@@ -1530,8 +1574,9 @@ export function slabDistRangeForBar(
     for (let ix = 0; ix < axesX.length - 1; ix++) {
       const s = baySlabExtent(project, axesX, axesY, ix, iy);
       if (bar.x >= s.x0 - 1 && bar.x <= s.x1 + 1) {
-        xLo = Math.min(xLo, s.x0);
-        xHi = Math.max(xHi, s.x1);
+        const e = expandContiguous(ix, iy, "X");
+        xLo = Math.min(xLo, e.lo);
+        xHi = Math.max(xHi, e.hi);
       }
     }
   }
@@ -1767,7 +1812,10 @@ export function buildMergedDistRanges(
       run = [];
     };
     for (const p of group) {
-      if (!run.length || p.bayIndex === run[run.length - 1].bayIndex + 1) {
+      // Cùng bayIndex (nhiều thanh trong 1 ô) hoặc ô kề (+1) → 1 đường liên tục.
+      // Khi xóa dầm giữa ô: bay kề mặt dày 0 — gộp để khoảng rải chạm nhau (không kẽ hở ±inset).
+      const prev = run.length ? run[run.length - 1]!.bayIndex : -1;
+      if (!run.length || p.bayIndex === prev || p.bayIndex === prev + 1) {
         run.push(p);
       } else {
         flush();
@@ -2181,8 +2229,83 @@ function offsetBarPerp(bar: RebarBarSeg, deltaMm: number): RebarBarSeg {
 }
 
 /**
- * Đặt lại đầu thanh vào da ngoài ± lớp BV tại đúng trạm (sau khi lệch ⊥ 2 lớp).
- * Dầm lệch/xéo: mặt ngoài đổi theo vị trí — lệch Y/X mà giữ nguyên đầu cũ → móc rơi ngoài dầm.
+ * Điểm (x,y) còn nằm trong bao da ngoài ± lớp BV (4 cạnh biên, kể cả dầm xéo).
+ * Dùng để cắt đầu thép / bỏ trạm rơi ra ngoài hình thang.
+ */
+export function pointInCoverEnvelope(
+  project: SlabProject,
+  x: number,
+  y: number,
+  cover = slabCoverMm(project),
+): boolean {
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  if (axesX.length < 2 || axesY.length < 2) return false;
+  const L = beamOuterFacesAtAlong(project, "Y", axesX[0]!, y);
+  const R = beamOuterFacesAtAlong(project, "Y", axesX[axesX.length - 1]!, y);
+  const B = beamOuterFacesAtAlong(project, "X", axesY[0]!, x);
+  const T = beamOuterFacesAtAlong(project, "X", axesY[axesY.length - 1]!, x);
+  return (
+    x >= L.lo + cover - 0.5 &&
+    x <= R.hi - cover + 0.5 &&
+    y >= B.lo + cover - 0.5 &&
+    y <= T.hi - cover + 0.5
+  );
+}
+
+/**
+ * Cắt đoạn [lo,hi] trên thanh (X: theo x tại y; Y: theo y tại x) còn trong bao da ± BV.
+ */
+export function clipSpanToCoverEnvelope(
+  project: SlabProject,
+  dir: "X" | "Y",
+  station: number,
+  lo: number,
+  hi: number,
+  cover = slabCoverMm(project),
+): { lo: number; hi: number } | null {
+  if (!(hi - lo > 1)) return null;
+  const inside = (t: number) =>
+    dir === "X"
+      ? pointInCoverEnvelope(project, t, station, cover)
+      : pointInCoverEnvelope(project, station, t, cover);
+  const step = Math.max(8, Math.min(40, (hi - lo) / 50));
+  const samples: number[] = [];
+  for (let t = lo; t <= hi + 1e-6; t += step) samples.push(t);
+  if (samples.length === 0 || samples[samples.length - 1]! < hi - 0.5) samples.push(hi);
+
+  let first = -1;
+  let last = -1;
+  for (let i = 0; i < samples.length; i++) {
+    if (inside(samples[i]!)) {
+      if (first < 0) first = i;
+      last = i;
+    }
+  }
+  if (first < 0 || last < 0) return null;
+
+  const refine = (a: number, b: number, wantInside: boolean): number => {
+    let loT = a;
+    let hiT = b;
+    for (let k = 0; k < 18; k++) {
+      const mid = (loT + hiT) / 2;
+      if (inside(mid) === wantInside) hiT = mid;
+      else loT = mid;
+    }
+    return wantInside ? hiT : loT;
+  };
+
+  let outLo = samples[first]!;
+  let outHi = samples[last]!;
+  if (first > 0) outLo = refine(samples[first - 1]!, samples[first]!, true);
+  if (last < samples.length - 1) outHi = refine(samples[last]!, samples[last + 1]!, false);
+  if (!(outHi - outLo > 1)) return null;
+  return { lo: outLo, hi: outHi };
+}
+
+/**
+ * Đặt lại đầu thanh vào da ngoài ± lớp BV tại đúng trạm (sau khi lệch ⊥ 2 lớp),
+ * rồi cắt theo bao 4 cạnh — tránh móc rơi ngoài dầm xéo / hình thang.
  */
 export function reanchorBarEndsToCover(project: SlabProject, bar: RebarBarSeg): RebarBarSeg {
   const cover = slabCoverMm(project);
@@ -2196,7 +2319,9 @@ export function reanchorBarEndsToCover(project: SlabProject, bar: RebarBarSeg): 
     const x0 = left.lo + cover;
     const x1 = right.hi - cover;
     if (!(x1 - x0 > 1)) return bar;
-    return { ...bar, x0, x1 };
+    const clipped = clipSpanToCoverEnvelope(project, "X", bar.y, x0, x1, cover);
+    if (!clipped) return bar;
+    return { ...bar, x0: clipped.lo, x1: clipped.hi };
   }
 
   const bottom = beamOuterFacesAtAlong(project, "X", axesY[0]!, bar.x);
@@ -2204,7 +2329,9 @@ export function reanchorBarEndsToCover(project: SlabProject, bar: RebarBarSeg): 
   const y0 = bottom.lo + cover;
   const y1 = top.hi - cover;
   if (!(y1 - y0 > 1)) return bar;
-  return { ...bar, y0, y1 };
+  const clipped = clipSpanToCoverEnvelope(project, "Y", bar.x, y0, y1, cover);
+  if (!clipped) return bar;
+  return { ...bar, y0: clipped.lo, y1: clipped.hi };
 }
 
 /** Lệch ⊥ minh họa 2 lớp + neo đầu thép lại theo lớp BV tại trạm mới. */

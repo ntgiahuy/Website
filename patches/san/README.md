@@ -1,4 +1,4 @@
-# Patch: Móc thép trong da dầm (lớp BV)
+# Patch: Móc trong da dầm + khoảng rải khi xóa dầm
 
-- Sau lệch ⊥ 2 lớp trên mặt bằng, neo lại đầu thanh = da ngoài ± Dày lớp bảo vệ tại đúng trạm
-- Tránh móc rơi ngoài dầm khi dầm biên lệch/xéo
+- Cắt đầu thép theo bao da ngoài ± lớp BV (hình thang / dầm xéo)
+- Gộp khoảng rải khi xóa dầm giữa ô — một đường liên tục, đầu chạm nhau
