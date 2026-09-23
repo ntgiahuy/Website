@@ -1705,7 +1705,7 @@ export const SLAB_REBAR_HOOK_MM = 100;
  * để đoạn ⊥ vẫn thấy rõ (~minPx trên SVG/PDF). Thống kê / chiều dài phát triển
  * vẫn dùng leftHook/rightHook gốc.
  */
-export function hookDrawMm(hookMm: number, pxPerMm: number, minPx = 12): number {
+export function hookDrawMm(hookMm: number, pxPerMm: number, minPx = 6): number {
   const h = Math.max(0, Math.round(Number(hookMm) || 0));
   if (h <= 0) return 0;
   if (!(pxPerMm > 1e-9)) return h;
