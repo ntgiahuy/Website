@@ -176,8 +176,10 @@ export function SlabPreview({
   );
   // Chừa chỗ: dầm nhô ngoài plan + vòng số hiệu + chuỗi dim (da dầm + tim trục)
   const DIM_GAP = 14;
+  /** Khoảng hở mép vòng số hiệu → đường dim đầu (tránh đè số lên bubble). */
+  const DIM_AFTER_BUBBLE = 16;
   const DIM_CHAINS = 2; // face + axis
-  const dimBand = DIM_GAP * DIM_CHAINS + 10;
+  const dimBand = DIM_AFTER_BUBBLE + DIM_GAP * DIM_CHAINS + 10;
   const pad = Math.max(
     48 + dimBand,
     AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 12 + dimBand + bleedMm * 0.04,
@@ -813,7 +815,7 @@ export function SlabPreview({
               const axisXMarks = axesX.map((a) => a.pos);
               const axisYMarks = axesY.map((a) => a.pos);
               const hNodes: ReactNode[] = [];
-              let yDim = Y(outerBottom) + AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 6;
+              let yDim = Y(outerBottom) + AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + DIM_AFTER_BUBBLE;
               if (faceX.length >= 2) {
                 hNodes.push(
                   <SvgDimHChain key="dim-face-x" marksMm={faceX} y={yDim} X={X} fontSize={7} />,
@@ -826,7 +828,7 @@ export function SlabPreview({
                 );
               }
               const vNodes: ReactNode[] = [];
-              let xDim = X(outerLeft) - AXIS_BUBBLE_OFFSET - AXIS_BUBBLE_R - 6;
+              let xDim = X(outerLeft) - AXIS_BUBBLE_OFFSET - AXIS_BUBBLE_R - DIM_AFTER_BUBBLE;
               if (faceY.length >= 2) {
                 vNodes.push(
                   <SvgDimVChain key="dim-face-y" marksMm={faceY} x={xDim} Y={Y} fontSize={7} />,
