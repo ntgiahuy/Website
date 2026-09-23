@@ -288,11 +288,9 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
   const marks: LevelMark3[] = [];
 
   const zTop = 0;
-  /** Cột stub: +50cm trên mặt sàn, −1m dưới mặt sàn (mm mặt bằng 3D). */
+  /** Stub cột chỉ phía trên mặt sàn (+50cm) — nét liền trên phối cảnh sàn. */
   const COL_ABOVE_SLAB_MM = 500;
-  const COL_BELOW_SLAB_MM = 1000;
   const zColTop = zTop + COL_ABOVE_SLAB_MM;
-  const zColBot = zTop - COL_BELOW_SLAB_MM;
 
   let ci = 0;
   for (const ax of axesX) {
@@ -311,12 +309,10 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
       const x1 = ax.pos + half;
       const y0 = ay.pos - half;
       const y1 = ay.pos + half;
-      // Tách stub trên/dưới — tránh 1 cạnh đứng xuyên suốt thành “đường cột” lạ.
+      // Chỉ stub cột phía trên sàn (nét liền). Không vẽ cột dưới —
+      // tránh nét đứt đứng chồng cùng tim với cột trên trên phối cảnh sàn.
       if (COL_ABOVE_SLAB_MM > 1) {
         solids.push(rectSolid(`col-above-${ci}`, x0, y0, x1, y1, zTop, zColTop));
-      }
-      if (COL_BELOW_SLAB_MM > 1) {
-        solids.push(rectSolid(`col-below-${ci}`, x0, y0, x1, y1, zColBot, zTop));
       }
       ci += 1;
     }
@@ -357,30 +353,18 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
   drawFaces.sort((a, b) => faceDepth(a) - faceDepth(b));
 
   const rawEdges: DrawEdge[] = [];
-  const colSolids = solids.filter((s) => s.id.startsWith("col-"));
-  const inColFootprint = (p: Pt3) =>
-    colSolids.some(
-      (s) =>
-        p.x > s.min.x + EPS &&
-        p.x < s.max.x - EPS &&
-        p.y > s.min.y + EPS &&
-        p.y < s.max.y - EPS,
-    );
   const isVerticalEdge = (a: Pt3, b: Pt3) =>
     Math.abs(a.x - b.x) < EPS && Math.abs(a.y - b.y) < EPS && Math.abs(a.z - b.z) > EPS;
 
   for (const s of solids) {
     const isBeam = s.id.startsWith("beam-");
-    const isColBelow = s.id.startsWith("col-below-");
     const isColAbove = s.id.startsWith("col-above-");
     for (const ed of s.edgeDefs) {
-      // Bỏ cạnh đứng thân dầm trùng chân cột — tránh nét đứt chồng lên cột trên (nét liền).
-      if (isBeam && isVerticalEdge(ed.a, ed.b) && inColFootprint(lerp(ed.a, ed.b, 0.5))) {
-        continue;
-      }
-      // Phối cảnh sàn: dầm dưới sàn → đứt; cột trên → liền; cột dưới → đứt.
+      // Phối cảnh sàn: không vẽ cạnh đứng thân dầm — tránh nét đứt đứng cạnh stub cột.
+      if (isBeam && isVerticalEdge(ed.a, ed.b)) continue;
+      // Mọi dầm → đứt (sàn nằm trên); cột trên → liền.
       let style0: "solid" | "dashed";
-      if (isBeam || isColBelow) style0 = "dashed";
+      if (isBeam) style0 = "dashed";
       else if (isColAbove) style0 = "solid";
       else {
         const c = solidCenter(s);
@@ -397,15 +381,21 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
     }
   }
 
+  // Chỉ giữ cạnh đứng nét liền (stub cột trên); loại mọi nét đứt đứng còn sót.
+  const filteredRaw = rawEdges.filter((e) => {
+    if (!isVerticalEdge(e.a, e.b)) return true;
+    return e.style === "solid";
+  });
+
   const edges: DrawEdge[] = [];
-  for (const e of rawEdges) {
+  for (const e of filteredRaw) {
     const hit = edges.findIndex((o) => nearlySameEdge(e.a, e.b, o.a, o.b));
     if (hit < 0) edges.push(e);
     else if (e.style === "solid") edges[hit].style = "solid";
   }
 
-  // Mặt sàn các ô thường + hatch sàn thấp; ô thủng vẽ khung + chéo đẹp.
-  // Cạnh mặt sàn (nằm trên dầm) — nét liền để đọc mặt bằng sàn.
+  // Mặt sàn các ô thường + hatch sàn thấp; ô thủng vẽ khung + chéo nét liền.
+  // Không viền nét liền mặt sàn — tránh ghi đè cạnh dầm (phải giữ nét đứt).
   const deckFaces: Face3[] = [];
   if (axesX.length >= 2 && axesY.length >= 2) {
     for (let ix = 0; ix < axesX.length - 1; ix++) {
@@ -446,17 +436,6 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
           ],
           kind: "solid",
         });
-        // Viền mặt sàn trên dầm — nét liền (ghi đè cạnh dầm đứt trùng mép)
-        const deckEdge = (a: Pt3, b: Pt3) => {
-          const ne: DrawEdge = { a, b, style: "solid" };
-          const hit = edges.findIndex((o) => nearlySameEdge(a, b, o.a, o.b));
-          if (hit < 0) edges.push(ne);
-          else edges[hit].style = "solid";
-        };
-        deckEdge({ x: bay.x0, y: bay.y0, z }, { x: bay.x1, y: bay.y0, z });
-        deckEdge({ x: bay.x1, y: bay.y0, z }, { x: bay.x1, y: bay.y1, z });
-        deckEdge({ x: bay.x1, y: bay.y1, z }, { x: bay.x0, y: bay.y1, z });
-        deckEdge({ x: bay.x0, y: bay.y1, z }, { x: bay.x0, y: bay.y0, z });
       }
     }
   }

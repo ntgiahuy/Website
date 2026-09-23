@@ -2604,7 +2604,7 @@ export function SlabApp() {
             <Panel title="Mô hình 3D" className="max-w-xl">
               <p className="mb-2 text-[11px] text-zinc-400">
                 Phối cảnh sàn: <b className="text-zinc-200">dầm nét đứt</b> (nằm dưới sàn);
-                <b className="text-zinc-200"> cột trên sàn nét liền</b>; cột dưới sàn nét đứt; ô thủng khung + chéo.
+                <b className="text-zinc-200"> cột trên sàn nét liền</b>; ô thủng khung + chéo.
                 Dùng <b className="text-zinc-200">− / % / +</b> để thu nhỏ·phóng to (50–300%).
               </p>
               <div className="flex flex-wrap gap-2">

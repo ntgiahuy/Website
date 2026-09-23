@@ -1,4 +1,6 @@
-# Patch: Dim kích thước mặt bằng minh họa
+# Patch: Phối cảnh sàn 3D — dầm đứt, cột trên liền
 
-Đã bổ sung chuỗi dim da dầm + lòng sàn và tim trục trên ảnh minh họa (SlabPreview), giống PDF/CAD.
-`faceChainAlongX/Y` xuất từ `grid.ts`; PDF dùng chung.
+- Tất cả dầm: nét đứt (sàn nằm trên)
+- Cột phía trên sàn: nét liền (stub +50cm)
+- Không vẽ cột dưới / cạnh đứng thân dầm (tránh nét đứt trên đường đứng cột)
+- Ô thủng: khung + chéo nét liền
