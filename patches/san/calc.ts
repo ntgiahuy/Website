@@ -147,7 +147,7 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
     const th = project.simple2.topHook;
     return [
       {
-        id: uid("zone"),
+        id: "preset-simple2-bot-x",
         mark: "MC 1-1",
         layer: "bottom",
         direction: "X",
@@ -161,7 +161,7 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
         note: "Lớp dưới X",
       },
       {
-        id: uid("zone"),
+        id: "preset-simple2-bot-y",
         mark: "MC 2-2",
         layer: "bottom",
         direction: "Y",
@@ -175,7 +175,7 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
         note: "Lớp dưới Y",
       },
       {
-        id: uid("zone"),
+        id: "preset-simple2-top-x",
         mark: "MT 1-1",
         layer: "top",
         direction: "X",
@@ -189,7 +189,7 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
         note: "Lớp trên X",
       },
       {
-        id: uid("zone"),
+        id: "preset-simple2-top-y",
         mark: "MT 2-2",
         layer: "top",
         direction: "Y",
@@ -219,7 +219,7 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
 
   const zones: RebarZone[] = [
     {
-      id: uid("zone"),
+      id: "preset-economy2-bot-x",
       mark: "MC 1-1",
       layer: "bottom",
       direction: "X",
@@ -233,7 +233,7 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
       note: "Lớp dưới X",
     },
     {
-      id: uid("zone"),
+      id: "preset-economy2-bot-y",
       mark: "MC 2-2",
       layer: "bottom",
       direction: "Y",
@@ -247,7 +247,7 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
       note: "Lớp dưới Y",
     },
     {
-      id: uid("zone"),
+      id: "preset-economy2-ct",
       mark: "CT 1",
       layer: "structural",
       direction: hatDir === "X" ? "Y" : "X",
@@ -264,7 +264,7 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
 
   if (hatDir === "X") {
     zones.push({
-      id: uid("zone"),
+      id: "preset-economy2-hat",
       mark: "MT 1-1",
       layer: "top",
       direction: "X",
@@ -283,7 +283,7 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
     });
   } else {
     zones.push({
-      id: uid("zone"),
+      id: "preset-economy2-hat",
       mark: "MT 1-1",
       layer: "top",
       direction: "Y",

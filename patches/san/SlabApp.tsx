@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   Box,
   Check,
@@ -106,6 +106,41 @@ function draftZone(mark = "MC 1-1"): RebarZone {
     showSpacing: true,
     spacingSymbol: "a",
   };
+}
+
+function AxisMmInput({
+  value,
+  onCommit,
+  className,
+  title,
+}: {
+  value: number;
+  onCommit: (v: number) => void;
+  className?: string;
+  title?: string;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+  return (
+    <Input
+      type="number"
+      className={className}
+      title={title}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        const v = Number(draft);
+        const next = Number.isFinite(v) ? v : 0;
+        if (next !== value) onCommit(next);
+        else setDraft(String(value));
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+    />
+  );
 }
 
 export function SlabApp() {
@@ -739,6 +774,16 @@ export function SlabApp() {
     else if (sel.kind === "axis") setTab("axes");
   }
 
+  const handlePlanSelectRef = useRef(handlePlanSelect);
+  handlePlanSelectRef.current = handlePlanSelect;
+  /** Callback ổn định — tránh SlabPreview re-render (nháy) mỗi lần đổi tab. */
+  const stablePlanSelect = useCallback(
+    (sel: PlanSelection | null, e?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) => {
+      handlePlanSelectRef.current(sel, e);
+    },
+    [],
+  );
+
   /** Danh sách loại dầm đã lưu (D1, D2…). */
   function sortedBeamTypes() {
     return [...(project.beamTypes ?? [])];
@@ -989,8 +1034,8 @@ export function SlabApp() {
     persist({ ...project, layoutPreset });
   }
 
-  const model = computeModel(project);
-  const zones = effectiveZones(project);
+  const model = useMemo(() => computeModel(project), [project]);
+  const zones = useMemo(() => effectiveZones(project), [project]);
 
   async function exportPdf() {
     setBusy(true);
@@ -1502,19 +1547,24 @@ export function SlabApp() {
                         <div key={ax.id} className="flex min-w-0 flex-nowrap items-center gap-1.5">
                           <Input
                             className="w-12 max-w-12 shrink-0"
-                            value={ax.name}
-                            onChange={(e) => updateAxesX(renameAxis(project.axesX, ax.id, e.target.value))}
+                            key={`name-x-${ax.id}-${ax.name}`}
+                            defaultValue={ax.name}
+                            onBlur={(e) => {
+                              const name = e.target.value.trim();
+                              if (name && name !== ax.name) {
+                                updateAxesX(renameAxis(project.axesX, ax.id, name));
+                              }
+                            }}
                           />
-                          <Input
-                            type="number"
+                          <AxisMmInput
                             className="min-w-0 w-auto flex-1"
                             title={i === 0 ? "Vị trí gốc (mm)" : "Khoảng cách từ trục trước (mm)"}
                             value={axisSpan(project.axesX, i)}
-                            onChange={(e) => {
-                              const v = Number(e.target.value) || 0;
+                            onCommit={(v) => {
                               if (i === 0) {
                                 const sorted = sortAxes(project.axesX);
                                 const delta = v - sorted[0].pos;
+                                if (delta === 0) return;
                                 updateAxesX(sorted.map((a) => ({ ...a, pos: a.pos + delta })));
                               } else {
                                 updateAxesX(setAxisSpan(project.axesX, i, v));
@@ -1553,19 +1603,24 @@ export function SlabApp() {
                         <div key={ay.id} className="flex min-w-0 flex-nowrap items-center gap-1.5">
                           <Input
                             className="w-12 max-w-12 shrink-0"
-                            value={ay.name}
-                            onChange={(e) => updateAxesY(renameAxis(project.axesY, ay.id, e.target.value))}
+                            key={`name-y-${ay.id}-${ay.name}`}
+                            defaultValue={ay.name}
+                            onBlur={(e) => {
+                              const name = e.target.value.trim();
+                              if (name && name !== ay.name) {
+                                updateAxesY(renameAxis(project.axesY, ay.id, name));
+                              }
+                            }}
                           />
-                          <Input
-                            type="number"
+                          <AxisMmInput
                             className="min-w-0 w-auto flex-1"
                             title={i === 0 ? "Vị trí gốc (mm)" : "Khoảng cách từ trục trước (mm)"}
                             value={axisSpan(project.axesY, i)}
-                            onChange={(e) => {
-                              const v = Number(e.target.value) || 0;
+                            onCommit={(v) => {
                               if (i === 0) {
                                 const sorted = sortAxes(project.axesY);
                                 const delta = v - sorted[0].pos;
+                                if (delta === 0) return;
                                 updateAxesY(sorted.map((a) => ({ ...a, pos: a.pos + delta })));
                               } else {
                                 updateAxesY(setAxisSpan(project.axesY, i, v));
@@ -2521,7 +2576,7 @@ export function SlabApp() {
               insertBeamMode={insertBeamMode}
               selection={planSelection}
               beamMultiSelect={beamMultiSelect}
-              onSelect={handlePlanSelect}
+              onSelect={stablePlanSelect}
             />
           </div>
         </div>

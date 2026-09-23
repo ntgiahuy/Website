@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { effectiveZones } from "@/lib/calc";
 import {
   axisInteriorSegmentsX,
@@ -133,7 +133,7 @@ function SvgDimVChain({
   return <g pointerEvents="none">{nodes}</g>;
 }
 
-export function SlabPreview({
+export const SlabPreview = memo(function SlabPreview({
   project,
   show3d,
   zoomPct = 100,
@@ -624,21 +624,32 @@ export function SlabPreview({
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
+    let raf = 0;
     const sync = () => {
-      setViewport({ w: el.clientWidth, h: el.clientHeight });
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const w = Math.round(el.clientWidth);
+        const h = Math.round(el.clientHeight);
+        // Tránh vòng lặp scrollbar ↔ ResizeObserver (nháy liên tục).
+        setViewport((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+      });
     };
     sync();
     const ro = new ResizeObserver(sync);
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
   }, [show3d]);
 
   const scale = zoom / 100;
   const canvasW = Math.max(1, Math.round(viewport.w * scale));
   const canvasH = Math.max(1, Math.round(viewport.h * scale));
-  // Vùng cuộn ≥ viewport khi phóng to; khi thu nhỏ vẫn đủ chỗ căn giữa
-  const scrollW = Math.max(viewport.w, canvasW);
-  const scrollH = Math.max(viewport.h, canvasH);
+  // Vùng cuộn ≥ viewport khi phóng to; khi 100% dùng % để tránh nháy scrollbar
+  const atDefaultZoom = Math.abs(scale - 1) < 0.001;
+  const scrollW = atDefaultZoom ? undefined : Math.max(viewport.w, canvasW);
+  const scrollH = atDefaultZoom ? undefined : Math.max(viewport.h, canvasH);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-zinc-950">
@@ -646,16 +657,16 @@ export function SlabPreview({
         <div
           className="box-border flex items-center justify-center p-1 sm:p-2"
           style={{
-            width: scrollW || "100%",
-            height: scrollH || "100%",
+            width: scrollW ?? "100%",
+            height: scrollH ?? "100%",
             minWidth: "100%",
             minHeight: "100%",
           }}
         >
           <svg
             viewBox={`0 0 ${W} ${H}`}
-            width={viewport.w ? canvasW : "100%"}
-            height={viewport.h ? canvasH : "100%"}
+            width={atDefaultZoom || !viewport.w ? "100%" : canvasW}
+            height={atDefaultZoom || !viewport.h ? "100%" : canvasH}
             className="block shrink-0"
             preserveAspectRatio="xMidYMid meet"
             onClick={() => {
@@ -1150,4 +1161,4 @@ export function SlabPreview({
       <div className="shrink-0 border-t border-zinc-800 px-3 py-1.5 text-[11px] text-zinc-500">{statusText}</div>
     </div>
   );
-}
+});
