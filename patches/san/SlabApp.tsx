@@ -2603,8 +2603,9 @@ export function SlabApp() {
           {tab === "model3d" && (
             <Panel title="Mô hình 3D" className="max-w-xl">
               <p className="mb-2 text-[11px] text-zinc-400">
-                Phối cảnh isometric: phần nổi / mặt nhìn thấy / cạnh đà biên ngoài — nét liền; cạnh che khuất dưới sàn — nét đứt mảnh; ô thủng vẽ khung + chéo.
-                Dùng <b className="text-zinc-200">− / % / +</b> trên thanh tab để thu nhỏ·phóng to (50–300%).
+                Phối cảnh sàn: <b className="text-zinc-200">dầm nét đứt</b> (nằm dưới sàn);
+                <b className="text-zinc-200"> cột trên sàn nét liền</b>; cột dưới sàn nét đứt; ô thủng khung + chéo.
+                Dùng <b className="text-zinc-200">− / % / +</b> để thu nhỏ·phóng to (50–300%).
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button

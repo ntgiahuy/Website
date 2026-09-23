@@ -358,27 +358,25 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
 
   const rawEdges: DrawEdge[] = [];
   for (const s of solids) {
-    const c = solidCenter(s);
-    const forceDashed = s.id.startsWith("col-below-");
-    const forceSolid = s.id.startsWith("col-above-");
-    const preferSolid = forceSolid || s.id.startsWith("beam-");
+    const isBeam = s.id.startsWith("beam-");
+    const isColBelow = s.id.startsWith("col-below-");
+    const isColAbove = s.id.startsWith("col-above-");
     for (const ed of s.edgeDefs) {
-      let style0: "solid" | "dashed" = forceDashed
-        ? "dashed"
-        : forceSolid
-          ? "solid"
-          : classifyEdge(ed.a, ed.b, s.faces[ed.f0], s.faces[ed.f1], c, occluderFaces);
-      // Phần nổi (cột trên sàn) / cạnh trước dầm: ưu tiên nét liền nếu không bị che.
-      if (preferSolid && style0 === "dashed" && !forceDashed) {
-        const mid = lerp(ed.a, ed.b, 0.5);
-        if (!isPointOccluded(mid, occluderFaces) && (faceFrontFacing(s.faces[ed.f0], c) || faceFrontFacing(s.faces[ed.f1], c))) {
-          style0 = "solid";
-        }
+      // Phối cảnh sàn: dầm nằm dưới sàn → nét đứt; cột trên sàn → nét liền; cột dưới → nét đứt.
+      let style0: "solid" | "dashed";
+      if (isBeam || isColBelow) style0 = "dashed";
+      else if (isColAbove) style0 = "solid";
+      else {
+        const c = solidCenter(s);
+        style0 = classifyEdge(ed.a, ed.b, s.faces[ed.f0], s.faces[ed.f1], c, occluderFaces);
       }
       const parts = clipEdgeOutsideSolids(ed.a, ed.b, solids, s.id);
       for (const [p0, p1] of parts) {
         let style: "solid" | "dashed" = style0;
-        if (style === "solid" && isPointOccluded(lerp(p0, p1, 0.5), occluderFaces)) style = "dashed";
+        // Không hạ cột trên sàn xuống nét đứt dù bị che một phần.
+        if (style === "solid" && !isColAbove && isPointOccluded(lerp(p0, p1, 0.5), occluderFaces)) {
+          style = "dashed";
+        }
         rawEdges.push({ a: p0, b: p1, style });
       }
     }
@@ -391,48 +389,8 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
     else if (e.style === "solid") edges[hit].style = "solid";
   }
 
-  // Cạnh đà biên ngoài (mép trên khung) — luôn nét liền.
-  let ox0 = Infinity, oy0 = Infinity, ox1 = -Infinity, oy1 = -Infinity;
-  for (const s of solids) {
-    if (!s.id.startsWith("beam-")) continue;
-    ox0 = Math.min(ox0, s.min.x);
-    oy0 = Math.min(oy0, s.min.y);
-    ox1 = Math.max(ox1, s.max.x);
-    oy1 = Math.max(oy1, s.max.y);
-  }
-  if (Number.isFinite(ox0)) {
-    const tol = 40;
-    const nearTop = (p: Pt3) => Math.abs(p.z - zTop) < 8;
-    const onOuter = (a: Pt3, b: Pt3) =>
-      (Math.abs(a.x - ox0) < tol && Math.abs(b.x - ox0) < tol) ||
-      (Math.abs(a.x - ox1) < tol && Math.abs(b.x - ox1) < tol) ||
-      (Math.abs(a.y - oy0) < tol && Math.abs(b.y - oy0) < tol) ||
-      (Math.abs(a.y - oy1) < tol && Math.abs(b.y - oy1) < tol);
-    for (const e of edges) {
-      if (nearTop(e.a) && nearTop(e.b) && onOuter(e.a, e.b)) e.style = "solid";
-      // Cạnh đứng da ngoài dầm biên
-      if (onOuter(e.a, e.b) && Math.abs(e.a.x - e.b.x) < 2 && Math.abs(e.a.y - e.b.y) < 2) {
-        e.style = "solid";
-      }
-      if (
-        onOuter(e.a, e.b) &&
-        Math.abs(e.a.z - e.b.z) < 2 &&
-        (Math.abs(e.a.z - zTop) < 8 || Math.abs(e.a.z - (zTop - 500)) < 80)
-      ) {
-        // mép dưới/da ngoài gần mặt ngoài
-        if (
-          (Math.abs(e.a.x - ox0) < tol && Math.abs(e.b.x - ox0) < tol) ||
-          (Math.abs(e.a.x - ox1) < tol && Math.abs(e.b.x - ox1) < tol) ||
-          (Math.abs(e.a.y - oy0) < tol && Math.abs(e.b.y - oy0) < tol) ||
-          (Math.abs(e.a.y - oy1) < tol && Math.abs(e.b.y - oy1) < tol)
-        ) {
-          e.style = "solid";
-        }
-      }
-    }
-  }
-
   // Mặt sàn các ô thường + hatch sàn thấp; ô thủng vẽ khung + chéo đẹp.
+  // Cạnh mặt sàn (nằm trên dầm) — nét liền để đọc mặt bằng sàn.
   const deckFaces: Face3[] = [];
   if (axesX.length >= 2 && axesY.length >= 2) {
     for (let ix = 0; ix < axesX.length - 1; ix++) {
@@ -455,7 +413,6 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
               { a: { x: x0, y: y0, z }, b: { x: x1, y: y1, z }, style: "solid" },
               { a: { x: x0, y: y1, z }, b: { x: x1, y: y0, z }, style: "solid" },
             );
-            // Ghi nhận bbox ô thủng (không vẽ lại — đã nằm trong edges nét liền)
             openingXs.push(
               [{ x: x0, y: y0, z }, { x: x1, y: y1, z }],
               [{ x: x0, y: y1, z }, { x: x1, y: y0, z }],
@@ -463,7 +420,7 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
           }
           continue;
         }
-        if (kind === "low") continue; // hatch riêng bên dưới
+        if (kind === "low") continue;
         const z = zTop + 1;
         deckFaces.push({
           pts: [
@@ -474,6 +431,17 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
           ],
           kind: "solid",
         });
+        // Viền mặt sàn trên dầm — nét liền (ghi đè cạnh dầm đứt trùng mép)
+        const deckEdge = (a: Pt3, b: Pt3) => {
+          const ne: DrawEdge = { a, b, style: "solid" };
+          const hit = edges.findIndex((o) => nearlySameEdge(a, b, o.a, o.b));
+          if (hit < 0) edges.push(ne);
+          else edges[hit].style = "solid";
+        };
+        deckEdge({ x: bay.x0, y: bay.y0, z }, { x: bay.x1, y: bay.y0, z });
+        deckEdge({ x: bay.x1, y: bay.y0, z }, { x: bay.x1, y: bay.y1, z });
+        deckEdge({ x: bay.x1, y: bay.y1, z }, { x: bay.x0, y: bay.y1, z });
+        deckEdge({ x: bay.x0, y: bay.y1, z }, { x: bay.x0, y: bay.y0, z });
       }
     }
   }
