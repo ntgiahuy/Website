@@ -25,6 +25,7 @@ import {
   typicalRebarBars,
   faceChainAlongX,
   faceChainAlongY,
+  hookDrawMm,
 } from "@/lib/grid";
 import type { PlanSelection, SlabProject } from "@/lib/types";
 import { buildBeamFrameScene, projectSceneToSvg } from "@/lib/view3d";
@@ -861,8 +862,8 @@ export function SlabPreview({
                     const { left: leftHook, right: rightHook } = hooksForRebarBar(project, bar, zones);
                     const hooks = rebarHookSegments(
                       bar,
-                      leftHook,
-                      rightHook,
+                      hookDrawMm(leftHook, s),
+                      hookDrawMm(rightHook, s),
                       project.planWidth,
                       project.planHeight,
                     );

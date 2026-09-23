@@ -1697,7 +1697,20 @@ export function rectNearlyEquals(
 }
 
 /** Chiều dài móc thép sàn trên mặt bằng (mm) — fallback khi zone không có. */
-export const SLAB_REBAR_HOOK_MM = 50;
+export const SLAB_REBAR_HOOK_MM = 100;
+
+/**
+ * Chiều dài móc khi vẽ mặt bằng (mm).
+ * Giữ đúng số đã nhập; nếu quá ngắn so với tỉ lệ bản vẽ thì nâng tối thiểu
+ * để đoạn ⊥ vẫn thấy rõ (~minPx trên SVG/PDF). Thống kê / chiều dài phát triển
+ * vẫn dùng leftHook/rightHook gốc.
+ */
+export function hookDrawMm(hookMm: number, pxPerMm: number, minPx = 12): number {
+  const h = Math.max(0, Math.round(Number(hookMm) || 0));
+  if (h <= 0) return 0;
+  if (!(pxPerMm > 1e-9)) return h;
+  return Math.max(h, Math.ceil(minPx / pxPerMm));
+}
 
 /** Móc mặc định theo preset (simple2 / economy2) khi không khớp zone. */
 function presetHookFallbackMm(project: SlabProject): number {

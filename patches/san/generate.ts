@@ -29,6 +29,7 @@ import {
   typicalRebarBars,
   faceChainAlongX,
   faceChainAlongY,
+  hookDrawMm,
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarZone, SlabProject } from "../types";
 import { buildBeamFrameScene, projectSceneToSvg } from "../view3d";
@@ -813,8 +814,8 @@ function drawPlan(
     }
     for (const h of rebarHookSegments(
       bar,
-      leftHook,
-      rightHook,
+      hookDrawMm(leftHook, s),
+      hookDrawMm(rightHook, s),
       project.planWidth,
       project.planHeight,
     )) {

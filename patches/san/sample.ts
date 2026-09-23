@@ -37,9 +37,9 @@ export function defaultInfo(): SlabInfo {
 export function defaultSimple2(): Simple2Layer {
   return {
     bottomSpec: "10a150",
-    bottomHook: 50,
+    bottomHook: 100,
     topSpec: "10a150",
-    topHook: 50,
+    topHook: 100,
     textHeight: 150,
   };
 }
@@ -47,11 +47,11 @@ export function defaultSimple2(): Simple2Layer {
 export function defaultEconomy2(): Economy2Layer {
   return {
     bottomSpec: "10a200",
-    bottomHook: 60,
+    bottomHook: 100,
     topSpec: "10a150",
-    topHook: 60,
+    topHook: 100,
     structuralSpec: "6a150",
-    structuralHook: 50,
+    structuralHook: 80,
     distToCenter: 4,
     textHeight: 150,
     hatAlongShort: true,
@@ -107,8 +107,8 @@ function sampleZones(): RebarZone[] {
       direction: "X",
       dia: 10,
       spacing: 150,
-      leftHook: 50,
-      rightHook: 50,
+      leftHook: 100,
+      rightHook: 100,
       x1: pad,
       y1: pad,
       x2: 6000 - pad,
@@ -125,8 +125,8 @@ function sampleZones(): RebarZone[] {
       direction: "X",
       dia: 10,
       spacing: 150,
-      leftHook: 50,
-      rightHook: 50,
+      leftHook: 100,
+      rightHook: 100,
       x1: pad,
       y1: pad,
       x2: 3000,
