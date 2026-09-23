@@ -357,12 +357,28 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
   drawFaces.sort((a, b) => faceDepth(a) - faceDepth(b));
 
   const rawEdges: DrawEdge[] = [];
+  const colSolids = solids.filter((s) => s.id.startsWith("col-"));
+  const inColFootprint = (p: Pt3) =>
+    colSolids.some(
+      (s) =>
+        p.x > s.min.x + EPS &&
+        p.x < s.max.x - EPS &&
+        p.y > s.min.y + EPS &&
+        p.y < s.max.y - EPS,
+    );
+  const isVerticalEdge = (a: Pt3, b: Pt3) =>
+    Math.abs(a.x - b.x) < EPS && Math.abs(a.y - b.y) < EPS && Math.abs(a.z - b.z) > EPS;
+
   for (const s of solids) {
     const isBeam = s.id.startsWith("beam-");
     const isColBelow = s.id.startsWith("col-below-");
     const isColAbove = s.id.startsWith("col-above-");
     for (const ed of s.edgeDefs) {
-      // Phối cảnh sàn: dầm nằm dưới sàn → nét đứt; cột trên sàn → nét liền; cột dưới → nét đứt.
+      // Bỏ cạnh đứng thân dầm trùng chân cột — tránh nét đứt chồng lên cột trên (nét liền).
+      if (isBeam && isVerticalEdge(ed.a, ed.b) && inColFootprint(lerp(ed.a, ed.b, 0.5))) {
+        continue;
+      }
+      // Phối cảnh sàn: dầm dưới sàn → đứt; cột trên → liền; cột dưới → đứt.
       let style0: "solid" | "dashed";
       if (isBeam || isColBelow) style0 = "dashed";
       else if (isColAbove) style0 = "solid";
@@ -373,7 +389,6 @@ export function buildBeamFrameScene(project: SlabProject): Scene3D {
       const parts = clipEdgeOutsideSolids(ed.a, ed.b, solids, s.id);
       for (const [p0, p1] of parts) {
         let style: "solid" | "dashed" = style0;
-        // Không hạ cột trên sàn xuống nét đứt dù bị che một phần.
         if (style === "solid" && !isColAbove && isPointOccluded(lerp(p0, p1, 0.5), occluderFaces)) {
           style = "dashed";
         }
