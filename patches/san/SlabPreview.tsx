@@ -1082,10 +1082,10 @@ export const SlabPreview = memo(function SlabPreview({
                         const ux = dx / plen;
                         const uy = dy / plen;
                         const inset = Math.min(ah, plen * 0.35);
-                        /** Minh họa: nhỏ gấp 32 so với r=3.2 cũ. */
-                        const jr = 3.2 / 32;
+                        /** Minh họa: nhỏ gấp 2 so với r=3.2 cũ. */
+                        const jr = 3.2 / 2;
                         const jd = jr * 0.72;
-                        const jStroke = 1.5 / 32;
+                        const jStroke = 1.5 / 2;
                         // Chấm đúng giao khoảng rải ∩ cây điển hình (đã lệch lớp)
                         const junctions = distRangeJunctionsOnBars(seg, drawBars);
                         return (
