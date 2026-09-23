@@ -1186,6 +1186,61 @@ export function beamOuterFacesAtSpan(
   return beamSegAvgOuterFaces(beam, spanIndex);
 }
 
+/** Da dầm tại trục (fallback tiết diện nếu đoạn bị bỏ). */
+function facesAtAxisSpanForDim(
+  project: SlabProject,
+  beamDir: PlanBeam["direction"],
+  axis: GridAxis,
+  spanIndex: number,
+): { lo: number; hi: number } {
+  const f = beamOuterFacesAtSpan(project, beamDir, axis, spanIndex);
+  if (Math.abs(f.hi - f.lo) >= 1) return f;
+  return beamOuterFaces(axis.pos, beamSectionOnAxis(project, beamDir, axis));
+}
+
+/**
+ * Chuỗi mốc da dầm + lòng sàn theo phương X (dầm đứng trên axesX).
+ * [lo0, hi0, lo1, hi1, …] → đoạn hi−lo = B dầm; lo(i+1)−hi(i) = bề rộng sàn.
+ */
+export function faceChainAlongX(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+): number[] {
+  if (axesX.length === 0) return [];
+  const spanIy = Math.max(0, Math.min(axesY.length - 2, Math.floor((axesY.length - 1) / 2)));
+  const pts: number[] = [];
+  for (const ax of axesX) {
+    const f = facesAtAxisSpanForDim(project, "Y", ax, spanIy);
+    const lo = Math.min(f.lo, f.hi);
+    const hi = Math.max(f.lo, f.hi);
+    if (pts.length === 0 || Math.abs(pts[pts.length - 1]! - lo) > 0.5) pts.push(lo);
+    else pts[pts.length - 1] = lo;
+    pts.push(hi);
+  }
+  return pts;
+}
+
+/** Chuỗi mốc da dầm + lòng sàn theo phương Y (dầm ngang trên axesY). */
+export function faceChainAlongY(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+): number[] {
+  if (axesY.length === 0) return [];
+  const spanIx = Math.max(0, Math.min(axesX.length - 2, Math.floor((axesX.length - 1) / 2)));
+  const pts: number[] = [];
+  for (const ay of axesY) {
+    const f = facesAtAxisSpanForDim(project, "X", ay, spanIx);
+    const lo = Math.min(f.lo, f.hi);
+    const hi = Math.max(f.lo, f.hi);
+    if (pts.length === 0 || Math.abs(pts[pts.length - 1]! - lo) > 0.5) pts.push(lo);
+    else pts[pts.length - 1] = lo;
+    pts.push(hi);
+  }
+  return pts;
+}
+
 /** Khóa đoạn dầm giữa hai trục giao. */
 export function beamSegKey(a0Id: string, a1Id: string): string {
   return `${a0Id}|${a1Id}`;

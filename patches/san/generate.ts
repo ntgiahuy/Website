@@ -11,9 +11,6 @@ import {
   type ScheduleRow,
 } from "../calc";
 import {
-  beamOuterFaces,
-  beamOuterFacesAtSpan,
-  beamSectionOnAxis,
   beamSegSideFaces,
   beamSegments,
   beamFaceDashStyle,
@@ -30,6 +27,8 @@ import {
   hooksForRebarBar,
   rebarHookSegments,
   typicalRebarBars,
+  faceChainAlongX,
+  faceChainAlongY,
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarZone, SlabProject } from "../types";
 import { buildBeamFrameScene, projectSceneToSvg } from "../view3d";
@@ -669,61 +668,6 @@ function dimVChain(
     if (mm < 1) continue;
     dimV(ctx, x, toY(a), toY(b), String(mm), size, labelSide);
   }
-}
-
-/** Da dầm tại trục (fallback tiết diện nếu đoạn bị bỏ). */
-function facesAtAxisSpan(
-  project: SlabProject,
-  beamDir: PlanBeam["direction"],
-  axis: GridAxis,
-  spanIndex: number,
-): { lo: number; hi: number } {
-  const f = beamOuterFacesAtSpan(project, beamDir, axis, spanIndex);
-  if (Math.abs(f.hi - f.lo) >= 1) return f;
-  return beamOuterFaces(axis.pos, beamSectionOnAxis(project, beamDir, axis));
-}
-
-/**
- * Chuỗi mốc da dầm + lòng sàn theo phương X (dầm đứng trên axesX).
- * [lo0, hi0, lo1, hi1, …] → đoạn hi−lo = B dầm; lo(i+1)−hi(i) = bề rộng sàn.
- */
-function faceChainAlongX(
-  project: SlabProject,
-  axesX: GridAxis[],
-  axesY: GridAxis[],
-): number[] {
-  if (axesX.length === 0) return [];
-  const spanIy = Math.max(0, Math.min(axesY.length - 2, Math.floor((axesY.length - 1) / 2)));
-  const pts: number[] = [];
-  for (const ax of axesX) {
-    const f = facesAtAxisSpan(project, "Y", ax, spanIy);
-    const lo = Math.min(f.lo, f.hi);
-    const hi = Math.max(f.lo, f.hi);
-    if (pts.length === 0 || Math.abs(pts[pts.length - 1] - lo) > 0.5) pts.push(lo);
-    else pts[pts.length - 1] = lo;
-    pts.push(hi);
-  }
-  return pts;
-}
-
-/** Chuỗi mốc da dầm + lòng sàn theo phương Y (dầm ngang trên axesY). */
-function faceChainAlongY(
-  project: SlabProject,
-  axesX: GridAxis[],
-  axesY: GridAxis[],
-): number[] {
-  if (axesY.length === 0) return [];
-  const spanIx = Math.max(0, Math.min(axesX.length - 2, Math.floor((axesX.length - 1) / 2)));
-  const pts: number[] = [];
-  for (const ay of axesY) {
-    const f = facesAtAxisSpan(project, "X", ay, spanIx);
-    const lo = Math.min(f.lo, f.hi);
-    const hi = Math.max(f.lo, f.hi);
-    if (pts.length === 0 || Math.abs(pts[pts.length - 1] - lo) > 0.5) pts.push(lo);
-    else pts[pts.length - 1] = lo;
-    pts.push(hi);
-  }
-  return pts;
 }
 
 function drawShape(ctx: Ctx, row: ScheduleRow, x: number, y: number, w: number, h: number) {

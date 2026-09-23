@@ -23,6 +23,8 @@ import {
   hooksForRebarBar,
   rebarHookSegments,
   typicalRebarBars,
+  faceChainAlongX,
+  faceChainAlongY,
 } from "@/lib/grid";
 import type { PlanSelection, SlabProject } from "@/lib/types";
 import { buildBeamFrameScene, projectSceneToSvg } from "@/lib/view3d";
@@ -38,6 +40,96 @@ const AXIS_BUBBLE_OFFSET = AXIS_BUBBLE_R + AXIS_BUBBLE_GAP;
 
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
+}
+
+const DIM_STROKE = "#60a5fa";
+const DIM_TEXT = "#93c5fd";
+const DIM_TICK = 3.5;
+
+/** Chuỗi dim ngang (SVG): tick + đường + số. */
+function SvgDimHChain({
+  marksMm,
+  y,
+  X,
+  fontSize = 8,
+}: {
+  marksMm: number[];
+  y: number;
+  X: (mm: number) => number;
+  fontSize?: number;
+}) {
+  const nodes: ReactNode[] = [];
+  for (let i = 0; i < marksMm.length - 1; i++) {
+    const a = marksMm[i]!;
+    const b = marksMm[i + 1]!;
+    const mm = Math.round(Math.abs(b - a));
+    if (mm < 1) continue;
+    const x1 = X(Math.min(a, b));
+    const x2 = X(Math.max(a, b));
+    const mid = (x1 + x2) / 2;
+    nodes.push(
+      <g key={`dh-${i}-${mm}`}>
+        <line x1={x1} y1={y} x2={x2} y2={y} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <line x1={x1} y1={y - DIM_TICK} x2={x1} y2={y + DIM_TICK} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <line x1={x2} y1={y - DIM_TICK} x2={x2} y2={y + DIM_TICK} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <text
+          x={mid}
+          y={y - 4}
+          fill={DIM_TEXT}
+          fontSize={fontSize}
+          fontWeight="600"
+          textAnchor="middle"
+        >
+          {mm}
+        </text>
+      </g>,
+    );
+  }
+  return <g pointerEvents="none">{nodes}</g>;
+}
+
+/** Chuỗi dim đứng (SVG): số xoay dọc bên trái. */
+function SvgDimVChain({
+  marksMm,
+  x,
+  Y,
+  fontSize = 8,
+}: {
+  marksMm: number[];
+  x: number;
+  Y: (mm: number) => number;
+  fontSize?: number;
+}) {
+  const nodes: ReactNode[] = [];
+  for (let i = 0; i < marksMm.length - 1; i++) {
+    const a = marksMm[i]!;
+    const b = marksMm[i + 1]!;
+    const mm = Math.round(Math.abs(b - a));
+    if (mm < 1) continue;
+    const y1 = Y(Math.max(a, b));
+    const y2 = Y(Math.min(a, b));
+    const mid = (y1 + y2) / 2;
+    nodes.push(
+      <g key={`dv-${i}-${mm}`}>
+        <line x1={x} y1={y1} x2={x} y2={y2} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <line x1={x - DIM_TICK} y1={y1} x2={x + DIM_TICK} y2={y1} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <line x1={x - DIM_TICK} y1={y2} x2={x + DIM_TICK} y2={y2} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <text
+          x={x - 5}
+          y={mid}
+          fill={DIM_TEXT}
+          fontSize={fontSize}
+          fontWeight="600"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          transform={`rotate(-90 ${x - 5} ${mid})`}
+        >
+          {mm}
+        </text>
+      </g>,
+    );
+  }
+  return <g pointerEvents="none">{nodes}</g>;
 }
 
 export function SlabPreview({
@@ -82,8 +174,14 @@ export function SlabPreview({
     bleed.xMax - project.planWidth,
     bleed.yMax - project.planHeight,
   );
-  // Chừa chỗ: dầm nhô ngoài plan + vòng số hiệu + khe hở
-  const pad = Math.max(48, AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 12 + bleedMm * 0.04);
+  // Chừa chỗ: dầm nhô ngoài plan + vòng số hiệu + chuỗi dim (da dầm + tim trục)
+  const DIM_GAP = 14;
+  const DIM_CHAINS = 2; // face + axis
+  const dimBand = DIM_GAP * DIM_CHAINS + 10;
+  const pad = Math.max(
+    48 + dimBand,
+    AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 12 + dimBand + bleedMm * 0.04,
+  );
   const sx = (W - pad * 2) / Math.max(project.planWidth, 1);
   const sy = (H - pad * 2) / Math.max(project.planHeight, 1);
   const s = Math.min(sx, sy);
@@ -708,6 +806,45 @@ export function SlabPreview({
                 </g>
               );
             })}
+            {/* Dim kích thước: da dầm + lòng sàn · tim trục (như PDF / CAD) */}
+            {(() => {
+              const faceX = faceChainAlongX(project, axesX, axesY);
+              const faceY = faceChainAlongY(project, axesX, axesY);
+              const axisXMarks = axesX.map((a) => a.pos);
+              const axisYMarks = axesY.map((a) => a.pos);
+              const hNodes: ReactNode[] = [];
+              let yDim = Y(outerBottom) + AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 6;
+              if (faceX.length >= 2) {
+                hNodes.push(
+                  <SvgDimHChain key="dim-face-x" marksMm={faceX} y={yDim} X={X} fontSize={7} />,
+                );
+                yDim += DIM_GAP;
+              }
+              if (axisXMarks.length >= 2) {
+                hNodes.push(
+                  <SvgDimHChain key="dim-axis-x" marksMm={axisXMarks} y={yDim} X={X} fontSize={7.5} />,
+                );
+              }
+              const vNodes: ReactNode[] = [];
+              let xDim = X(outerLeft) - AXIS_BUBBLE_OFFSET - AXIS_BUBBLE_R - 6;
+              if (faceY.length >= 2) {
+                vNodes.push(
+                  <SvgDimVChain key="dim-face-y" marksMm={faceY} x={xDim} Y={Y} fontSize={7} />,
+                );
+                xDim -= DIM_GAP;
+              }
+              if (axisYMarks.length >= 2) {
+                vNodes.push(
+                  <SvgDimVChain key="dim-axis-y" marksMm={axisYMarks} x={xDim} Y={Y} fontSize={7.5} />,
+                );
+              }
+              return (
+                <g pointerEvents="none">
+                  {hNodes}
+                  {vNodes}
+                </g>
+              );
+            })()}
             {beamNodes}
             {(() => {
               const bars = stripRebarBarSegments(project, axesX, axesY);
