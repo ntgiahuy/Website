@@ -789,8 +789,8 @@ function dimV(
   line(ctx, x, lo, x, hi, 0.45);
   line(ctx, x - 3, lo, x + 3, lo, 0.45);
   line(ctx, x - 3, hi, x + 3, hi, 0.45);
-  // Số sát đường dim của chính chuỗi này (khe nhỏ) — tránh đè sang đường dim hàng bên cạnh
-  const clear = 2.5;
+  // Số hở khỏi đường dim của chính chuỗi này; DIM_GAP_Y đủ rộng để không đè hàng bên
+  const clear = 4;
   const anchorX = labelSide === "left" ? x - clear : x + clear;
   textVerticalBeside(ctx, label, anchorX, (lo + hi) / 2, size, labelSide, false);
 }
@@ -844,8 +844,9 @@ function drawShape(ctx: Ctx, row: ScheduleRow, x: number, y: number, w: number, 
   }
   const straight = row.barLength - row.leftHook - row.rightHook;
   textSimple(ctx, String(straight), (x0 + x1) / 2, midY - 9, 5.8, false, "center");
-  if (row.leftHook > 0) textSimple(ctx, String(row.leftHook), x0 - 2, y + 2, 5.2);
-  if (row.rightHook > 0) textSimple(ctx, String(row.rightHook), x1 - 14, y + 2, 5.2);
+  // Số móc đối xứng: trong lòng móc, cách nét đứng ~2pt (trái left-align, phải right-align)
+  if (row.leftHook > 0) textSimple(ctx, String(row.leftHook), x0 + 2, y + 2, 5.2, false, "left");
+  if (row.rightHook > 0) textSimple(ctx, String(row.rightHook), x1 - 2, y + 2, 5.2, false, "right");
 }
 
 function fmtNum(n: number, digits = 2) {
