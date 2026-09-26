@@ -44,9 +44,12 @@ import {
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarLayer, RebarZone, SlabProject } from "../types";
 
-const PAGE_W = 1684;
-const PAGE_H = 1191;
+/** Khổ A1 ngang (mm → pt @ 72dpi): 841×594 mm. */
+const PAGE_W = Math.round((841 * 72) / 25.4); // 2384
+const PAGE_H = Math.round((594 * 72) / 25.4); // 1684
 const BLACK = rgb(0, 0, 0);
+/** Tiêu đề khung tên shop drawing. */
+const SHOP_TITLE = "SHOP DRAWING THÉP SÀN (BY GIAHUY.NET)";
 const GRAY = rgb(0.45, 0.45, 0.45);
 const AXIS_LINE = rgb(0.28, 0.28, 0.28);
 /** Chỉ thép dùng nét đỏ; dầm / khung / tim trục = đen. */
@@ -2026,38 +2029,56 @@ export async function generateSlabPdf(
   const zones = effectiveZones(project);
   const ctx: Ctx = { page, font, fontBold, boldKit, project, model };
 
+  const pagePad = 28;
+  // Khung ngoài khổ A1
   ctx.page.drawRectangle({
     x: 16,
     y: 16,
     width: PAGE_W - 32,
     height: PAGE_H - 32,
     borderColor: BLACK,
-    borderWidth: 1.05,
+    borderWidth: 1.35,
   });
 
-  const title = `${project.info.name} (SL=${project.info.quantity}; dày=${project.info.thickness}mm)`;
-  textSimple(ctx, "1/1", 28, 34, 8, false, "left");
-  textSimple(ctx, title, PAGE_W - 36, 34, 11, true, "right");
+  /**
+   * Khung tên phía trên (trong khung trang):
+   * SHOP DRAWING THÉP SÀN (BY GIAHUY.NET) — đậm, chữ lớn.
+   */
+  const titleFrameX = pagePad;
+  const titleFrameY = pagePad;
+  const titleFrameW = PAGE_W - pagePad * 2;
+  const titleFrameH = 88;
+  // Khung đôi
+  rect(ctx, titleFrameX, titleFrameY, titleFrameW, titleFrameH, 1.6);
+  rect(ctx, titleFrameX + 4, titleFrameY + 4, titleFrameW - 8, titleFrameH - 8, 0.85);
+  // Đường ngang tách tiêu đề shop / dòng thông tin sàn
+  const titleSplitY = titleFrameY + 56;
+  line(ctx, titleFrameX + 4, titleSplitY, titleFrameX + titleFrameW - 4, titleSplitY, 0.85);
+  textSimple(ctx, SHOP_TITLE, PAGE_W / 2, titleFrameY + 34, 28, true, "center");
+
+  const projTitle = `${project.info.name} (SL=${project.info.quantity}; dày=${project.info.thickness}mm)`;
+  textSimple(ctx, "1/1", titleFrameX + 14, titleFrameY + 74, 10, false, "left");
+  textSimple(ctx, projTitle, PAGE_W / 2, titleFrameY + 74, 12, true, "center");
   textSimple(
     ctx,
-    `Bê tông ${project.info.concreteGrade} · Thép ${project.info.steelGrade} · Lớp BV ${project.info.cover}mm`,
-    PAGE_W - 36,
-    48,
-    7.5,
+    `Bê tông ${project.info.concreteGrade} · Thép ${project.info.steelGrade} · Lớp BV ${project.info.cover}mm · Khổ A1`,
+    titleFrameX + titleFrameW - 14,
+    titleFrameY + 74,
+    9,
     false,
     "right",
   );
 
   /**
-   * Một trang:
+   * Một trang A1:
    * Hàng trên: Lớp dưới (trái) | Lớp trên (phải).
    * Dưới lớp dưới: Mặt cắt A-A → B-B.
-   * Góc dưới phải khổ giấy: Bảng thống kê | Tổng hợp (cùng một hàng).
+   * Góc dưới phải: Bảng thống kê | Tổng hợp (cùng một hàng).
    */
-  const marginX = 36;
-  const gap = 12;
-  const topY = 62;
-  const bottomLimit = PAGE_H - 28;
+  const marginX = pagePad;
+  const gap = 14;
+  const topY = titleFrameY + titleFrameH + 14;
+  const bottomLimit = PAGE_H - pagePad;
   const colW = Math.floor((PAGE_W - marginX * 2 - gap) / 2);
   const leftX = marginX;
   const rightX = marginX + colW + gap;
@@ -2090,17 +2111,17 @@ export async function generateSlabPdf(
     return one * 2 + gap;
   };
 
-  // planH: mặt bằng + mặt cắt; chừa tableBlock ở đáy trang
+  // planH: mặt bằng + mặt cắt; chừa tableBlock ở đáy trang (A1 rộng hơn)
   let planH = Math.max(
-    200,
-    Math.min(440, bottomLimit - topY - estSecHFor(0.06) - gap - tableBlock.blockH - 24),
+    280,
+    Math.min(620, bottomLimit - topY - estSecHFor(0.08) - gap - tableBlock.blockH - 28),
   );
   let planS = planScale(project, colW, planH);
   for (let i = 0; i < 4; i++) {
     const secH = estSecHFor(planS);
     const estPlanBlock = planH + 95;
     if (topY + estPlanBlock + gap + secH + 8 <= bottomLimit - tableBlock.blockH) break;
-    planH = Math.max(170, planH - 28);
+    planH = Math.max(220, planH - 36);
     planS = planScale(project, colW, planH);
   }
 
@@ -2112,7 +2133,6 @@ export async function generateSlabPdf(
   drawSectionCutsAboveSchedule(ctx, leftX, afterPlans + gap, colW, planS);
 
   // Bảng TK + Tổng hợp: cùng hàng, neo góc dưới phải (trong khung trang)
-  const pagePad = 28;
   const tablesX = PAGE_W - pagePad - tableBlock.blockW;
   const tablesY = PAGE_H - pagePad - tableBlock.blockH;
   drawScheduleTable(ctx, tablesX, tablesY);
