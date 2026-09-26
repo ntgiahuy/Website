@@ -36,10 +36,12 @@ type Anchor = { leftPct: number; topPct: number };
 
 /** Bán kính vòng số hiệu trục (px SVG). */
 const AXIS_BUBBLE_R = 6;
-/** Khoảng hở giữa da dầm ngoài và mép vòng (kề sàn, không chạm). */
-const AXIS_BUBBLE_GAP = 12;
-/** Tâm vòng số hiệu cách da dầm ngoài. */
-const AXIS_BUBBLE_OFFSET = AXIS_BUBBLE_R + AXIS_BUBBLE_GAP;
+/** Da dầm → đường dim dầm/sàn (gần hình vẽ nhất). */
+const DIM_FROM_EDGE = 16;
+/** Khoảng cách giữa các chuỗi dim. */
+const DIM_CHAIN_GAP = 14;
+/** Mép đường dim ngoài cùng → mép vòng số hiệu. */
+const DIM_TO_BUBBLE = 10;
 
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
@@ -170,13 +172,11 @@ export const SlabPreview = memo(function SlabPreview({
   const W = 640;
   const H = 420;
   const bleed = useMemo(() => planBeamBleed(project, axesX, axesY), [project, axesX, axesY]);
-  // Chừa chỗ: vòng số hiệu + chuỗi dim (da dầm + tim trục) ngoài da dầm ngoài cùng
-  const DIM_GAP = 14;
-  /** Khoảng hở mép vòng số hiệu → đường dim đầu (tránh đè số lên bubble). */
-  const DIM_AFTER_BUBBLE = 22;
+  // Ngoài → vào: số hiệu trục → dim tim trục → dim dầm/sàn → hình vẽ
   const DIM_CHAINS = 2; // face + axis
-  const dimBand = DIM_AFTER_BUBBLE + DIM_GAP * DIM_CHAINS + 10;
-  const pad = Math.max(48 + dimBand, AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 12 + dimBand);
+  const dimBand =
+    DIM_FROM_EDGE + DIM_CHAIN_GAP * DIM_CHAINS + DIM_TO_BUBBLE + AXIS_BUBBLE_R * 2 + 8;
+  const pad = Math.max(56, dimBand + 14);
   /** Khung vẽ theo da dầm ngoài (kể cả dầm lệch ngoài biên), không cố định 0…plan. */
   const extentW = Math.max(bleed.xMax - bleed.xMin, 1);
   const extentH = Math.max(bleed.yMax - bleed.yMin, 1);
@@ -192,6 +192,30 @@ export const SlabPreview = memo(function SlabPreview({
   const outerRight = bleed.xMax;
   const outerBottom = bleed.yMin;
   const outerTop = bleed.yMax;
+
+  /** Vị trí dim + bubble: ngoài → số hiệu → dim trục → dim dầm/sàn → hình. */
+  const faceXMarks = faceChainAlongX(project, axesX, axesY);
+  const faceYMarks = faceChainAlongY(project, axesX, axesY);
+  const axisXMarks = axesX.map((a) => a.pos);
+  const axisYMarks = axesY.map((a) => a.pos);
+  const edgeBottomY = Y(outerBottom);
+  const edgeLeftX = X(outerLeft);
+  let yDimCursor = edgeBottomY + DIM_FROM_EDGE;
+  const yFaceDim = faceXMarks.length >= 2 ? yDimCursor : null;
+  if (yFaceDim != null) yDimCursor += DIM_CHAIN_GAP;
+  const yAxisDim = axisXMarks.length >= 2 ? yDimCursor : null;
+  if (yAxisDim != null) yDimCursor += DIM_TO_BUBBLE + AXIS_BUBBLE_R;
+  else if (yFaceDim != null) yDimCursor = yFaceDim + DIM_TO_BUBBLE + AXIS_BUBBLE_R;
+  else yDimCursor = edgeBottomY + AXIS_BUBBLE_R + 12;
+  const bubbleBottomCY = yDimCursor;
+  let xDimCursor = edgeLeftX - DIM_FROM_EDGE;
+  const xFaceDim = faceYMarks.length >= 2 ? xDimCursor : null;
+  if (xFaceDim != null) xDimCursor -= DIM_CHAIN_GAP;
+  const xAxisDim = axisYMarks.length >= 2 ? xDimCursor : null;
+  if (xAxisDim != null) xDimCursor -= DIM_TO_BUBBLE + AXIS_BUBBLE_R;
+  else if (xFaceDim != null) xDimCursor = xFaceDim - DIM_TO_BUBBLE - AXIS_BUBBLE_R;
+  else xDimCursor = edgeLeftX - AXIS_BUBBLE_R - 12;
+  const bubbleLeftCX = xDimCursor;
 
   function anchorFromSvg(svgX: number, svgY: number): Anchor {
     return {
@@ -219,8 +243,8 @@ export const SlabPreview = memo(function SlabPreview({
     const axes = sel.dir === "X" ? axesX : axesY;
     const ax = axes.find((a) => a.id === sel.axisId);
     if (!ax) return { leftPct: 50, topPct: 40 };
-    if (sel.dir === "X") return anchorFromSvg(X(ax.pos), Y(outerBottom) + AXIS_BUBBLE_OFFSET + 20);
-    return anchorFromSvg(X(outerLeft) - AXIS_BUBBLE_OFFSET, Y(ax.pos));
+    if (sel.dir === "X") return anchorFromSvg(X(ax.pos), bubbleBottomCY);
+    return anchorFromSvg(bubbleLeftCX, Y(ax.pos));
   }
 
   function pick(sel: PlanSelection | null, e?: MouseEvent) {
@@ -714,8 +738,8 @@ export const SlabPreview = memo(function SlabPreview({
             {axesX.map((ax) => {
               const active = selection?.kind === "axis" && selection.dir === "X" && selection.axisId === ax.id;
               const cx = X(ax.pos);
-              const edgeY = Y(outerBottom);
-              const cy = edgeY + AXIS_BUBBLE_OFFSET;
+              const edgeY = edgeBottomY;
+              const cy = bubbleBottomCY;
               const stroke = active ? "#79b8ff" : "#52525b";
               const sw = active ? 1.2 : 0.6;
               const interior = axisInteriorSegmentsX(project, axesX, axesY, ax.pos);
@@ -735,7 +759,7 @@ export const SlabPreview = memo(function SlabPreview({
                       pointerEvents="none"
                     />
                   ))}
-                  {/* Đường dẫn nét mảnh gạch đứt: mép vòng → da sàn ngoài */}
+                  {/* Đường dẫn: mép vòng (ngoài) → da sàn — băng qua chuỗi dim */}
                   <line
                     x1={cx}
                     y1={cy - AXIS_BUBBLE_R}
@@ -779,8 +803,8 @@ export const SlabPreview = memo(function SlabPreview({
             })}
             {axesY.map((ay) => {
               const active = selection?.kind === "axis" && selection.dir === "Y" && selection.axisId === ay.id;
-              const edgeX = X(outerLeft);
-              const cx = edgeX - AXIS_BUBBLE_OFFSET;
+              const edgeX = edgeLeftX;
+              const cx = bubbleLeftCX;
               const cy = Y(ay.pos);
               const stroke = active ? "#fbbf24" : "#52525b";
               const sw = active ? 1.2 : 0.6;
@@ -801,7 +825,7 @@ export const SlabPreview = memo(function SlabPreview({
                       pointerEvents="none"
                     />
                   ))}
-                  {/* Đường dẫn nét mảnh gạch đứt: mép vòng → da sàn ngoài */}
+                  {/* Đường dẫn: mép vòng (ngoài) → da sàn — băng qua chuỗi dim */}
                   <line
                     x1={cx + AXIS_BUBBLE_R}
                     y1={cy}
@@ -843,45 +867,21 @@ export const SlabPreview = memo(function SlabPreview({
                 </g>
               );
             })}
-            {/* Dim kích thước: da dầm + lòng sàn · tim trục (như PDF / CAD) */}
-            {(() => {
-              const faceX = faceChainAlongX(project, axesX, axesY);
-              const faceY = faceChainAlongY(project, axesX, axesY);
-              const axisXMarks = axesX.map((a) => a.pos);
-              const axisYMarks = axesY.map((a) => a.pos);
-              const hNodes: ReactNode[] = [];
-              let yDim = Y(outerBottom) + AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + DIM_AFTER_BUBBLE;
-              if (faceX.length >= 2) {
-                hNodes.push(
-                  <SvgDimHChain key="dim-face-x" marksMm={faceX} y={yDim} X={X} fontSize={7} />,
-                );
-                yDim += DIM_GAP;
-              }
-              if (axisXMarks.length >= 2) {
-                hNodes.push(
-                  <SvgDimHChain key="dim-axis-x" marksMm={axisXMarks} y={yDim} X={X} fontSize={7.5} />,
-                );
-              }
-              const vNodes: ReactNode[] = [];
-              let xDim = X(outerLeft) - AXIS_BUBBLE_OFFSET - AXIS_BUBBLE_R - DIM_AFTER_BUBBLE;
-              if (faceY.length >= 2) {
-                vNodes.push(
-                  <SvgDimVChain key="dim-face-y" marksMm={faceY} x={xDim} Y={Y} fontSize={7} />,
-                );
-                xDim -= DIM_GAP;
-              }
-              if (axisYMarks.length >= 2) {
-                vNodes.push(
-                  <SvgDimVChain key="dim-axis-y" marksMm={axisYMarks} x={xDim} Y={Y} fontSize={7.5} />,
-                );
-              }
-              return (
-                <g pointerEvents="none">
-                  {hNodes}
-                  {vNodes}
-                </g>
-              );
-            })()}
+            {/* Dim: sát hình = dầm/sàn; ngoài hơn = tim trục; số hiệu ngoài cùng */}
+            <g pointerEvents="none">
+              {yFaceDim != null && (
+                <SvgDimHChain key="dim-face-x" marksMm={faceXMarks} y={yFaceDim} X={X} fontSize={7} />
+              )}
+              {yAxisDim != null && (
+                <SvgDimHChain key="dim-axis-x" marksMm={axisXMarks} y={yAxisDim} X={X} fontSize={7.5} />
+              )}
+              {xFaceDim != null && (
+                <SvgDimVChain key="dim-face-y" marksMm={faceYMarks} x={xFaceDim} Y={Y} fontSize={7} />
+              )}
+              {xAxisDim != null && (
+                <SvgDimVChain key="dim-axis-y" marksMm={axisYMarks} x={xAxisDim} Y={Y} fontSize={7.5} />
+              )}
+            </g>
             {beamNodes}
             {(() => {
               const bars = stripRebarBarSegments(project, axesX, axesY);

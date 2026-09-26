@@ -1,4 +1,4 @@
-# Patch: PDF bảng TK + tổng hợp góc dưới phải
+# Patch: số hiệu trục ngoài cùng → dim trục → dim dầm/sàn → hình
 
-- Bảng thống kê và tổng hợp cùng một hàng.
-- Neo góc dưới bên phải khổ giấy.
+- Preview + PDF mặt bằng / mặt cắt: vòng số hiệu nằm ngoài chuỗi dim.
+- Thứ tự ngoài → vào: số hiệu trục → dim tim trục → dim dầm·sàn → hình vẽ.
