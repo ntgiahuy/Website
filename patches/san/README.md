@@ -1,4 +1,4 @@
-# Patch: PDF layout mặt bằng ngang + mặt cắt dưới lớp dưới
+# Patch: PDF bảng TK + tổng hợp góc dưới phải
 
-- Lớp dưới | Lớp trên cùng hàng.
-- A-A / B-B dưới mặt bằng lớp dưới; thống kê dưới lớp trên.
+- Bảng thống kê và tổng hợp cùng một hàng.
+- Neo góc dưới bên phải khổ giấy.

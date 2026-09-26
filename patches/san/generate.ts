@@ -1934,7 +1934,7 @@ function drawScheduleTable(ctx: Ctx, x: number, y: number) {
     9,
     true,
   );
-  return { w, h: h + 16 };
+  return { w, h: 18 + h };
 }
 
 function drawSummaryTable(ctx: Ctx, x: number, y: number) {
@@ -1980,6 +1980,33 @@ function drawSummaryTable(ctx: Ctx, x: number, y: number) {
   }
   const fy = ty0 + gridH + 12;
   textSimple(ctx, `Tổng TL: ${fmtNum(totalWeight || model.totalWeight)} kg`, x + 8, fy, 8, true);
+  return { w, h: fy + 10 - y };
+}
+
+/** Kích thước khối bảng TK + tổng hợp (cùng hàng) — để neo góc dưới phải. */
+function scheduleSummaryBlockSize(ctx: Ctx): {
+  schedW: number;
+  schedH: number;
+  sumW: number;
+  sumH: number;
+  blockW: number;
+  blockH: number;
+} {
+  const rows = buildPdfScheduleRows(ctx);
+  const schedW = 36 + 40 + 168 + 28 + 52 + 28 + 36 + 40 + 48 + 50;
+  const schedH = 18 + 34 + Math.max(rows.length, 1) * 18;
+  const dias = new Set(rows.map((r) => r.dia));
+  const sumW = 138 + Math.max(dias.size, 1) * 78;
+  const sumH = 18 + 4 * 24 + 12 + 10;
+  const gap = 14;
+  return {
+    schedW,
+    schedH,
+    sumW,
+    sumH,
+    blockW: schedW + gap + sumW,
+    blockH: Math.max(schedH, sumH),
+  };
 }
 
 export async function generateSlabPdf(
@@ -2023,9 +2050,9 @@ export async function generateSlabPdf(
 
   /**
    * Một trang:
-   * Hàng trên: Lớp dưới (trái) | Lớp trên (phải) — cùng hàng, cùng tỉ lệ.
-   * Dưới lớp dưới: Mặt cắt A-A → B-B xếp dọc.
-   * Dưới lớp trên: Bảng thống kê → Tổng hợp.
+   * Hàng trên: Lớp dưới (trái) | Lớp trên (phải).
+   * Dưới lớp dưới: Mặt cắt A-A → B-B.
+   * Góc dưới phải khổ giấy: Bảng thống kê | Tổng hợp (cùng một hàng).
    */
   const marginX = 36;
   const gap = 12;
@@ -2034,6 +2061,9 @@ export async function generateSlabPdf(
   const colW = Math.floor((PAGE_W - marginX * 2 - gap) / 2);
   const leftX = marginX;
   const rightX = marginX + colW + gap;
+
+  const tableBlock = scheduleSummaryBlockSize(ctx);
+  const tableGap = 14;
 
   // Chừa chỗ dưới cột trái cho 2 mặt cắt (+ dim trục / B+sàn)
   const estSecHFor = (s: number) => {
@@ -2060,20 +2090,17 @@ export async function generateSlabPdf(
     return one * 2 + gap;
   };
 
-  // planH: đủ cao cho mặt bằng, còn lại cho mặt cắt / bảng TK
-  const scheduleReserve = 220;
+  // planH: mặt bằng + mặt cắt; chừa tableBlock ở đáy trang
   let planH = Math.max(
     200,
-    Math.min(420, bottomLimit - topY - estSecHFor(0.06) - gap - 40),
+    Math.min(440, bottomLimit - topY - estSecHFor(0.06) - gap - tableBlock.blockH - 24),
   );
   let planS = planScale(project, colW, planH);
-  // Thu planH nếu mặt cắt + phần còn lại không vừa trang
   for (let i = 0; i < 4; i++) {
     const secH = estSecHFor(planS);
-    // Ước chiều cao mặt bằng thực (plan box + dim + tiêu đề)
     const estPlanBlock = planH + 95;
-    if (topY + estPlanBlock + gap + Math.max(secH, scheduleReserve) <= bottomLimit) break;
-    planH = Math.max(170, planH - 30);
+    if (topY + estPlanBlock + gap + secH + 8 <= bottomLimit - tableBlock.blockH) break;
+    planH = Math.max(170, planH - 28);
     planS = planScale(project, colW, planH);
   }
 
@@ -2084,9 +2111,12 @@ export async function generateSlabPdf(
   // A-A / B-B nằm dưới mặt bằng lớp dưới (cột trái)
   drawSectionCutsAboveSchedule(ctx, leftX, afterPlans + gap, colW, planS);
 
-  // Thống kê + tổng hợp dưới mặt bằng lớp trên (cột phải)
-  const table = drawScheduleTable(ctx, rightX, afterPlans + gap);
-  drawSummaryTable(ctx, rightX, afterPlans + gap + table.h + 14);
+  // Bảng TK + Tổng hợp: cùng hàng, neo góc dưới phải (trong khung trang)
+  const pagePad = 28;
+  const tablesX = PAGE_W - pagePad - tableBlock.blockW;
+  const tablesY = PAGE_H - pagePad - tableBlock.blockH;
+  drawScheduleTable(ctx, tablesX, tablesY);
+  drawSummaryTable(ctx, tablesX + tableBlock.schedW + tableGap, tablesY);
 
   return pdf.save();
 }
