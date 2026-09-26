@@ -1,0 +1,395 @@
+From 15cec300d07abea3f4709ca2d9f367cd8034271e Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 17 Sep 2026 07:33:28 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20d=E1=BA=A7m=20theo=20tim=20tr=E1=BB=A5c?=
+ =?UTF-8?q?=20=E2=80=94=20bi=C3=AAn=20da=20ngo=C3=A0i,=20gi=E1=BB=AFa=20t?=
+ =?UTF-8?q?=C3=A2m=20d=E1=BA=A7m?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Khi đổi khoảng cách tim trục, dầm dịch theo trục gắn kèm.
+Trục biên: B1=0 hoặc B (tim = da dầm ngoài); trục giữa: B1=B/2.
+---
+ components/slab/SlabApp.tsx |  25 ++++---
+ lib/grid.ts                 | 142 ++++++++++++++++++++++++++++++++----
+ lib/sample.ts               |  20 ++---
+ 3 files changed, 156 insertions(+), 31 deletions(-)
+
+diff --git a/components/slab/SlabApp.tsx b/components/slab/SlabApp.tsx
+index b95d3da..3ce4fb4 100644
+--- a/components/slab/SlabApp.tsx
++++ b/components/slab/SlabApp.tsx
+@@ -40,6 +40,7 @@ import {
+   setPlanSize,
+   sortAxes,
+   syncBeamInfo,
++  syncBeamsToAxes,
+ } from "@/lib/grid";
+ import { withBasePath } from "@/lib/base-path";
+ import { downloadPdf, generateSlabPdf } from "@/lib/pdf/generate";
+@@ -220,13 +221,18 @@ export function SlabApp() {
+     const parsed = parseBeamSize(beam.size);
+     const B = dims.beamB ?? parsed.b;
+     const H = dims.beamH ?? parsed.h;
+-    const B1 = dims.beamB1 ?? (Number.isFinite(beam.offset) ? beam.offset : Math.round(B / 2));
+-    persist(
+-      patchBeam(project, beam.id, {
+-        size: `${Math.round(B)}x${Math.round(H)}`,
+-        offset: B1 as number,
+-      }),
+-    );
++    const patched = patchBeam(project, beam.id, {
++      size: `${Math.round(B)}x${Math.round(H)}`,
++      ...(dims.beamB1 !== undefined
++        ? { offset: dims.beamB1 }
++        : {}),
++    });
++    // Đổi B (không sửa B1 tay) → tính lại B1 biên/giữa theo lưới trục
++    if (dims.beamB !== undefined && dims.beamB1 === undefined) {
++      persist(syncBeamsToAxes(patched));
++    } else {
++      persist(patched);
++    }
+   }
+ 
+ 
+@@ -980,8 +986,9 @@ export function SlabApp() {
+                     </Field>
+                   </div>
+                   <p className="mt-1.5 text-[11px] text-zinc-500">
+-                    B1: từ mép trái dầm đến tim dầm. Dầm và trục độc lập — thêm/bớt trục không đổi dầm và ngược lại.
+-                    Kích thước: {project.info.beamSizeX || `${project.info.beamB}x${project.info.beamH}`}.
++                    B1 tự động: trục biên = da dầm ngoài (B1=0 hoặc B); trục giữa = tâm dầm (B1=B/2).
++                    Đổi khoảng cách tim trục thì dầm theo tim. Kích thước:{" "}
++                    {project.info.beamSizeX || `${project.info.beamB}x${project.info.beamH}`}.
+                   </p>
+                 </div>
+                 <div className="mt-3 rounded border border-zinc-700 bg-zinc-950/60 p-2">
+diff --git a/lib/grid.ts b/lib/grid.ts
+index d3a5812..2261e1a 100644
+--- a/lib/grid.ts
++++ b/lib/grid.ts
+@@ -45,6 +45,103 @@ export function beamOuterFaces(axisPos: number, sec: BeamSection): { lo: number;
+   return { lo: axisPos - sec.b1, hi: axisPos + (sec.bw - sec.b1) };
+ }
+ 
++/**
++ * B1 theo vị trí trục trên lưới:
++ * - biên đầu: tim = da ngoài lo (B1 = 0)
++ * - biên cuối: tim = da ngoài hi (B1 = B)
++ * - giữa: tim = tâm dầm (B1 = B/2)
++ */
++export function beamOffsetForAxisIndex(bw: number, index: number, count: number): number {
++  const B = Math.max(1, Math.round(bw) || 1);
++  if (count <= 1) return Math.round(B / 2);
++  if (index <= 0) return 0;
++  if (index >= count - 1) return B;
++  return Math.round(B / 2);
++}
++
++/**
++ * Ghép dầm → chỉ số trục: axisId → trùng vị trí → cùng thứ tự (khi số dầm = số trục) → gần nhất.
++ * Quan trọng khi đổi nhịp: vị trí trục đã đổi, không còn khớp pos cũ.
++ */
++function resolveBeamAxisIndex(
++  beam: PlanBeam,
++  axes: GridAxis[],
++  peersSorted: PlanBeam[],
++): number {
++  if (!axes.length) return -1;
++  if (beam.axisId) {
++    const byId = axes.findIndex((a) => a.id === beam.axisId);
++    if (byId >= 0) return byId;
++  }
++  const byPos = axes.findIndex((a) => Math.abs(a.pos - beam.axis) < 0.5);
++  if (byPos >= 0) return byPos;
++  if (peersSorted.length === axes.length) {
++    const peerIdx = peersSorted.findIndex((p) => p.id === beam.id);
++    if (peerIdx >= 0) return peerIdx;
++  }
++  let best = 0;
++  let bestDist = Math.abs(axes[0].pos - beam.axis);
++  for (let i = 1; i < axes.length; i++) {
++    const d = Math.abs(axes[i].pos - beam.axis);
++    if (d < bestDist) {
++      best = i;
++      bestDist = d;
++    }
++  }
++  return best;
++}
++
++/**
++ * Đưa dầm theo tim trục (axisId / vị trí) và chỉnh B1 biên / giữa.
++ * Gọi sau khi đổi khoảng cách / số lượng trục.
++ */
++export function syncBeamsToAxes(project: SlabProject): SlabProject {
++  const axesX = sortAxes(project.axesX ?? []);
++  const axesY = sortAxes(project.axesY ?? []);
++  const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
++
++  const peersY = (project.beams ?? [])
++    .filter((b) => b.direction === "Y")
++    .slice()
++    .sort((a, b) => a.axis - b.axis || a.name.localeCompare(b.name));
++  const peersX = (project.beams ?? [])
++    .filter((b) => b.direction === "X")
++    .slice()
++    .sort((a, b) => a.axis - b.axis || a.name.localeCompare(b.name));
++
++  const beams = (project.beams ?? []).map((b) => {
++    if (b.direction === "Y") {
++      const idx = resolveBeamAxisIndex(b, axesX, peersY);
++      if (idx < 0) return { ...b, start: 0, end: Hplan };
++      const ax = axesX[idx];
++      const { b: bw } = parseSizeStr(b.size);
++      return {
++        ...b,
++        axis: ax.pos,
++        axisId: ax.id,
++        offset: beamOffsetForAxisIndex(bw, idx, axesX.length),
++        start: 0,
++        end: Hplan,
++      };
++    }
++
++    const idx = resolveBeamAxisIndex(b, axesY, peersX);
++    if (idx < 0) return { ...b, start: 0, end: W };
++    const ay = axesY[idx];
++    const { b: bw } = parseSizeStr(b.size);
++    return {
++      ...b,
++      axis: ay.pos,
++      axisId: ay.id,
++      offset: beamOffsetForAxisIndex(bw, idx, axesY.length),
++      start: 0,
++      end: W,
++    };
++  });
++
++  return { ...project, beams };
++}
++
+ /** Đoạn dầm đứng (phương Y): kéo đầu đến da dầm ngang tại hai đầu. */
+ export function verticalBeamSegExtent(
+   project: SlabProject,
+@@ -399,6 +496,7 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
+   for (const ax of axesX) {
+     const old = findPrev("Y", ax.id, ax.pos);
+     const dims = old ? parseSize(old.size) : { b: B, h: H };
++    const idx = axesX.findIndex((a) => a.id === ax.id);
+     beams.push({
+       id: old?.id ?? uid("beam"),
+       name: nextName(old?.name),
+@@ -408,12 +506,13 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
+       axisId: ax.id,
+       start: 0,
+       end: Hplan,
+-      offset: Number.isFinite(old?.offset) ? (old!.offset as number) : B1,
++      offset: beamOffsetForAxisIndex(dims.b, idx, axesX.length),
+     });
+   }
+   for (const ay of axesY) {
+     const old = findPrev("X", ay.id, ay.pos);
+     const dims = old ? parseSize(old.size) : { b: B, h: H };
++    const idx = axesY.findIndex((a) => a.id === ay.id);
+     beams.push({
+       id: old?.id ?? uid("beam"),
+       name: nextName(old?.name),
+@@ -423,7 +522,7 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
+       axisId: ay.id,
+       start: 0,
+       end: W,
+-      offset: Number.isFinite(old?.offset) ? (old!.offset as number) : B1,
++      offset: beamOffsetForAxisIndex(dims.b, idx, axesY.length),
+     });
+   }
+   return beams;
+@@ -445,7 +544,9 @@ export function patchBeamOnAxis(
+   const parsed = parseSize(current?.size ?? formatBeamSize(project.info.beamB, project.info.beamH));
+   const B = dims.beamB ?? parsed.b;
+   const H = dims.beamH ?? parsed.h;
+-  const B1 = dims.beamB1 ?? current?.offset ?? Math.round(B / 2);
++  const B1 =
++    dims.beamB1 ??
++    beamOffsetForAxisIndex(B, axisIndex, axes.length);
+   const size = formatBeamSize(B, H);
+   const beams = (project.beams?.length ? project.beams : []).map((b) => {
+     const match = b.axisId === axis.id || (b.direction === dir && Math.abs(b.axis - axis.pos) < 0.5);
+@@ -454,7 +555,7 @@ export function patchBeamOnAxis(
+   return { ...project, beams };
+ }
+ 
+-/** Áp dụng B/H/B1 của một dầm cho toàn bộ dầm trên mặt bằng. */
++/** Áp dụng B/H của một dầm cho toàn bộ; B1 biên/giữa theo lưới trục. */
+ export function applyBeamDimsToAll(
+   project: SlabProject,
+   dims: { beamB: number; beamH: number; beamB1: number },
+@@ -463,7 +564,6 @@ export function applyBeamDimsToAll(
+   const beams = (project.beams?.length ? project.beams : []).map((b) => ({
+     ...b,
+     size,
+-    offset: dims.beamB1,
+   }));
+   const info = syncBeamInfo({
+     ...project.info,
+@@ -471,7 +571,7 @@ export function applyBeamDimsToAll(
+     beamH: dims.beamH,
+     beamB1: dims.beamB1,
+   });
+-  return { ...project, info, beams };
++  return syncBeamsToAxes({ ...project, info, beams });
+ }
+ 
+ /** Đặt cùng một nhịp (mm) cho mọi khoảng giữa trục theo phương X hoặc Y. */
+@@ -509,17 +609,17 @@ export function ensureAxes(project: SlabProject): SlabProject {
+   return { ...project, info, axesX, axesY, ...size };
+ }
+ 
+-/** Cập nhật trục + kích thước mặt bằng — không đụng danh sách dầm. */
++/** Cập nhật trục + kích thước mặt bằng; dầm theo tim trục (biên / giữa). */
+ export function applyAxesToProject(project: SlabProject): SlabProject {
+   const withAxes = ensureAxes(project);
+   const size = planSizeFromAxes(withAxes.axesX, withAxes.axesY);
+   const info = syncBeamInfo(withAxes.info);
+-  return {
++  return syncBeamsToAxes({
+     ...withAxes,
+     info,
+     ...size,
+     beams: withAxes.beams ?? [],
+-  };
++  });
+ }
+ 
+ /**
+@@ -581,6 +681,7 @@ export function applyAxisCount(
+   const synced: PlanBeam[] = axes.map((ax, i) => {
+     const prev = existing[i];
+     const dims = prev ? parseSize(prev.size) : { b: B, h: H };
++    const bw = dims.b;
+     return {
+       id: prev?.id ?? uid("beam"),
+       name: nextName(prev?.name),
+@@ -590,7 +691,7 @@ export function applyAxisCount(
+       axisId: ax.id,
+       start: 0,
+       end: beamDir === "Y" ? Hplan : W,
+-      offset: Number.isFinite(prev?.offset) ? (prev!.offset as number) : B1,
++      offset: beamOffsetForAxisIndex(bw, i, axes.length),
+     };
+   });
+ 
+@@ -613,20 +714,35 @@ export function createBeam(
+   axisPos: number,
+   index: number,
+ ): PlanBeam {
+-  const { B, H, B1 } = beamDims(project.info);
++  const { B, H } = beamDims(project.info);
+   const prefix = project.info.beamNamePrefix || "D";
+   const axesX = sortAxes(project.axesX ?? []);
+   const axesY = sortAxes(project.axesY ?? []);
+   const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
++  const axes = direction === "Y" ? axesX : axesY;
++  let axisIdx = axes.findIndex((a) => Math.abs(a.pos - axisPos) < 0.5);
++  if (axisIdx < 0 && axes.length) {
++    axisIdx = 0;
++    let best = Math.abs(axes[0].pos - axisPos);
++    for (let i = 1; i < axes.length; i++) {
++      const d = Math.abs(axes[i].pos - axisPos);
++      if (d < best) {
++        best = d;
++        axisIdx = i;
++      }
++    }
++  }
++  const axis = axisIdx >= 0 ? axes[axisIdx] : undefined;
+   return {
+     id: uid("beam"),
+     name: `${prefix}${index}`,
+     size: formatBeamSize(B, H),
+     direction,
+-    axis: axisPos,
++    axis: axis?.pos ?? axisPos,
++    axisId: axis?.id,
+     start: 0,
+     end: direction === "Y" ? Hplan : W,
+-    offset: B1,
++    offset: beamOffsetForAxisIndex(B, Math.max(0, axisIdx), Math.max(1, axes.length)),
+   };
+ }
+ 
+diff --git a/lib/sample.ts b/lib/sample.ts
+index 249ab52..e8bf0c0 100644
+--- a/lib/sample.ts
++++ b/lib/sample.ts
+@@ -7,7 +7,7 @@ import type {
+   SlabInfo,
+   SlabProject,
+ } from "./types";
+-import { defaultAxesX, defaultAxesY } from "./grid";
++import { applyAxesToProject, defaultAxesX, defaultAxesY } from "./grid";
+ import { uid } from "./utils";
+ 
+ export function defaultInfo(): SlabInfo {
+@@ -61,10 +61,11 @@ function sampleBeams(): PlanBeam[] {
+   const H = 4500;
+   const prefix = "D";
+   const size = "220x500";
+-  const B1 = 110;
++  const bw = 220;
+   const beams: PlanBeam[] = [];
+-  // Dầm trên trục X (chạy theo phương Y)
+-  [0, W / 2, W].forEach((axis, i) => {
++  // Dầm trên trục X (chạy theo phương Y): biên B1=0/B, giữa B/2
++  [0, W / 2, W].forEach((axis, i, arr) => {
++    const offset = i === 0 ? 0 : i === arr.length - 1 ? bw : Math.round(bw / 2);
+     beams.push({
+       id: uid("beam"),
+       name: `${prefix}${i + 1}`,
+@@ -73,11 +74,12 @@ function sampleBeams(): PlanBeam[] {
+       axis,
+       start: 0,
+       end: H,
+-      offset: B1,
++      offset,
+     });
+   });
+   // Dầm trên trục Y (chạy theo phương X)
+-  [0, H].forEach((axis, i) => {
++  [0, H].forEach((axis, i, arr) => {
++    const offset = i === 0 ? 0 : i === arr.length - 1 ? bw : Math.round(bw / 2);
+     beams.push({
+       id: uid("beam"),
+       name: `${prefix}${i + 4}`,
+@@ -86,7 +88,7 @@ function sampleBeams(): PlanBeam[] {
+       axis,
+       start: 0,
+       end: W,
+-      offset: B1,
++      offset,
+     });
+   });
+   return beams;
+@@ -151,7 +153,7 @@ function sampleSections(): SectionCut[] {
+ 
+ /** Sàn mẫu S1: 6.0 × 4.5 m, dày 100, thép 10a150. */
+ export function createSampleS1(): SlabProject {
+-  return {
++  return applyAxesToProject({
+     info: defaultInfo(),
+     planWidth: 6000,
+     planHeight: 4500,
+@@ -166,7 +168,7 @@ export function createSampleS1(): SlabProject {
+     sections: sampleSections(),
+     layoutPreset: "simple2",
+     show3d: false,
+-  };
++  });
+ }
+ 
+ export function createEmptyProject(): SlabProject {
+-- 
+2.43.0
+
