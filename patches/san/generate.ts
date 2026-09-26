@@ -40,6 +40,7 @@ import {
   beamOuterFacesAtAlong,
   beamFacesAtAlongDirect,
   findBeamOnAxis,
+  slabCoverMm,
   type RebarBarSeg,
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarLayer, RebarZone, SlabProject } from "../types";
@@ -1287,10 +1288,104 @@ function buildPdfScheduleRows(ctx: Ctx): Array<ScheduleRow & { stt: number }> {
 
 
 /** Đoạn mặt cắt dọc theo đường cắt (mm thế giới). */
-type SectionAlongSeg =
+export type SectionAlongSeg =
   | { kind: "beam"; lo: number; hi: number; h: number; name: string }
   | { kind: "slab"; lo: number; hi: number; drop: number; label?: string }
   | { kind: "opening"; lo: number; hi: number; label?: string };
+
+/** Đoạn thép dọc mặt cắt: xuyên dầm liên tục; đầu neo (biên / ô thủng / cắt) + móc. */
+export type SectionLongRebarRun = {
+  loMm: number;
+  hiMm: number;
+  drop: number;
+  /** Đầu trái kết thúc trong thân dầm (biên / ô thủng / lệch cao độ). */
+  leftTerm: boolean;
+  /** Đầu phải kết thúc trong thân dầm. */
+  rightTerm: boolean;
+};
+
+/**
+ * Độ thụt đầu thép vào thân dầm trên mặt cắt (mm).
+ * Ít nhất bằng lớp BV; tăng tối thiểu ~0.4 B để thấy rõ trên TL nhỏ,
+ * nhưng không vượt quá nửa bề rộng dầm.
+ */
+export function sectionTermPenMm(coverMm: number, beamWidthMm: number): number {
+  const cover = Math.max(0, Math.round(coverMm));
+  const bw = Math.max(0, beamWidthMm);
+  if (bw < 2) return cover;
+  const half = bw * 0.5 - 4;
+  const want = Math.max(cover, Math.min(90, bw * 0.4));
+  return Math.max(cover, Math.min(half, want));
+}
+
+/**
+ * Gộp đoạn sàn cùng cao độ xuyên qua dầm giữa; đầu tại dầm biên /
+ * kề ô thủng / lệch drop (sàn thấp cắt) → thụt vào thân dầm.
+ */
+export function buildSectionLongRebarRuns(
+  segs: SectionAlongSeg[],
+  coverMm: number,
+): SectionLongRebarRun[] {
+  const runs: SectionLongRebarRun[] = [];
+  let i = 0;
+  while (i < segs.length) {
+    const seg = segs[i]!;
+    if (seg.kind !== "slab") {
+      i += 1;
+      continue;
+    }
+    const drop = seg.drop;
+    let lo = seg.lo;
+    let hi = seg.hi;
+    let leftTerm = false;
+    let rightTerm = false;
+
+    // Trái: dầm kề — nếu phía ngoài không phải sàn cùng drop → neo trong thân dầm
+    if (i > 0 && segs[i - 1]!.kind === "beam") {
+      const beam = segs[i - 1]!;
+      const before = i > 1 ? segs[i - 2]! : null;
+      const cont =
+        before?.kind === "slab" && Math.abs(before.drop - drop) < 0.5;
+      if (!cont) {
+        const pen = sectionTermPenMm(coverMm, beam.hi - beam.lo);
+        lo = beam.lo + pen;
+        leftTerm = true;
+      }
+    }
+
+    // Lan sang phải qua dầm + sàn cùng drop
+    let j = i;
+    while (
+      j + 2 < segs.length &&
+      segs[j + 1]!.kind === "beam" &&
+      segs[j + 2]!.kind === "slab"
+    ) {
+      const next = segs[j + 2] as Extract<SectionAlongSeg, { kind: "slab" }>;
+      if (Math.abs(next.drop - drop) > 0.5) break;
+      hi = next.hi;
+      j += 2;
+    }
+
+    // Phải: dầm kề sau dải — neo nếu không liên tục cùng drop
+    if (j + 1 < segs.length && segs[j + 1]!.kind === "beam") {
+      const beam = segs[j + 1]!;
+      const after = j + 2 < segs.length ? segs[j + 2]! : null;
+      const cont =
+        after?.kind === "slab" && Math.abs(after.drop - drop) < 0.5;
+      if (!cont) {
+        const pen = sectionTermPenMm(coverMm, beam.hi - beam.lo);
+        hi = beam.hi - pen;
+        rightTerm = true;
+      }
+    }
+
+    if (hi - lo > 1) {
+      runs.push({ loMm: lo, hiMm: hi, drop, leftTerm, rightTerm });
+    }
+    i = j + 1;
+  }
+  return runs;
+}
 
 /** Dầm cắt ngang đường cắt (vuông góc mặt cắt). */
 function crossBeamsOnCut(
@@ -1469,7 +1564,7 @@ function deckAtCutPoint(
  * Dựng dải mặt cắt từ trục đầu → trục cuối:
  * đủ mọi dầm cắt ngang, ô thủng, sàn thấp trên đường cắt.
  */
-function buildSectionAlongSegs(
+export function buildSectionAlongSegs(
   project: SlabProject,
   cutDir: "X" | "Y",
   at: number,
@@ -1816,8 +1911,9 @@ function drawRebarSectionCut(
     }
   }
 
-  // Chấm thép ⊥ mặt cắt + nét dọc thanh song song trong đoạn sàn
+  // Chấm thép ⊥ mặt cắt (trong đoạn sàn) + nét dọc xuyên dầm / neo + móc
   const zones = effectiveZones(project);
+  const coverMm = slabCoverMm(project);
   const perpDir: "X" | "Y" = cutDir === "X" ? "Y" : "X";
   const hasBot = zones.some(
     (z) => (z.layer === "bottom" || z.layer === "structural") && z.direction === perpDir,
@@ -1827,10 +1923,19 @@ function drawRebarSectionCut(
     (z) => (z.layer === "bottom" || z.layer === "structural") && z.direction === cutDir,
   );
   const hasTopLong = zones.some((z) => z.layer === "top" && z.direction === cutDir);
+  const botLongZone = zones.find(
+    (z) => (z.layer === "bottom" || z.layer === "structural") && z.direction === cutDir,
+  );
+  const topLongZone = zones.find((z) => z.layer === "top" && z.direction === cutDir);
+  const botHookL = Math.max(0, Math.round(Number(botLongZone?.leftHook) || 0));
+  const botHookR = Math.max(0, Math.round(Number(botLongZone?.rightHook) || 0));
+  const topHookL = Math.max(0, Math.round(Number(topLongZone?.leftHook) || 0));
+  const topHookR = Math.max(0, Math.round(Number(topLongZone?.rightHook) || 0));
 
   /** Đoạn sàn đầu tiên đủ rộng — neo đường chỉ sắt. */
   let leaderSlab: { x0: number; x1: number; yBot: number; yTop: number } | null = null;
 
+  // Chấm ⊥ chỉ trong lòng sàn (không vẽ trên thân dầm)
   for (const seg of segs) {
     if (seg.kind !== "slab") continue;
     const x0 = toAlong(seg.lo) + 2;
@@ -1840,8 +1945,6 @@ function drawRebarSectionCut(
     const top = slabTopY + dropPx;
     const yBot = top + slabT * 0.35;
     const yTopR = top + slabT * 0.65;
-    if (hasBotLong) line(ctx, x0, yBot, x1, yBot, 0.55, REBAR_RED);
-    if (hasTopLong) line(ctx, x0, yTopR, x1, yTopR, 0.55, REBAR_RED);
     const n = Math.max(2, Math.min(14, Math.floor((x1 - x0) / 12)));
     for (let i = 0; i < n; i++) {
       const px = x0 + ((x1 - x0) * i) / Math.max(1, n - 1);
@@ -1860,6 +1963,39 @@ function drawRebarSectionCut(
     }
     if (!leaderSlab && x1 - x0 > 28) {
       leaderSlab = { x0, x1, yBot, yTop: yTopR };
+    }
+  }
+
+  /**
+   * Nét thép dọc: xuyên suốt qua dầm khi hai bên cùng cao độ;
+   * dầm biên / ô thủng / lệch drop → xuyên thân dầm ± cover;
+   * có móc: lớp dưới móc lên, lớp trên móc xuống.
+   */
+  const longRuns = buildSectionLongRebarRuns(segs, coverMm);
+  // Móc đủ dài để đọc trên TL mặt bằng (tối thiểu ~7pt, tối đa ~0.85 Hs)
+  const hookLenPx = Math.max(7, Math.min(slabT * 0.85, Math.max(80, coverMm * 4) * s));
+  const drawHook = (x: number, yBar: number, dir: -1 | 1) => {
+    line(ctx, x, yBar, x, yBar + dir * hookLenPx, 0.7, REBAR_RED);
+  };
+  for (const run of longRuns) {
+    const x0 = toAlong(run.loMm);
+    const x1 = toAlong(run.hiMm);
+    if (x1 - x0 < 2) continue;
+    const dropPx = run.drop > 0 ? run.drop * s : 0;
+    const top = slabTopY + dropPx;
+    const yBot = top + slabT * 0.35;
+    const yTopR = top + slabT * 0.65;
+    if (hasBotLong) {
+      line(ctx, x0, yBot, x1, yBot, 0.55, REBAR_RED);
+      // Lớp dưới: móc lên (về mặt sàn trên)
+      if (run.leftTerm && botHookL > 0) drawHook(x0, yBot, -1);
+      if (run.rightTerm && botHookR > 0) drawHook(x1, yBot, -1);
+    }
+    if (hasTopLong) {
+      line(ctx, x0, yTopR, x1, yTopR, 0.55, REBAR_RED);
+      // Lớp trên: móc xuống (về đáy sàn)
+      if (run.leftTerm && topHookL > 0) drawHook(x0, yTopR, 1);
+      if (run.rightTerm && topHookR > 0) drawHook(x1, yTopR, 1);
     }
   }
 
