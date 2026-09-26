@@ -1,4 +1,4 @@
-# Patch: PDF mặt cắt — dim B/sàn dưới dim trục + đường chỉ sắt
+# Patch: PDF layout mặt bằng ngang + mặt cắt dưới lớp dưới
 
-- Dim ngang: tim trục, rồi bề rộng dầm + lòng sàn bên dưới.
-- Đường chỉ sắt: STT · Ø · khoảng cách trên mặt cắt A-A / B-B.
+- Lớp dưới | Lớp trên cùng hàng.
+- A-A / B-B dưới mặt bằng lớp dưới; thống kê dưới lớp trên.
