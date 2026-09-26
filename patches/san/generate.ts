@@ -34,6 +34,12 @@ import {
   zoneForRebarBar,
   distRangeJunctionsOnBars,
   ensureSectionCuts,
+  sectionCutAtMm,
+  bayKindAt,
+  baySlabExtent,
+  beamOuterFacesAtAlong,
+  beamFacesAtAlongDirect,
+  findBeamOnAxis,
   type RebarBarSeg,
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarLayer, RebarZone, SlabProject } from "../types";
@@ -1183,9 +1189,291 @@ function buildPdfScheduleRows(ctx: Ctx): Array<ScheduleRow & { stt: number }> {
 }
 
 
+/** Đoạn mặt cắt dọc theo đường cắt (mm thế giới). */
+type SectionAlongSeg =
+  | { kind: "beam"; lo: number; hi: number; h: number; name: string }
+  | { kind: "slab"; lo: number; hi: number; drop: number; label?: string }
+  | { kind: "opening"; lo: number; hi: number; label?: string };
+
+/** Dầm cắt ngang đường cắt (vuông góc mặt cắt). */
+function crossBeamsOnCut(
+  project: SlabProject,
+  cutDir: "X" | "Y",
+  at: number,
+): Array<{ lo: number; hi: number; h: number; name: string }> {
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  const out: Array<{ lo: number; hi: number; h: number; name: string }> = [];
+  const seen = new Set<string>();
+
+  const pushBeam = (beam: PlanBeam, lo: number, hi: number) => {
+    const w = hi - lo;
+    if (w < 1) return;
+    const key = `${Math.round(lo)}:${Math.round(hi)}:${beam.id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const { h } = parseBeamSize(beam.size || "220x500");
+    out.push({ lo, hi, h, name: beam.name || "" });
+  };
+
+  // Dầm gắn trục: cắt tại X → dầm phương X (trục Y); cắt tại Y → dầm phương Y (trục X)
+  if (cutDir === "X") {
+    for (const ay of axesY) {
+      const beam = findBeamOnAxis(project, "X", ay);
+      if (!beam) continue;
+      const f = beamOuterFacesAtAlong(project, "X", ay, at);
+      pushBeam(beam, f.lo, f.hi);
+    }
+  } else {
+    for (const ax of axesX) {
+      const beam = findBeamOnAxis(project, "Y", ax);
+      if (!beam) continue;
+      const f = beamOuterFacesAtAlong(project, "Y", ax, at);
+      pushBeam(beam, f.lo, f.hi);
+    }
+  }
+
+  // Dầm tự do / mọi dầm cùng phương cắt ngang đường cắt (bổ sung nếu chưa có)
+  for (const beam of project.beams ?? []) {
+    if (beam.direction !== cutDir) continue;
+    const bLo = Math.min(beam.start, beam.end);
+    const bHi = Math.max(beam.start, beam.end);
+    if (at < bLo - 0.5 || at > bHi + 0.5) continue;
+    const perp = sortAxes(cutDir === "X" ? axesY : axesX);
+    const { lo, hi } = beamFacesAtAlongDirect(beam, at, perp);
+    if (hi - lo < 1) {
+      const { b: bw } = parseBeamSize(beam.size || "220x500");
+      const b1 = Number.isFinite(beam.offset) ? beam.offset : bw / 2;
+      pushBeam(beam, beam.axis - b1, beam.axis - b1 + bw);
+    } else {
+      pushBeam(beam, lo, hi);
+    }
+  }
+
+  return out.sort((a, b) => a.lo - b.lo);
+}
+
 /**
- * Mặt cắt thép sàn schematic: dầm hai đầu + sàn + chấm thép dưới/trên.
- * `cutDir` X → MẶT CẮT A-A (cắt tại X); Y → MẶT CẮT B-B (cắt tại Y).
+ * Loại sàn tại điểm trên đường cắt (trong ô / trên dầm).
+ * Trên thân dầm: nếu cả hai bên đều thủng → opening; nếu có sàn thấp → low; ngược lại normal.
+ */
+function deckAtCutPoint(
+  project: SlabProject,
+  cutDir: "X" | "Y",
+  at: number,
+  along: number,
+): { kind: "normal" | "opening" | "low"; drop: number; label?: string } {
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  if (axesX.length < 2 || axesY.length < 2) {
+    return { kind: "normal", drop: 0 };
+  }
+
+  for (let ix = 0; ix < axesX.length - 1; ix++) {
+    for (let iy = 0; iy < axesY.length - 1; iy++) {
+      const bay = baySlabExtent(project, axesX, axesY, ix, iy);
+      // cutDir X → điểm (at=X, along=Y); cutDir Y → (along=X, at=Y)
+      const px = cutDir === "X" ? at : along;
+      const py = cutDir === "X" ? along : at;
+      if (px < bay.x0 - 0.5 || px > bay.x1 + 0.5 || py < bay.y0 - 0.5 || py > bay.y1 + 0.5) {
+        continue;
+      }
+      const kind = bayKindAt(project, axesX, axesY, ix, iy);
+      if (kind === "opening") {
+        const op = (project.openings ?? []).find((o) =>
+          Math.abs(o.x - bay.x0) < 1 && Math.abs(o.y - bay.y0) < 1,
+        );
+        return { kind: "opening", drop: 0, label: op?.name || "Ô thủng" };
+      }
+      if (kind === "low") {
+        const ls = (project.lowSlabs ?? []).find((o) =>
+          Math.abs(o.x - bay.x0) < 1 && Math.abs(o.y - bay.y0) < 1,
+        );
+        const drop = Math.max(0, ls?.drop || project.info.lowSlabDrop || 0);
+        return { kind: "low", drop, label: ls?.name || "ST" };
+      }
+      return { kind: "normal", drop: 0 };
+    }
+  }
+
+  // Điểm nằm trên dầm / ngoài ô: lấy hai ô kề theo phương cắt
+  if (cutDir === "X") {
+    // at = X trên dầm đứng — xét ô trái/phải tại hàng chứa along
+    let iy = 0;
+    for (let j = 0; j < axesY.length - 1; j++) {
+      const bay = baySlabExtent(project, axesX, axesY, 0, j);
+      if (along >= bay.y0 - 0.5 && along <= bay.y1 + 0.5) {
+        iy = j;
+        break;
+      }
+    }
+    let left: ReturnType<typeof bayKindAt> | null = null;
+    let right: ReturnType<typeof bayKindAt> | null = null;
+    let lowDrop = 0;
+    let lowLabel: string | undefined;
+    for (let ix = 0; ix < axesX.length - 1; ix++) {
+      const bay = baySlabExtent(project, axesX, axesY, ix, iy);
+      const k = bayKindAt(project, axesX, axesY, ix, iy);
+      if (bay.x1 <= at + 0.5) left = k;
+      if (bay.x0 >= at - 0.5 && right == null) right = k;
+      if (k === "low") {
+        const ls = (project.lowSlabs ?? []).find((o) =>
+          Math.abs(o.x - bay.x0) < 1 && Math.abs(o.y - bay.y0) < 1,
+        );
+        lowDrop = Math.max(lowDrop, ls?.drop || project.info.lowSlabDrop || 0);
+        lowLabel = ls?.name || lowLabel;
+      }
+    }
+    if (left === "opening" && right === "opening") {
+      return { kind: "opening", drop: 0, label: "Ô thủng" };
+    }
+    if (left === "low" || right === "low") {
+      return { kind: "low", drop: lowDrop, label: lowLabel };
+    }
+    return { kind: "normal", drop: 0 };
+  }
+
+  // cutDir Y — at = Y trên dầm ngang
+  let ix = 0;
+  for (let i = 0; i < axesX.length - 1; i++) {
+    const bay = baySlabExtent(project, axesX, axesY, i, 0);
+    if (along >= bay.x0 - 0.5 && along <= bay.x1 + 0.5) {
+      ix = i;
+      break;
+    }
+  }
+  let below: ReturnType<typeof bayKindAt> | null = null;
+  let above: ReturnType<typeof bayKindAt> | null = null;
+  let lowDrop = 0;
+  let lowLabel: string | undefined;
+  for (let iy = 0; iy < axesY.length - 1; iy++) {
+    const bay = baySlabExtent(project, axesX, axesY, ix, iy);
+    const k = bayKindAt(project, axesX, axesY, ix, iy);
+    if (bay.y1 <= at + 0.5) below = k;
+    if (bay.y0 >= at - 0.5 && above == null) above = k;
+    if (k === "low") {
+      const ls = (project.lowSlabs ?? []).find((o) =>
+        Math.abs(o.x - bay.x0) < 1 && Math.abs(o.y - bay.y0) < 1,
+      );
+      lowDrop = Math.max(lowDrop, ls?.drop || project.info.lowSlabDrop || 0);
+      lowLabel = ls?.name || lowLabel;
+    }
+  }
+  if (below === "opening" && above === "opening") {
+    return { kind: "opening", drop: 0, label: "Ô thủng" };
+  }
+  if (below === "low" || above === "low") {
+    return { kind: "low", drop: lowDrop, label: lowLabel };
+  }
+  return { kind: "normal", drop: 0 };
+}
+
+/**
+ * Dựng dải mặt cắt từ trục đầu → trục cuối:
+ * đủ mọi dầm cắt ngang, ô thủng, sàn thấp trên đường cắt.
+ */
+function buildSectionAlongSegs(
+  project: SlabProject,
+  cutDir: "X" | "Y",
+  at: number,
+): { segs: SectionAlongSeg[]; along0: number; along1: number; axes: GridAxis[] } {
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  const bleed = planBeamBleed(project, axesX, axesY);
+  const alongAxes = cutDir === "X" ? axesY : axesX;
+  // Phạm vi: mép da dầm biên (để hiện đủ dầm đầu/cuối), gắn với trục đầu→cuối
+  const along0 = cutDir === "X" ? bleed.yMin : bleed.xMin;
+  const along1 = cutDir === "X" ? bleed.yMax : bleed.xMax;
+
+  const beams = crossBeamsOnCut(project, cutDir, at).filter(
+    (b) => b.hi > along0 - 0.5 && b.lo < along1 + 0.5,
+  );
+
+  // Mốc chia: đầu/cuối + mép mọi dầm + biên mọi ô trên đường cắt
+  const marks = new Set<number>([along0, along1]);
+  for (const b of beams) {
+    marks.add(b.lo);
+    marks.add(b.hi);
+  }
+  if (cutDir === "X") {
+    for (let iy = 0; iy < axesY.length - 1; iy++) {
+      for (let ix = 0; ix < axesX.length - 1; ix++) {
+        const bay = baySlabExtent(project, axesX, axesY, ix, iy);
+        if (at < bay.x0 - 0.5 || at > bay.x1 + 0.5) continue;
+        marks.add(bay.y0);
+        marks.add(bay.y1);
+      }
+    }
+  } else {
+    for (let ix = 0; ix < axesX.length - 1; ix++) {
+      for (let iy = 0; iy < axesY.length - 1; iy++) {
+        const bay = baySlabExtent(project, axesX, axesY, ix, iy);
+        if (at < bay.y0 - 0.5 || at > bay.y1 + 0.5) continue;
+        marks.add(bay.x0);
+        marks.add(bay.x1);
+      }
+    }
+  }
+  const sorted = [...marks].sort((a, b) => a - b);
+
+  const segs: SectionAlongSeg[] = [];
+  const beamAt = (mid: number) => beams.find((b) => mid >= b.lo - 0.5 && mid <= b.hi + 0.5);
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const lo = sorted[i]!;
+    const hi = sorted[i + 1]!;
+    if (hi - lo < 0.5) continue;
+    const mid = (lo + hi) / 2;
+    const beam = beamAt(mid);
+    if (beam) {
+      segs.push({ kind: "beam", lo, hi, h: beam.h, name: beam.name });
+      continue;
+    }
+    const deck = deckAtCutPoint(project, cutDir, at, mid);
+    if (deck.kind === "opening") {
+      segs.push({ kind: "opening", lo, hi, label: deck.label });
+    } else {
+      segs.push({
+        kind: "slab",
+        lo,
+        hi,
+        drop: deck.kind === "low" ? deck.drop : 0,
+        label: deck.kind === "low" ? deck.label : undefined,
+      });
+    }
+  }
+
+  // Gộp đoạn cùng loại liền kề (trừ dầm giữ tách để đúng bề rộng)
+  const merged: SectionAlongSeg[] = [];
+  for (const s of segs) {
+    const prev = merged[merged.length - 1];
+    if (
+      prev &&
+      prev.kind === s.kind &&
+      s.kind !== "beam" &&
+      prev.kind !== "beam" &&
+      Math.abs(prev.hi - s.lo) < 0.5
+    ) {
+      if (prev.kind === "slab" && s.kind === "slab" && prev.drop === s.drop) {
+        prev.hi = s.hi;
+        continue;
+      }
+      if (prev.kind === "opening" && s.kind === "opening") {
+        prev.hi = s.hi;
+        continue;
+      }
+    }
+    merged.push({ ...s });
+  }
+
+  return { segs: merged, along0, along1, axes: alongAxes };
+}
+
+/**
+ * Mặt cắt thép sàn đúng tỉ lệ mặt bằng: từ trục đầu → trục cuối,
+ * đủ dầm / ô thủng / sàn thấp trên đường cắt.
+ * `cutDir` X → MẶT CẮT A-A; Y → MẶT CẮT B-B.
+ * `planS` = cùng hệ số tỉ lệ với bản vẽ mặt bằng.
  */
 function drawRebarSectionCut(
   ctx: Ctx,
@@ -1193,99 +1481,214 @@ function drawRebarSectionCut(
   y: number,
   maxW: number,
   cutDir: "X" | "Y",
+  planS: number,
 ): number {
   const { project, model } = ctx;
   const sections = ensureSectionCuts(project);
   const sec = sections.find((s) => s.direction === cutDir);
   const label = cutDir === "X" ? "A-A" : "B-B";
+  const alongAxesAll = sortAxes(cutDir === "X" ? project.axesY ?? [] : project.axesX ?? []);
   const axisName =
     cutDir === "X"
       ? sortAxes(project.axesX ?? []).find((a) => a.id === sec?.axisId)?.name
       : sortAxes(project.axesY ?? []).find((a) => a.id === sec?.axisId)?.name;
-  const at = Math.round(sec?.at ?? 0);
+  const at = sec ? sectionCutAtMm(project, sec) : 0;
   const title = `MẶT CẮT THÉP SÀN ${label}`;
+  const axisSpanLabel =
+    alongAxesAll.length >= 2
+      ? `trục ${alongAxesAll[0]!.name}-${alongAxesAll[alongAxesAll.length - 1]!.name}`
+      : "";
   const sub =
     cutDir === "X"
-      ? `Cắt theo phương X · X=${at}${axisName ? ` (trục ${axisName})` : ""}`
-      : `Cắt theo phương Y · Y=${at}${axisName ? ` (trục ${axisName})` : ""}`;
+      ? `Cắt theo phương X · X=${at}${axisName ? ` (trục ${axisName})` : ""}${axisSpanLabel ? ` · ${axisSpanLabel}` : ""}`
+      : `Cắt theo phương Y · Y=${at}${axisName ? ` (trục ${axisName})` : ""}${axisSpanLabel ? ` · ${axisSpanLabel}` : ""}`;
 
   textSimple(ctx, title, x + maxW / 2, y + 2, 8.5, true, "center");
   textSimple(ctx, sub, x + maxW / 2, y + 14, 6.2, false, "center", GRAY);
 
-  const scale = 0.32;
-  const slabT = Math.max(model.thickness * scale, 16);
-  const beamSize =
-    cutDir === "X"
-      ? parseBeamSize(project.info.beamSizeY || project.info.beamSizeX || "220x500")
-      : parseBeamSize(project.info.beamSizeX || project.info.beamSizeY || "220x500");
-  const beamH = Math.max(28, beamSize.h * scale * 0.4);
-  const beamB = Math.max(18, beamSize.b * scale * 0.5);
-  const pad = 18;
-  const drawW = maxW - pad * 2;
-  const sy = y + 28;
+  const { segs, along0, along1, axes } = buildSectionAlongSegs(project, cutDir, at);
+  const spanMm = Math.max(along1 - along0, 1);
+  const padL = 28;
+  const padR = 36;
+  const drawW = maxW - padL - padR;
+  // Chiều dài mặt cắt = đúng tỉ lệ mặt bằng; nếu vượt khung thì co đều
+  const s = Math.min(planS, drawW / spanMm);
+  const usedW = spanMm * s;
+  const xBase = x + padL + (drawW - usedW) / 2;
+  const toAlong = (mm: number) => xBase + (mm - along0) * s;
 
-  // Sàn
-  rect(ctx, x + pad, sy, drawW, slabT, 0.85);
-  // Dầm hai đầu (dưới sàn)
-  rect(ctx, x + pad - beamB * 0.1, sy + slabT, beamB, beamH, 0.85);
-  rect(ctx, x + pad + drawW - beamB * 0.9, sy + slabT, beamB, beamH, 0.85);
+  const slabTmm = Math.max(model.thickness, 1);
+  const maxBeamHmm = Math.max(
+    200,
+    ...segs.filter((g): g is Extract<SectionAlongSeg, { kind: "beam" }> => g.kind === "beam").map((g) => g.h),
+    parseBeamSize(project.info.beamSizeX || project.info.beamSizeY || "220x500").h,
+  );
+  const maxDropMm = Math.max(
+    0,
+    ...segs.filter((g): g is Extract<SectionAlongSeg, { kind: "slab" }> => g.kind === "slab").map((g) => g.drop),
+  );
+  /**
+   * Cao độ: phóng vừa đủ để thấy dày sàn / hạ sàn thấp / cao dầm,
+   * trong khi chiều dài vẫn theo tỉ lệ mặt bằng.
+   */
+  const elevS = Math.max(s * 2.2, 0.16);
+  const slabT = Math.max(slabTmm * elevS, 8);
+  const beamH = Math.max(maxBeamHmm * elevS * 0.55, 22);
+  const dropS = Math.max(maxDropMm * elevS, maxDropMm > 0 ? 14 : 0);
+  const sy = y + 26;
+  const slabTopY = sy;
+  const slabBotY = sy + slabT;
 
-  // Chấm thép ⊥ mặt cắt: lớp dưới đặc, lớp trên rỗng
-  // Cắt X → thấy thanh Y; cắt Y → thấy thanh X
+  // Mặt sàn cao độ chuẩn (nét chuẩn)
+  line(ctx, xBase - 4, slabTopY, toAlong(along1) + 4, slabTopY, 0.35, GRAY, [2, 2]);
+
+  for (const seg of segs) {
+    const x0 = toAlong(seg.lo);
+    const x1 = toAlong(seg.hi);
+    const w = Math.max(x1 - x0, 0.8);
+    if (seg.kind === "beam") {
+      const bh = Math.max(seg.h * elevS * 0.55, 18);
+      // Đầu dầm = mặt sàn trên; thân dầm xuống dưới
+      rect(ctx, x0, slabTopY, w, slabT + bh, 0.9);
+      line(ctx, x0, slabBotY, x1, slabBotY, 0.45, GRAY);
+      if (seg.name) {
+        textSimple(ctx, seg.name, (x0 + x1) / 2, slabBotY + bh + 9, 5.5, false, "center", GRAY);
+      }
+      continue;
+    }
+    if (seg.kind === "opening") {
+      // Ô thủng: khung + hai đường chéo (không có sàn)
+      const hOpen = Math.max(slabT + dropS + 10, 18);
+      rect(ctx, x0, slabTopY, w, hOpen, 0.55);
+      line(ctx, x0, slabTopY, x1, slabTopY + hOpen, 0.55, GRAY);
+      line(ctx, x0, slabTopY + hOpen, x1, slabTopY, 0.55, GRAY);
+      if (seg.label) {
+        textSimple(ctx, seg.label, (x0 + x1) / 2, slabTopY + hOpen / 2 + 2, 6, false, "center", GRAY);
+      }
+      continue;
+    }
+    // Sàn thường / sàn thấp
+    const dropPx = seg.drop > 0 ? Math.max(seg.drop * elevS, 14) : 0;
+    const top = slabTopY + dropPx;
+    rect(ctx, x0, top, w, slabT, 0.85);
+    if (seg.drop > 0) {
+      // Thành đứng chuyển cấp + hatch sàn thấp
+      line(ctx, x0, slabTopY, x0, top + slabT, 0.75);
+      line(ctx, x1, slabTopY, x1, top + slabT, 0.75);
+      for (const hs of rectDiagonalHatchSegments(seg.lo, 0, seg.hi, Math.max(seg.drop, 1), 180)) {
+        const ax = toAlong(hs.xA);
+        const bx = toAlong(hs.xB);
+        const ay = top + ((hs.yA / Math.max(seg.drop, 1)) * slabT);
+        const by = top + ((hs.yB / Math.max(seg.drop, 1)) * slabT);
+        line(ctx, ax, ay, bx, by, 0.35, GRAY);
+      }
+      textSimple(
+        ctx,
+        `${seg.label || "ST"} (-${Math.round(seg.drop)})`,
+        (x0 + x1) / 2,
+        top + slabT + 9,
+        6,
+        false,
+        "center",
+        GRAY,
+      );
+    }
+  }
+
+  // Chấm thép ⊥ mặt cắt trong đoạn sàn (không vẽ trên ô thủng)
   const zones = effectiveZones(project);
   const perpDir: "X" | "Y" = cutDir === "X" ? "Y" : "X";
   const hasBot = zones.some(
     (z) => (z.layer === "bottom" || z.layer === "structural") && z.direction === perpDir,
   );
   const hasTop = zones.some((z) => z.layer === "top" && z.direction === perpDir);
-  // Thanh song song mặt cắt — nét ngang trong lớp
   const hasBotLong = zones.some(
     (z) => (z.layer === "bottom" || z.layer === "structural") && z.direction === cutDir,
   );
   const hasTopLong = zones.some((z) => z.layer === "top" && z.direction === cutDir);
-  const n = 7;
-  const x0 = x + pad + 14;
-  const x1 = x + pad + drawW - 14;
-  const yBot = sy + slabT * 0.3;
-  const yTop = sy + slabT * 0.7;
-  if (hasBotLong) line(ctx, x0, yBot, x1, yBot, 0.65, REBAR_RED);
-  if (hasTopLong) line(ctx, x0, yTop, x1, yTop, 0.65, REBAR_RED);
-  for (let i = 0; i < n; i++) {
-    const px = x0 + ((x1 - x0) * i) / Math.max(1, n - 1);
-    if (hasBot) {
-      ctx.page.drawCircle({ x: px, y: ty(yBot), size: 2.1, color: REBAR_RED });
-    }
-    if (hasTop) {
-      ctx.page.drawCircle({
-        x: px,
-        y: ty(yTop),
-        size: 2.1,
-        borderColor: REBAR_RED,
-        borderWidth: 0.75,
-      });
+
+  for (const seg of segs) {
+    if (seg.kind !== "slab") continue;
+    const x0 = toAlong(seg.lo) + 3;
+    const x1 = toAlong(seg.hi) - 3;
+    if (x1 - x0 < 6) continue;
+    const dropPx = seg.drop > 0 ? Math.max(seg.drop * elevS, 14) : 0;
+    const top = slabTopY + dropPx;
+    const yBot = top + slabT * 0.3;
+    const yTopR = top + slabT * 0.7;
+    if (hasBotLong) line(ctx, x0, yBot, x1, yBot, 0.55, REBAR_RED);
+    if (hasTopLong) line(ctx, x0, yTopR, x1, yTopR, 0.55, REBAR_RED);
+    const n = Math.max(2, Math.min(12, Math.floor((x1 - x0) / 14)));
+    for (let i = 0; i < n; i++) {
+      const px = x0 + ((x1 - x0) * i) / Math.max(1, n - 1);
+      if (hasBot) {
+        ctx.page.drawCircle({ x: px, y: ty(yBot), size: 1.8, color: REBAR_RED });
+      }
+      if (hasTop) {
+        ctx.page.drawCircle({
+          x: px,
+          y: ty(yTopR),
+          size: 1.8,
+          borderColor: REBAR_RED,
+          borderWidth: 0.65,
+        });
+      }
     }
   }
 
-  dimV(ctx, x + pad + drawW + 10, sy, sy + slabT, `${project.info.thickness}`, 6, "right");
+  // Bong bóng trục đầu → cuối dưới mặt cắt
+  const axisBubbleY = slabBotY + beamH + dropS + 22;
+  for (const ax of axes) {
+    const px = toAlong(ax.pos);
+    line(ctx, px, slabTopY, px, axisBubbleY - AXIS_BUBBLE_R, 0.35, AXIS_LINE, AXIS_CENTERLINE_DASH);
+    ctx.page.drawCircle({
+      x: px,
+      y: ty(axisBubbleY),
+      size: AXIS_BUBBLE_R,
+      borderColor: BLACK,
+      borderWidth: 0.65,
+    });
+    textInAxisBubble(ctx, ax.name, px, axisBubbleY, 6);
+  }
+
+  // Dim chiều dày sàn (theo cao độ vẽ)
+  dimV(ctx, toAlong(along1) + 12, slabTopY, slabBotY, `${project.info.thickness}`, 6, "right");
+  if (maxDropMm > 0) {
+    dimV(
+      ctx,
+      toAlong(along1) + 26,
+      slabTopY,
+      slabTopY + dropS,
+      `${Math.round(maxDropMm)}`,
+      5.5,
+      "right",
+    );
+  }
   textSimple(
     ctx,
-    `Lớp BV ${project.info.cover}`,
+    `TL mặt bằng 1/${project.info.drawingScale || 100} · Lớp BV ${project.info.cover}`,
     x + maxW / 2,
-    sy + slabT + beamH + 12,
-    6.5,
+    axisBubbleY + 14,
+    6.2,
     false,
     "center",
+    GRAY,
   );
-  return sy + slabT + beamH + 26;
+  return axisBubbleY + 24;
 }
 
-/** Hai mặt cắt A-A (X) và B-B (Y) cạnh nhau — nằm trên bảng thống kê. */
-function drawSectionCutsAboveSchedule(ctx: Ctx, x: number, y: number, maxW: number): number {
-  const gap = 16;
-  const half = (maxW - gap) / 2;
-  const bottomA = drawRebarSectionCut(ctx, x, y, half, "X");
-  const bottomB = drawRebarSectionCut(ctx, x + half + gap, y, half, "Y");
-  return Math.max(bottomA, bottomB);
+/** A-A trên, B-B dưới — cùng tỉ lệ mặt bằng; nằm trên bảng thống kê. */
+function drawSectionCutsAboveSchedule(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  maxW: number,
+  planS: number,
+): number {
+  const gap = 10;
+  const bottomA = drawRebarSectionCut(ctx, x, y, maxW, "X", planS);
+  const bottomB = drawRebarSectionCut(ctx, x, bottomA + gap, maxW, "Y", planS);
+  return bottomB;
 }
 
 function drawScheduleTable(ctx: Ctx, x: number, y: number) {
@@ -1447,7 +1850,7 @@ export async function generateSlabPdf(
 
   /**
    * Một trang: Lớp dưới (trên) + Lớp trên (dưới) cùng cột trái;
-   * phải: Mặt cắt A-A / B-B → Thống kê → Tổng hợp.
+   * phải: Mặt cắt A-A → B-B (xếp dọc, đúng tỉ lệ MB) → Thống kê → Tổng hợp.
    */
   const leftX = 36;
   const planW = 780;
@@ -1456,14 +1859,42 @@ export async function generateSlabPdf(
   const bottomLimit = PAGE_H - 28;
   // Chia đôi chiều cao còn lại cho 2 mặt bằng (kèm dim + tiêu đề)
   const stackBudget = bottomLimit - topY - gap;
-  const planH = Math.max(220, Math.min(340, Math.floor(stackBudget / 2) - 95));
+  // Chừa chỗ cột phải: 2 mặt cắt xếp dọc + bảng TK — thu planH nếu cần
+  let planH = Math.max(200, Math.min(320, Math.floor(stackBudget / 2) - 95));
+  const planS = planScale(project, planW, planH);
+
+  const rightX = 860;
+  const rightW = 780;
+  // Ước lượng chiều cao 2 mặt cắt xếp dọc (cao độ phóng) để không đè bảng TK
+  const estSecH = (() => {
+    const elevS = Math.max(planS * 2.2, 0.16);
+    const maxBeam = Math.max(
+      parseBeamSize(project.info.beamSizeX || "220x500").h,
+      parseBeamSize(project.info.beamSizeY || "220x500").h,
+      500,
+    );
+    const maxDrop = Math.max(0, ...(project.lowSlabs ?? []).map((ls) => ls.drop || project.info.lowSlabDrop || 0));
+    const one =
+      26 +
+      Math.max(model.thickness * elevS, 8) +
+      Math.max(maxBeam * elevS * 0.55, 22) +
+      Math.max(maxDrop * elevS, maxDrop > 0 ? 14 : 0) +
+      22 +
+      AXIS_BUBBLE_R +
+      24;
+    return one * 2 + 10;
+  })();
+  const scheduleReserve = 260;
+  if (topY + estSecH + scheduleReserve > bottomLimit) {
+    const overflow = topY + estSecH + scheduleReserve - bottomLimit;
+    planH = Math.max(170, planH - Math.ceil(overflow / 2));
+  }
+  const planSFinal = planScale(project, planW, planH);
 
   const afterBottom = drawPlan(ctx, leftX, topY, planW, planH, zones, "bottom");
   drawPlan(ctx, leftX, afterBottom + gap, planW, planH, zones, "top");
 
-  const rightX = 860;
-  const rightW = 780;
-  const afterSections = drawSectionCutsAboveSchedule(ctx, rightX, 62, rightW);
+  const afterSections = drawSectionCutsAboveSchedule(ctx, rightX, 62, rightW, planSFinal);
   const table = drawScheduleTable(ctx, rightX, afterSections + 10);
   drawSummaryTable(ctx, rightX, afterSections + 10 + table.h + 14);
 
