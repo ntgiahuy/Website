@@ -1,0 +1,373 @@
+From d3f16483e8717a6214f57e4cd0fb4d4e453e7fdf Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 17 Sep 2026 14:58:32 +0000
+Subject: [PATCH] =?UTF-8?q?fix:=20d=E1=BA=A7m=20l=E1=BB=87ch=20=E2=80=94?=
+ =?UTF-8?q?=20=C4=91=E1=BA=A7u=20d=E1=BA=A7m=20c=E1=BA=AFt=20qua=20b=C3=A1?=
+ =?UTF-8?q?m=20da=20B=20v=C3=A0=20ph=C3=B3ng=20d=C3=A0i=20ch=E1=BB=93ng=20?=
+ =?UTF-8?q?l=C3=AAn?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Khi chỉnh lệch/xéo, đoạn dầm ngược phương lấy da ngoài tại đúng
+tim giao (có nội suy dịch) để hai đoạn cắt nhau trong bề rộng B;
+dầm biên lệch ra ngoài thì đầu đoạn ngoài cùng tự kéo dài chồng lên.
+---
+ lib/grid.ts                       | 132 ++++++++++++++++++++++-------
+ scripts/test-skew-split-extend.ts | 134 ++++++++++++++++++++++++++++++
+ 2 files changed, 235 insertions(+), 31 deletions(-)
+ create mode 100644 scripts/test-skew-split-extend.ts
+
+diff --git a/lib/grid.ts b/lib/grid.ts
+index 35d109c..69ce12e 100644
+--- a/lib/grid.ts
++++ b/lib/grid.ts
+@@ -319,35 +319,90 @@ export function syncBeamsToAxes(project: SlabProject): SlabProject {
+   return { ...project, beams };
+ }
+ 
+-/** Đoạn dầm đứng (phương Y): kéo đầu đến da dầm ngang tại hai đầu. */
++/**
++ * Mặt ngoài dầm tại tọa độ dọc theo thanh — nội suy dịch/xéo theo trục giao.
++ * Không gọi beamSegments (tránh vòng lặp khi tính lo/hi đoạn).
++ */
++export function beamFacesAtAlongDirect(
++  beam: PlanBeam,
++  alongMm: number,
++  perpAxes: GridAxis[],
++): { lo: number; hi: number } {
++  const sorted = sortAxes(perpAxes);
++  const bLo = Math.min(beam.start, beam.end);
++  const bHi = Math.max(beam.start, beam.end);
++  const crosses = sorted.filter((a) => a.pos >= bLo - 0.5 && a.pos <= bHi + 0.5);
++  if (crosses.length < 2) {
++    const { b: bw } = parseSizeStr(beam.size);
++    const b1 = Number.isFinite(beam.offset) ? (beam.offset as number) : bw / 2;
++    const { s0, s1 } = getBeamSegShift(beam, 0);
++    const mid = (s0 + s1) / 2;
++    const lo = beam.axis - b1 + mid;
++    return { lo, hi: lo + bw };
++  }
++  let segIndex = 0;
++  for (let i = 0; i < crosses.length - 1; i++) {
++    const mid = (crosses[i].pos + crosses[i + 1].pos) / 2;
++    if (alongMm < mid) {
++      segIndex = i;
++      break;
++    }
++    segIndex = i;
++  }
++  const a0 = crosses[segIndex];
++  const a1 = crosses[segIndex + 1];
++  return beamSegFacesAtAlong(beam, segIndex, alongMm, a0.pos, a1.pos);
++}
++
++/**
++ * Da dầm trên một trục tại vị trí dọc theo dầm ngược phương (tính lệch/xéo).
++ * Không có dầm trên trục → bề dày 0 tại tim trục.
++ */
++export function axisBeamFacesAtAlong(
++  project: SlabProject,
++  beamDir: PlanBeam["direction"],
++  axis: GridAxis,
++  alongMm: number,
++): { lo: number; hi: number } {
++  const beam = findBeamOnAxis(project, beamDir, axis);
++  if (!beam) return { lo: axis.pos, hi: axis.pos };
++  const perp = sortAxes(beamDir === "Y" ? project.axesY ?? [] : project.axesX ?? []);
++  return beamFacesAtAlongDirect(beam, alongMm, perp);
++}
++
++/** Đoạn dầm đứng (phương Y): kéo đầu đến da dầm ngang tại hai đầu (theo lệch/xéo tại tim X). */
+ export function verticalBeamSegExtent(
+   project: SlabProject,
+   y0: number,
+   y1: number,
+   axesY: GridAxis[],
++  alongXMm?: number,
+ ): { yLo: number; yHi: number } {
+   const loAxis = Math.min(y0, y1);
+   const hiAxis = Math.max(y0, y1);
+   const aLo = axesY.find((a) => Math.abs(a.pos - loAxis) < 0.5) ?? { id: "", name: "", pos: loAxis };
+   const aHi = axesY.find((a) => Math.abs(a.pos - hiAxis) < 0.5) ?? { id: "", name: "", pos: hiAxis };
+-  const faceLo = beamOuterFaces(loAxis, beamSectionOnAxis(project, "X", aLo));
+-  const faceHi = beamOuterFaces(hiAxis, beamSectionOnAxis(project, "X", aHi));
++  const along = Number.isFinite(alongXMm) ? (alongXMm as number) : (loAxis + hiAxis) / 2;
++  const faceLo = axisBeamFacesAtAlong(project, "X", aLo, along);
++  const faceHi = axisBeamFacesAtAlong(project, "X", aHi, along);
+   return { yLo: faceLo.lo, yHi: faceHi.hi };
+ }
+ 
+-/** Đoạn dầm ngang (phương X): kéo đầu đến da dầm đứng tại hai đầu. */
++/** Đoạn dầm ngang (phương X): kéo đầu đến da dầm đứng tại hai đầu (theo lệch/xéo tại tim Y). */
+ export function horizontalBeamSegExtent(
+   project: SlabProject,
+   x0: number,
+   x1: number,
+   axesX: GridAxis[],
++  alongYMm?: number,
+ ): { xLo: number; xHi: number } {
+   const loAxis = Math.min(x0, x1);
+   const hiAxis = Math.max(x0, x1);
+   const aLo = axesX.find((a) => Math.abs(a.pos - loAxis) < 0.5) ?? { id: "", name: "", pos: loAxis };
+   const aHi = axesX.find((a) => Math.abs(a.pos - hiAxis) < 0.5) ?? { id: "", name: "", pos: hiAxis };
+-  const faceLo = beamOuterFaces(loAxis, beamSectionOnAxis(project, "Y", aLo));
+-  const faceHi = beamOuterFaces(hiAxis, beamSectionOnAxis(project, "Y", aHi));
++  const along = Number.isFinite(alongYMm) ? (alongYMm as number) : (loAxis + hiAxis) / 2;
++  const faceLo = axisBeamFacesAtAlong(project, "Y", aLo, along);
++  const faceHi = axisBeamFacesAtAlong(project, "Y", aHi, along);
+   return { xLo: faceLo.lo, xHi: faceHi.hi };
+ }
+ 
+@@ -1065,24 +1120,30 @@ export function beamOuterFacesAtAlong(
+   axis: GridAxis,
+   alongMm: number,
+ ): { lo: number; hi: number } {
+-  const sec = beamSectionOnAxis(project, beamDir, axis);
+-  const base = beamOuterFaces(axis.pos, sec);
+   const beam = findBeamOnAxis(project, beamDir, axis);
+   if (!beam) return { lo: axis.pos, hi: axis.pos };
+-  const segs = beamSegments(project, beam);
+-  if (segs.length === 0) return { lo: axis.pos, hi: axis.pos };
+-  let seg = segs.find((s) => alongMm >= s.lo - 0.5 && alongMm <= s.hi + 0.5);
+-  if (!seg) {
+-    seg = segs.reduce((best, s) => {
+-      const d = alongMm < s.lo ? s.lo - alongMm : alongMm > s.hi ? alongMm - s.hi : 0;
+-      const bd = alongMm < best.lo ? best.lo - alongMm : alongMm > best.hi ? alongMm - best.hi : 0;
+-      return d < bd ? s : best;
+-    });
+-  }
+-  if (isBeamSegOmitted(beam, seg.a0.id, seg.a1.id)) {
+-    return { lo: axis.pos, hi: axis.pos };
++  const perp = sortAxes(beamDir === "Y" ? project.axesY ?? [] : project.axesX ?? []);
++  // Tìm đoạn chứa alongMm để tôn trọng omitSegKeys
++  const bLo = Math.min(beam.start, beam.end);
++  const bHi = Math.max(beam.start, beam.end);
++  const crosses = perp.filter((a) => a.pos >= bLo - 0.5 && a.pos <= bHi + 0.5);
++  if (crosses.length >= 2) {
++    let segIndex = 0;
++    for (let i = 0; i < crosses.length - 1; i++) {
++      const mid = (crosses[i].pos + crosses[i + 1].pos) / 2;
++      if (alongMm < mid) {
++        segIndex = i;
++        break;
++      }
++      segIndex = i;
++    }
++    const a0 = crosses[segIndex];
++    const a1 = crosses[segIndex + 1];
++    if (isBeamSegOmitted(beam, a0.id, a1.id)) {
++      return { lo: axis.pos, hi: axis.pos };
++    }
+   }
+-  return beamSegFacesAtAlong(beam, seg.index, alongMm, seg.lo, seg.hi);
++  return beamFacesAtAlongDirect(beam, alongMm, perp);
+ }
+ 
+ export function baySlabExtent(
+@@ -1902,7 +1963,7 @@ export function insertBeamInBay(
+   };
+ }
+ 
+-/** Phạm vi vẽ dầm theo chiều dài: kéo đầu tới da dầm ngược phương nếu có. */
++/** Phạm vi vẽ dầm theo chiều dài: kéo đầu tới da dầm ngược phương nếu có (tính lệch/xéo). */
+ export function beamDrawRange(
+   project: SlabProject,
+   beam: PlanBeam,
+@@ -1913,13 +1974,18 @@ export function beamDrawRange(
+   for (const p of perp) {
+     const pLo = Math.min(p.start, p.end);
+     const pHi = Math.max(p.start, p.end);
+-    if (beam.axis < pLo - 1 || beam.axis > pHi + 1) continue;
+-    const { b: bw } = parseSize(p.size);
+-    const b1 = Number.isFinite(p.offset) ? (p.offset as number) : bw / 2;
+-    const faces = beamOuterFaces(p.axis, { bw, b1 });
+-    const half = Math.max(faces.hi - faces.lo, bw) / 2 + 80;
+-    if (Math.abs(p.axis - lo) <= half) lo = Math.min(lo, faces.lo);
+-    if (Math.abs(p.axis - hi) <= half) hi = Math.max(hi, faces.hi);
++    // Tim dầm đang xét có nằm trên thân dầm ngược phương không?
++    const alongOnPerp = beam.axis;
++    if (alongOnPerp < pLo - 1 || alongOnPerp > pHi + 1) continue;
++    const faces = beamFacesAtAlongDirect(
++      p,
++      alongOnPerp,
++      sortAxes(p.direction === "Y" ? project.axesY ?? [] : project.axesX ?? []),
++    );
++    const half = Math.max(faces.hi - faces.lo, 1) / 2 + 80;
++    // Gần đầu lo/hi của dầm đang xét (theo tim trục dầm ngược)
++    if (Math.abs(p.axis - lo) <= half || faces.lo <= lo + half) lo = Math.min(lo, faces.lo);
++    if (Math.abs(p.axis - hi) <= half || faces.hi >= hi - half) hi = Math.max(hi, faces.hi);
+   }
+   return { lo, hi };
+ }
+@@ -1953,10 +2019,12 @@ export function beamSegments(project: SlabProject, beam: PlanBeam): BeamSegment[
+       .map((a, fullIndex) => ({ a, fullIndex }))
+       .filter(({ a }) => a.pos >= bLo - 0.5 && a.pos <= bHi + 0.5);
+     const out: BeamSegment[] = [];
++    // Tim X của dầm đứng — đầu/cuối đoạn bám da dầm ngang lệch/xéo tại đúng tim này
++    const alongX = beam.axis;
+     for (let i = 0; i < crosses.length - 1; i++) {
+       const a0 = crosses[i].a;
+       const a1 = crosses[i + 1].a;
+-      const { yLo, yHi } = verticalBeamSegExtent(project, a0.pos, a1.pos, axesY);
++      const { yLo, yHi } = verticalBeamSegExtent(project, a0.pos, a1.pos, axesY, alongX);
+       out.push({
+         index: i,
+         lo: yLo,
+@@ -1974,10 +2042,12 @@ export function beamSegments(project: SlabProject, beam: PlanBeam): BeamSegment[
+     .map((a, fullIndex) => ({ a, fullIndex }))
+     .filter(({ a }) => a.pos >= bLo - 0.5 && a.pos <= bHi + 0.5);
+   const out: BeamSegment[] = [];
++  // Tim Y của dầm ngang — đầu/cuối đoạn bám da dầm đứng lệch/xéo tại đúng tim này
++  const alongY = beam.axis;
+   for (let i = 0; i < crosses.length - 1; i++) {
+     const a0 = crosses[i].a;
+     const a1 = crosses[i + 1].a;
+-    const { xLo, xHi } = horizontalBeamSegExtent(project, a0.pos, a1.pos, axesX);
++    const { xLo, xHi } = horizontalBeamSegExtent(project, a0.pos, a1.pos, axesX, alongY);
+     out.push({
+       index: i,
+       lo: xLo,
+diff --git a/scripts/test-skew-split-extend.ts b/scripts/test-skew-split-extend.ts
+new file mode 100644
+index 0000000..27e693e
+--- /dev/null
++++ b/scripts/test-skew-split-extend.ts
+@@ -0,0 +1,134 @@
++/**
++ * Dầm lệch: đoạn dầm cắt qua bám da trong bề rộng B;
++ * khi lệch ra ngoài đầu → phóng dài chồng lên dầm lệch.
++ */
++import { createSampleS1 } from "../lib/sample";
++import {
++  applyAxesToProject,
++  beamsFromAxes,
++  beamSegments,
++  beamSegSideFaces,
++  patchBeamSelectedSegShiftsContinuous,
++} from "../lib/grid";
++import { uid } from "../lib/utils";
++
++function assert(cond: unknown, msg: string): asserts cond {
++  if (!cond) throw new Error(msg);
++}
++
++let p = createSampleS1();
++// Lưới 3 trục đứng × 4 trục ngang (như hình A–D / 1–3)
++p = {
++  ...p,
++  axesX: [
++    { id: uid("ax"), name: "1", pos: 0 },
++    { id: uid("ax"), name: "2", pos: 3000 },
++    { id: uid("ax"), name: "3", pos: 6000 },
++  ],
++  axesY: [
++    { id: uid("ay"), name: "A", pos: 0 },
++    { id: uid("ay"), name: "B", pos: 1500 },
++    { id: uid("ay"), name: "C", pos: 3000 },
++    { id: uid("ay"), name: "D", pos: 4500 },
++  ],
++};
++p = applyAxesToProject({ ...p, beams: beamsFromAxes(p) });
++
++const vertMid = (p.beams ?? []).find((b) => b.direction === "Y" && Math.abs(b.axis - 3000) < 1);
++assert(vertMid, "need mid vertical beam on axis 2");
++const horizB = (p.beams ?? []).find((b) => b.direction === "X" && Math.abs(b.axis - 1500) < 1);
++assert(horizB, `need horizontal beam on B, have ${(p.beams ?? []).map((b) => b.direction + "@" + b.axis).join(",")}`);
++
++const segsBefore = beamSegments(p, horizB!);
++assert(segsBefore.length === 2, `horiz should have 2 segs, got ${segsBefore.length}`);
++const left0 = segsBefore[0];
++const right0 = segsBefore[1];
++// Chưa lệch: hai đoạn cắt nhau trong B tại trục 2
++assert(left0.hi > right0.lo, `overlap before: left.hi=${left0.hi} right.lo=${right0.lo}`);
++const overlap0 = left0.hi - right0.lo;
++assert(Math.abs(overlap0 - 220) < 1.5, `overlap before want B=220 got ${overlap0}`);
++
++// Lệch dầm giữa xéo s0=200 s1=600 suốt thanh
++const vSegs = beamSegments(p, vertMid!);
++p = patchBeamSelectedSegShiftsContinuous(
++  p,
++  vSegs.map((s) => ({ beamId: vertMid!.id, segIndex: s.index })),
++  { s0: 200, s1: 600 },
++);
++
++const horiz = (p.beams ?? []).find((b) => b.id === horizB!.id)!;
++const segs = beamSegments(p, horiz);
++assert(segs.length === 2, `after skew still 2 segs, got ${segs.length}`);
++
++const left = segs[0];
++const right = segs[1];
++const overlap = left.hi - right.lo;
++console.log({
++  left: { lo: left.lo, hi: left.hi },
++  right: { lo: right.lo, hi: right.hi },
++  overlap,
++});
++
++assert(overlap > 100, `overlap within skewed B, got ${overlap}`);
++assert(Math.abs(overlap - 220) < 2, `overlap should ≈ B=220, got ${overlap}`);
++// Khớp lệch: joint đã dịch sang phải so với trước
++assert(left.hi > left0.hi + 100, `left.hi should extend right after skew: ${left.hi} vs ${left0.hi}`);
++assert(right.lo > right0.lo + 100, `right.lo should move right: ${right.lo} vs ${right0.lo}`);
++
++// --- Case 2: dầm biên lệch ra ngoài → phóng dài đoạn ngoài cùng ---
++let p2 = createSampleS1();
++p2 = {
++  ...p2,
++  axesX: [
++    { id: uid("ax"), name: "1", pos: 0 },
++    { id: uid("ax"), name: "2", pos: 3000 },
++    { id: uid("ax"), name: "3", pos: 6000 },
++    { id: uid("ax"), name: "4", pos: 9000 },
++  ],
++  axesY: [
++    { id: uid("ay"), name: "A", pos: 0 },
++    { id: uid("ay"), name: "B", pos: 2000 },
++    { id: uid("ay"), name: "C", pos: 4000 },
++  ],
++};
++p2 = applyAxesToProject({ ...p2, beams: beamsFromAxes(p2) });
++
++const edge = (p2.beams ?? []).find((b) => b.direction === "Y" && Math.abs(b.axis - 9000) < 1);
++assert(edge, "need edge beam on axis 4");
++const hA = (p2.beams ?? []).find((b) => b.direction === "X" && Math.abs(b.axis - 0) < 1);
++assert(hA, "need bottom horizontal");
++
++const beforeEdge = beamSegments(p2, hA!);
++const lastBefore = beforeEdge[beforeEdge.length - 1];
++assert(lastBefore, "need last horiz seg");
++
++const eSegs = beamSegments(p2, edge!);
++p2 = patchBeamSelectedSegShiftsContinuous(
++  p2,
++  eSegs.map((s) => ({ beamId: edge!.id, segIndex: s.index })),
++  { s0: 500, s1: 200 }, // lệch ra ngoài (+X), xéo
++);
++
++const hA2 = (p2.beams ?? []).find((b) => b.id === hA!.id)!;
++const afterEdge = beamSegments(p2, hA2);
++const lastAfter = afterEdge[afterEdge.length - 1];
++console.log({
++  lastBeforeHi: lastBefore.hi,
++  lastAfterHi: lastAfter.hi,
++  delta: lastAfter.hi - lastBefore.hi,
++});
++
++assert(
++  lastAfter.hi > lastBefore.hi + 150,
++  `edge horiz should extend outward: ${lastAfter.hi} vs ${lastBefore.hi}`,
++);
++
++// Chồng lên dầm lệch: hi đoạn ngang = da ngoài (hi) của dầm biên tại Y=A
++const edge2 = (p2.beams ?? []).find((b) => b.id === edge!.id)!;
++const edgeFaces = beamSegSideFaces(edge2, 0); // tại đầu A
++assert(
++  Math.abs(lastAfter.hi - edgeFaces.hi0) < 2,
++  `last.hi should match edge outer hi0=${edgeFaces.hi0}, got ${lastAfter.hi}`,
++);
++
++console.log("OK skew split + extend");
+-- 
+2.43.0
+
