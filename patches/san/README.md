@@ -1,4 +1,4 @@
-# Patch: PDF bảng TK + tổng hợp góc dưới phải
+# Patch: PDF tiêu đề mặt cắt dưới bản vẽ
 
-- Bảng thống kê và tổng hợp cùng một hàng.
-- Neo góc dưới bên phải khổ giấy.
+- Chữ MẶT CẮT THÉP SÀN … đặt dưới bản cắt (như tiêu đề mặt bằng).
+- Thứ tự: MẶT CẮT → TL · Lớp BV → Cắt theo phương ….

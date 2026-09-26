@@ -1618,9 +1618,6 @@ function drawRebarSectionCut(
       ? `Cắt theo phương X · X=${at}${axisName ? ` (trục ${axisName})` : ""}${axisSpanLabel ? ` · ${axisSpanLabel}` : ""}`
       : `Cắt theo phương Y · Y=${at}${axisName ? ` (trục ${axisName})` : ""}${axisSpanLabel ? ` · ${axisSpanLabel}` : ""}`;
 
-  textSimple(ctx, title, x + maxW / 2, y + 2, 8.5, true, "center");
-  textSimple(ctx, sub, x + maxW / 2, y + 14, 6.2, false, "center", GRAY);
-
   const { segs, along0, along1, axes } = buildSectionAlongSegs(project, cutDir, at);
   const spanMm = Math.max(along1 - along0, 1);
   const padL = 28;
@@ -1650,8 +1647,8 @@ function drawRebarSectionCut(
   const slabT = slabTmm * s;
   const beamH = maxBeamHmm * s;
   const dropS = maxDropMm * s;
-  // Chừa chỗ đường chỉ sắt phía trên mặt sàn
-  const sy = y + 42;
+  // Tiêu đề mặt cắt đặt dưới bản cắt (như mặt bằng) — chỉ chừa chỗ đường chỉ sắt
+  const sy = y + 14;
   const slabTopY = sy;
   const slabBotY = sy + slabT;
 
@@ -1886,17 +1883,24 @@ function drawRebarSectionCut(
     yDim += DIM_GAP;
   }
 
+  /**
+   * Dưới bản cắt (trên → dưới), dưới TL mặt bằng nếu có:
+   * MẶT CẮT THÉP SÀN … → TL · Lớp BV → Cắt theo phương …
+   */
+  const titleY = yDim + 10;
+  textSimple(ctx, title, x + maxW / 2, titleY, 8.5, true, "center");
   textSimple(
     ctx,
     `TL 1/${project.info.drawingScale || 100} · Lớp BV ${project.info.cover}`,
     x + maxW / 2,
-    yDim + 2,
+    titleY + 12,
     6.2,
     false,
     "center",
     GRAY,
   );
-  return yDim + 16;
+  textSimple(ctx, sub, x + maxW / 2, titleY + 24, 6.2, false, "center", GRAY);
+  return titleY + 36;
 }
 
 /** A-A trên, B-B dưới — cùng tỉ lệ mặt bằng (đặt dưới mặt bằng lớp dưới). */
