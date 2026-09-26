@@ -1,0 +1,202 @@
+From ab5f9b33a5d45dba6e86590f475922eac819792f Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Thu, 17 Sep 2026 08:40:59 +0000
+Subject: [PATCH] =?UTF-8?q?feat:=20=C4=91=E1=BB=95i=20lo=E1=BA=A1i=20?=
+ =?UTF-8?q?=C3=B4=20s=C3=A0n=20th=C6=B0=E1=BB=9Dng=20/=20=C3=B4=20th?=
+ =?UTF-8?q?=E1=BB=A7ng=20/=20s=C3=A0n=20th=E1=BA=A5p?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Chọn ô đang chọn để sửa nếu chèn nhầm: Sàn thường, Ô thủng, Sàn thấp.
+---
+ components/slab/SlabApp.tsx | 130 +++++++++++++++++++++++++-----------
+ 1 file changed, 91 insertions(+), 39 deletions(-)
+
+diff --git a/components/slab/SlabApp.tsx b/components/slab/SlabApp.tsx
+index 8848c67..2408132 100644
+--- a/components/slab/SlabApp.tsx
++++ b/components/slab/SlabApp.tsx
+@@ -562,43 +562,20 @@ export function SlabApp() {
+     persist(applyAxesToProject({ ...project, axesY: nextAxes }));
+   }
+ 
+-  function insertOpening() {
+-    if (planSelection?.kind !== "bay") {
+-      setStatus("Chọn một ô sàn trên bản vẽ rồi bấm Chèn Ô thủng.");
+-      setTab("draw");
+-      return;
+-    }
++  function selectedBayKind(): "normal" | "opening" | "low" {
++    if (planSelection?.kind !== "bay") return "normal";
+     const xs = sortAxes(project.axesX);
+     const ys = sortAxes(project.axesY);
+     const { x0, x1, y0, y1 } = baySlabExtent(project, xs, ys, planSelection.ix, planSelection.iy);
+-    const x = Math.min(x0, x1);
+-    const y = Math.min(y0, y1);
+-    const w = Math.abs(x1 - x0);
+-    const h = Math.abs(y1 - y0);
+-    const openings = (project.openings ?? []).filter((o) => !rectNearlyEquals(o, x0, y0, x1, y1));
+-    const lowSlabs = (project.lowSlabs ?? []).filter((o) => !rectNearlyEquals(o, x0, y0, x1, y1));
+-    persist({
+-      ...project,
+-      openings: [
+-        ...openings,
+-        {
+-          id: uid("op"),
+-          name: `Ô${openings.length + 1}`,
+-          x,
+-          y,
+-          w,
+-          h,
+-        },
+-      ],
+-      lowSlabs,
+-    });
+-    setTab("draw");
+-    setStatus(`Đã chèn ô thủng tại ô ${xs[planSelection.ix]?.name}-${ys[planSelection.iy]?.name}.`);
++    if ((project.openings ?? []).some((o) => rectNearlyEquals(o, x0, y0, x1, y1))) return "opening";
++    if ((project.lowSlabs ?? []).some((o) => rectNearlyEquals(o, x0, y0, x1, y1))) return "low";
++    return "normal";
+   }
+ 
+-  function insertLowSlab() {
++  /** Đặt loại ô đang chọn: sàn thường / ô thủng / sàn thấp (sửa được nếu chèn nhầm). */
++  function setSelectedBayKind(kind: "normal" | "opening" | "low") {
+     if (planSelection?.kind !== "bay") {
+-      setStatus("Chọn một ô sàn trên bản vẽ rồi bấm Chèn Sàn thấp.");
++      setStatus("Chọn một ô sàn trên bản vẽ rồi chọn loại ô (thường / thủng / thấp).");
+       setTab("draw");
+       return;
+     }
+@@ -609,8 +586,29 @@ export function SlabApp() {
+     const y = Math.min(y0, y1);
+     const w = Math.abs(x1 - x0);
+     const h = Math.abs(y1 - y0);
++    const bayName = `${xs[planSelection.ix]?.name}-${ys[planSelection.iy]?.name}`;
+     const openings = (project.openings ?? []).filter((o) => !rectNearlyEquals(o, x0, y0, x1, y1));
+     const lowSlabs = (project.lowSlabs ?? []).filter((o) => !rectNearlyEquals(o, x0, y0, x1, y1));
++
++    if (kind === "normal") {
++      persist({ ...project, openings, lowSlabs });
++      setTab("draw");
++      setStatus(`Đã đặt ô ${bayName} thành sàn thường.`);
++      return;
++    }
++    if (kind === "opening") {
++      persist({
++        ...project,
++        openings: [
++          ...openings,
++          { id: uid("op"), name: `Ô${openings.length + 1}`, x, y, w, h },
++        ],
++        lowSlabs,
++      });
++      setTab("draw");
++      setStatus(`Đã đặt ô ${bayName} thành ô thủng.`);
++      return;
++    }
+     persist({
+       ...project,
+       openings,
+@@ -628,9 +626,15 @@ export function SlabApp() {
+       ],
+     });
+     setTab("draw");
+-    setStatus(
+-      `Đã chèn sàn thấp (hạ ${project.info.lowSlabDrop ?? 0} mm) tại ô ${xs[planSelection.ix]?.name}-${ys[planSelection.iy]?.name}.`,
+-    );
++    setStatus(`Đã đặt ô ${bayName} thành sàn thấp (hạ ${project.info.lowSlabDrop ?? 0} mm).`);
++  }
++
++  function insertOpening() {
++    setSelectedBayKind("opening");
++  }
++
++  function insertLowSlab() {
++    setSelectedBayKind("low");
+   }
+ 
+   return (
+@@ -1309,18 +1313,41 @@ export function SlabApp() {
+                   <Button size="sm" className="bg-amber-600 text-white hover:bg-amber-500" onClick={() => void exportPdf()}>
+                     Vẽ thép sàn (PDF)
+                   </Button>
+-                  <Button size="sm" variant="secondary" onClick={insertOpening} title="Chọn ô sàn rồi chèn — đánh dấu X nét đứt">
+-                    Chèn Ô thủng
++                  <Button
++                    size="sm"
++                    variant="secondary"
++                    className={planSelection?.kind === "bay" && selectedBayKind() === "opening" ? "border-sky-500 text-sky-300" : undefined}
++                    onClick={insertOpening}
++                    title="Chọn ô sàn rồi đặt thành ô thủng (X nét đứt)"
++                  >
++                    Ô thủng
+                   </Button>
+-                  <Button size="sm" variant="secondary" onClick={insertLowSlab} title="Chọn ô sàn rồi chèn — gạch chéo sàn thấp">
+-                    Chèn Sàn thấp
++                  <Button
++                    size="sm"
++                    variant="secondary"
++                    className={planSelection?.kind === "bay" && selectedBayKind() === "low" ? "border-sky-500 text-sky-300" : undefined}
++                    onClick={insertLowSlab}
++                    title="Chọn ô sàn rồi đặt thành sàn thấp (gạch chéo)"
++                  >
++                    Sàn thấp
++                  </Button>
++                  <Button
++                    size="sm"
++                    variant="secondary"
++                    className={planSelection?.kind === "bay" && selectedBayKind() === "normal" ? "border-sky-500 text-sky-300" : undefined}
++                    onClick={() => setSelectedBayKind("normal")}
++                    title="Đặt lại ô đang chọn thành sàn thường"
++                    disabled={planSelection?.kind !== "bay"}
++                  >
++                    Sàn thường
+                   </Button>
+                   <Button size="sm" variant="secondary" className="text-amber-300" onClick={() => setStatus(`Thống kê: ${model.schedule.length} số hiệu · ${model.totalWeight.toFixed(1)} kg`)}>
+                     Thống kê thép sàn
+                   </Button>
+                 </div>
+                 <p className="mt-1.5 text-[11px] text-zinc-500">
+-                  Chọn ô sàn trên bản vẽ rồi bấm Chèn Ô thủng (X nét đứt) hoặc Chèn Sàn thấp (gạch chéo).
++                  Chọn ô sàn → chọn loại: <b className="text-zinc-400">Sàn thường</b> / <b className="text-zinc-400">Ô thủng</b> /{" "}
++                  <b className="text-zinc-400">Sàn thấp</b> (đổi lại được nếu chèn nhầm).
+                 </p>
+               </Panel>
+               <Panel title="Danh sách vùng thép" className="min-w-0 w-full">
+@@ -1357,6 +1384,31 @@ export function SlabApp() {
+                     </Button>
+                   </div>
+                   <p className="mb-2 text-[11px] text-zinc-400">{selectedBaySpans()!.name}</p>
++                  <div className="mb-2">
++                    <div className="mb-1 text-[11px] text-zinc-500">Loại ô sàn</div>
++                    <div className="flex flex-wrap gap-1.5">
++                      {(
++                        [
++                          ["normal", "Sàn thường"],
++                          ["opening", "Ô thủng"],
++                          ["low", "Sàn thấp"],
++                        ] as const
++                      ).map(([kind, label]) => {
++                        const active = selectedBayKind() === kind;
++                        return (
++                          <Button
++                            key={kind}
++                            size="sm"
++                            variant={active ? "default" : "secondary"}
++                            className={active ? "bg-sky-700 text-white hover:bg-sky-600" : undefined}
++                            onClick={() => setSelectedBayKind(kind)}
++                          >
++                            {label}
++                          </Button>
++                        );
++                      })}
++                    </div>
++                  </div>
+                   <div className="flex flex-col gap-2.5">
+                     <Field label="Khoảng cách Lx" unit="mm">
+                       <Input
+-- 
+2.43.0
+
