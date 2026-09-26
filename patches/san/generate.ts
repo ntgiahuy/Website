@@ -59,8 +59,14 @@ const DIST_BLUE = rgb(0.15, 0.39, 0.92);
 const REBAR_MARK_R = 4.8;
 /** Vòng số hiệu trục PDF: bán kính + khoảng hở khỏi da dầm. */
 const AXIS_BUBBLE_R = 5.5;
-const AXIS_BUBBLE_GAP = 10;
-const AXIS_BUBBLE_OFFSET = AXIS_BUBBLE_R + AXIS_BUBBLE_GAP;
+/** Da dầm / mặt cắt → đường dim dầm·sàn (gần hình nhất). */
+const DIM_FROM_EDGE = 12;
+/** Khoảng cách giữa các chuỗi dim ngang. */
+const DIM_CHAIN_GAP_X = 14;
+/** Khoảng cách chuỗi dim đứng (số xoay cần rộng hơn). */
+const DIM_CHAIN_GAP_Y = 20;
+/** Mép dim ngoài cùng → mép vòng số hiệu. */
+const DIM_TO_BUBBLE = 8;
 /** Da dầm phía trong (hướng vào ô sàn): nét đứt đều. */
 const BEAM_INNER_DASH = [3.2, 2];
 /** Tim trục: gạch–chấm–gạch–chấm liên tục. */
@@ -789,7 +795,7 @@ function dimV(
   line(ctx, x, lo, x, hi, 0.45);
   line(ctx, x - 3, lo, x + 3, lo, 0.45);
   line(ctx, x - 3, hi, x + 3, hi, 0.45);
-  // Số hở khỏi đường dim của chính chuỗi này; DIM_GAP_Y đủ rộng để không đè hàng bên
+  // Số hở khỏi đường dim của chính chuỗi này; DIM_CHAIN_GAP_Y đủ rộng để không đè hàng bên
   const clear = 4;
   const anchorX = labelSide === "left" ? x - clear : x + clear;
   textVerticalBeside(ctx, label, anchorX, (lo + hi) / 2, size, labelSide, false);
@@ -898,36 +904,16 @@ function drawPlan(
   // Khung ngoài sàn (da dầm biên) — nét liền
   rect(ctx, edgeLeft, edgeTop, edgeRight - edgeLeft, edgeBottom - edgeTop, 1.0);
 
-  // —— Tim trục: nét gạch–chấm liên tục xuyên mặt bằng ——
+  // —— Tim trục: nét gạch–chấm liên tục xuyên mặt bằng (bubble vẽ sau dim, ngoài cùng) ——
   for (let i = 0; i < axesX.length; i++) {
     const ax = axesX[i];
     const x = toX(ax.pos);
-    const by = edgeBottom + AXIS_BUBBLE_OFFSET;
     line(ctx, x, edgeTop, x, edgeBottom, 0.4, AXIS_LINE, AXIS_CENTERLINE_DASH);
-    line(ctx, x, by - AXIS_BUBBLE_R, x, edgeBottom, 0.35, BLACK, [2, 1.5]);
-    ctx.page.drawCircle({
-      x,
-      y: ty(by),
-      size: AXIS_BUBBLE_R,
-      borderColor: BLACK,
-      borderWidth: 0.7,
-    });
-    textInAxisBubble(ctx, ax.name, x, by);
   }
   for (let i = 0; i < axesY.length; i++) {
     const ay = axesY[i];
     const y = toY(ay.pos);
-    const bx = edgeLeft - AXIS_BUBBLE_OFFSET;
     line(ctx, edgeLeft, y, edgeRight, y, 0.4, AXIS_LINE, AXIS_CENTERLINE_DASH);
-    line(ctx, bx + AXIS_BUBBLE_R, y, edgeLeft, y, 0.35, BLACK, [2, 1.5]);
-    ctx.page.drawCircle({
-      x: bx,
-      y: ty(y),
-      size: AXIS_BUBBLE_R,
-      borderColor: BLACK,
-      borderWidth: 0.7,
-    });
-    textInAxisBubble(ctx, ay.name, bx, y);
   }
 
   // —— Dầm: da ngoài (biên sàn) nét liền; da trong (vào ô) nét đứt (không ghi tên dầm) ——
@@ -1123,37 +1109,38 @@ function drawPlan(
     }
   }
 
-  // —— Đường dim: da dầm + lòng sàn · tim trục · tổng ——
-  const DIM_GAP_X = 14; // số dim ngang hở phía trên đường
-  /** Khoảng cách chuỗi dim đứng ≥ bề rộng chữ xoay (~size) + 2 khe — tránh số đè đường hàng bên */
-  const DIM_GAP_Y = 20;
+  /**
+   * Ngoài → vào: số hiệu trục → dim tổng → dim tim trục → dim dầm/sàn → hình vẽ.
+   * Dim đặt sát hình trước; vòng số hiệu ngoài cùng.
+   */
   const faceX = faceChainAlongX(project, axesX, axesY);
   const faceY = faceChainAlongY(project, axesX, axesY);
   const axisXMarks = axesX.map((a) => a.pos);
   const axisYMarks = axesY.map((a) => a.pos);
 
-  // Ngang (phương X): dưới vòng trục — sát trong → ngoài
-  let yDim = edgeBottom + AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 6;
+  // Ngang (X): sát hình → ngoài
+  let yDim = edgeBottom + DIM_FROM_EDGE;
   if (faceX.length >= 2) {
     dimHChain(ctx, faceX, yDim, toX, 5.2); // B dầm + bề rộng sàn
-    yDim += DIM_GAP_X;
+    yDim += DIM_CHAIN_GAP_X;
   }
   if (axisXMarks.length >= 2) {
     dimHChain(ctx, axisXMarks, yDim, toX, 5.5); // tim trục
-    yDim += DIM_GAP_X;
+    yDim += DIM_CHAIN_GAP_X;
   }
   dimH(ctx, toX(bleed.xMin), toX(bleed.xMax), yDim, `${Math.round(bleed.xMax - bleed.xMin)}`, 6.5);
-  const dimBottomY = yDim;
+  yDim += DIM_TO_BUBBLE + AXIS_BUBBLE_R;
+  const bubbleBottomY = yDim;
 
-  // Đứng (phương Y): trái vòng trục — sát trong → ngoài (x giảm)
-  let xDim = edgeLeft - AXIS_BUBBLE_OFFSET - AXIS_BUBBLE_R - 6;
+  // Đứng (Y): sát hình → trái (x giảm)
+  let xDim = edgeLeft - DIM_FROM_EDGE;
   if (faceY.length >= 2) {
     dimVChain(ctx, faceY, xDim, toY, 5.2, "left");
-    xDim -= DIM_GAP_Y;
+    xDim -= DIM_CHAIN_GAP_Y;
   }
   if (axisYMarks.length >= 2) {
     dimVChain(ctx, axisYMarks, xDim, toY, 5.5, "left");
-    xDim -= DIM_GAP_Y;
+    xDim -= DIM_CHAIN_GAP_Y;
   }
   dimV(
     ctx,
@@ -1164,9 +1151,39 @@ function drawPlan(
     6.5,
     "left",
   );
+  xDim -= DIM_TO_BUBBLE + AXIS_BUBBLE_R;
+  const bubbleLeftX = xDim;
 
-  // Tiêu đề + tỉ lệ: dưới bản vẽ, hở khỏi số dim ngang
-  const titleY = dimBottomY + 18;
+  // Vòng số hiệu ngoài cùng + đường dẫn băng qua chuỗi dim
+  for (let i = 0; i < axesX.length; i++) {
+    const ax = axesX[i]!;
+    const x = toX(ax.pos);
+    line(ctx, x, bubbleBottomY - AXIS_BUBBLE_R, x, edgeBottom, 0.35, BLACK, [2, 1.5]);
+    ctx.page.drawCircle({
+      x,
+      y: ty(bubbleBottomY),
+      size: AXIS_BUBBLE_R,
+      borderColor: BLACK,
+      borderWidth: 0.7,
+    });
+    textInAxisBubble(ctx, ax.name, x, bubbleBottomY);
+  }
+  for (let i = 0; i < axesY.length; i++) {
+    const ay = axesY[i]!;
+    const y = toY(ay.pos);
+    line(ctx, bubbleLeftX + AXIS_BUBBLE_R, y, edgeLeft, y, 0.35, BLACK, [2, 1.5]);
+    ctx.page.drawCircle({
+      x: bubbleLeftX,
+      y: ty(y),
+      size: AXIS_BUBBLE_R,
+      borderColor: BLACK,
+      borderWidth: 0.7,
+    });
+    textInAxisBubble(ctx, ay.name, bubbleLeftX, y);
+  }
+
+  // Tiêu đề + tỉ lệ: dưới vòng số hiệu
+  const titleY = bubbleBottomY + AXIS_BUBBLE_R + 12;
   textSimple(ctx, planTitle, ox + maxW / 2, titleY, 10, true, "center");
   textSimple(ctx, `TL: 1/${project.info.drawingScale}`, ox + maxW / 2, titleY + 12, 7.5, false, "center");
 
@@ -1833,19 +1850,11 @@ function drawRebarSectionCut(
     }
   }
 
-  // Bong bóng trục đầu → cuối dưới mặt cắt
-  const axisBubbleY = slabTopY + beamH + dropS + 22;
+  // Đường dẫn tim trục xuống vùng dim (bubble vẽ sau, ngoài cùng)
+  const geomBottomY = slabTopY + beamH + dropS;
   for (const ax of axes) {
     const px = toAlong(ax.pos);
-    line(ctx, px, slabTopY, px, axisBubbleY - AXIS_BUBBLE_R, 0.35, AXIS_LINE, AXIS_CENTERLINE_DASH);
-    ctx.page.drawCircle({
-      x: px,
-      y: ty(axisBubbleY),
-      size: AXIS_BUBBLE_R,
-      borderColor: BLACK,
-      borderWidth: 0.65,
-    });
-    textInAxisBubble(ctx, ax.name, px, axisBubbleY, 6);
+    line(ctx, px, slabTopY, px, geomBottomY + 4, 0.35, AXIS_LINE, AXIS_CENTERLINE_DASH);
   }
 
   // Dim đứng: Hs + H (phải)
@@ -1867,27 +1876,39 @@ function drawRebarSectionCut(
   }
 
   /**
-   * Dim ngang dưới vòng trục:
-   * 1) dim tim trục
-   * 2) dưới đó: dim bề rộng dầm (B) + lòng sàn
+   * Dim ngang dưới mặt cắt — ngoài → vào:
+   * số hiệu trục → dim tim trục → dim B + lòng sàn → hình vẽ.
    */
-  const DIM_GAP = 14;
-  let yDim = axisBubbleY + AXIS_BUBBLE_R + 7;
+  let yDim = geomBottomY + DIM_FROM_EDGE + 10;
   const axisMarksMm = axes.map((a) => a.pos);
-  if (axisMarksMm.length >= 2) {
-    dimHChain(ctx, axisMarksMm, yDim, toAlong, 5.5);
-    yDim += DIM_GAP;
-  }
   if (faceMarksMm.length >= 2) {
     dimHChain(ctx, faceMarksMm, yDim, toAlong, 5.2);
-    yDim += DIM_GAP;
+    yDim += DIM_CHAIN_GAP_X;
+  }
+  if (axisMarksMm.length >= 2) {
+    dimHChain(ctx, axisMarksMm, yDim, toAlong, 5.5);
+    yDim += DIM_CHAIN_GAP_X;
+  }
+  yDim += DIM_TO_BUBBLE + AXIS_BUBBLE_R;
+  const axisBubbleY = yDim;
+  for (const ax of axes) {
+    const px = toAlong(ax.pos);
+    line(ctx, px, geomBottomY + 4, px, axisBubbleY - AXIS_BUBBLE_R, 0.35, AXIS_LINE, AXIS_CENTERLINE_DASH);
+    ctx.page.drawCircle({
+      x: px,
+      y: ty(axisBubbleY),
+      size: AXIS_BUBBLE_R,
+      borderColor: BLACK,
+      borderWidth: 0.65,
+    });
+    textInAxisBubble(ctx, ax.name, px, axisBubbleY, 6);
   }
 
   /**
-   * Dưới bản cắt (trên → dưới), dưới TL mặt bằng nếu có:
+   * Dưới vòng số hiệu (trên → dưới):
    * MẶT CẮT THÉP SÀN … → TL · Lớp BV → Cắt theo phương …
    */
-  const titleY = yDim + 10;
+  const titleY = axisBubbleY + AXIS_BUBBLE_R + 10;
   textSimple(ctx, title, x + maxW / 2, titleY, 8.5, true, "center");
   textSimple(
     ctx,
@@ -2156,15 +2177,16 @@ export async function generateSlabPdf(
     );
     const maxDrop = Math.max(0, ...(project.lowSlabs ?? []).map((ls) => ls.drop || 0));
     const one =
-      42 +
+      14 +
       maxBeam * s +
       maxDrop * s +
-      22 +
-      AXIS_BUBBLE_R +
-      7 +
-      11 +
-      11 +
-      18;
+      DIM_FROM_EDGE +
+      10 +
+      DIM_CHAIN_GAP_X * 2 +
+      DIM_TO_BUBBLE +
+      AXIS_BUBBLE_R * 2 +
+      10 +
+      36;
     return one * 2 + gap;
   };
 

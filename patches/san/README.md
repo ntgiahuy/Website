@@ -1,4 +1,4 @@
-# Patch: PDF tiêu đề mặt cắt dưới bản vẽ
+# Patch: số hiệu trục ngoài cùng → dim trục → dim dầm/sàn → hình
 
-- Chữ MẶT CẮT THÉP SÀN … đặt dưới bản cắt (như tiêu đề mặt bằng).
-- Thứ tự: MẶT CẮT → TL · Lớp BV → Cắt theo phương ….
+- Preview + PDF mặt bằng / mặt cắt: vòng số hiệu nằm ngoài chuỗi dim.
+- Thứ tự ngoài → vào: số hiệu trục → dim tim trục → dim dầm·sàn → hình vẽ.
