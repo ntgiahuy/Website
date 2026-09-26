@@ -107,7 +107,15 @@ function line(
   });
 }
 
-function rect(ctx: Ctx, x: number, y: number, w: number, h: number, t = 0.8) {
+function rect(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  t = 0.8,
+  fill?: ReturnType<typeof rgb>,
+) {
   ctx.page.drawRectangle({
     x,
     y: ty(y + h),
@@ -115,8 +123,12 @@ function rect(ctx: Ctx, x: number, y: number, w: number, h: number, t = 0.8) {
     height: h,
     borderColor: BLACK,
     borderWidth: t,
+    ...(fill ? { color: fill } : {}),
   });
 }
+
+/** Tô nhẹ tiết diện bê tông trên mặt cắt (để đọc rõ B / Hs / H). */
+const CONCRETE_FILL = rgb(0.92, 0.92, 0.92);
 
 function textSimple(
   ctx: Ctx,
@@ -1509,9 +1521,9 @@ function drawRebarSectionCut(
   const { segs, along0, along1, axes } = buildSectionAlongSegs(project, cutDir, at);
   const spanMm = Math.max(along1 - along0, 1);
   const padL = 28;
-  const padR = 36;
+  const padR = 48;
   const drawW = maxW - padL - padR;
-  // Chiều dài mặt cắt = đúng tỉ lệ mặt bằng; nếu vượt khung thì co đều
+  // Một tỉ lệ s cho cả nhịp + B dầm + dày sàn + H dầm (đúng tỉ lệ 3 kích thước)
   const s = Math.min(planS, drawW / spanMm);
   const usedW = spanMm * s;
   const xBase = x + padL + (drawW - usedW) / 2;
@@ -1519,22 +1531,22 @@ function drawRebarSectionCut(
 
   const slabTmm = Math.max(model.thickness, 1);
   const maxBeamHmm = Math.max(
-    200,
+    1,
     ...segs.filter((g): g is Extract<SectionAlongSeg, { kind: "beam" }> => g.kind === "beam").map((g) => g.h),
-    parseBeamSize(project.info.beamSizeX || project.info.beamSizeY || "220x500").h,
+    parseBeamSize(
+      project.info.beamSizeX ||
+        project.info.beamSizeY ||
+        `${project.info.beamB || 200}x${project.info.beamH || 500}`,
+    ).h,
   );
   const maxDropMm = Math.max(
     0,
     ...segs.filter((g): g is Extract<SectionAlongSeg, { kind: "slab" }> => g.kind === "slab").map((g) => g.drop),
   );
-  /**
-   * Cao độ: phóng vừa đủ để thấy dày sàn / hạ sàn thấp / cao dầm,
-   * trong khi chiều dài vẫn theo tỉ lệ mặt bằng.
-   */
-  const elevS = Math.max(s * 2.2, 0.16);
-  const slabT = Math.max(slabTmm * elevS, 8);
-  const beamH = Math.max(maxBeamHmm * elevS * 0.55, 22);
-  const dropS = Math.max(maxDropMm * elevS, maxDropMm > 0 ? 14 : 0);
+  // B (ngang) / Hs / H / drop — cùng hệ số s; không phóng lệch cao độ
+  const slabT = slabTmm * s;
+  const beamH = maxBeamHmm * s;
+  const dropS = maxDropMm * s;
   const sy = y + 26;
   const slabTopY = sy;
   const slabBotY = sy + slabT;
@@ -1542,44 +1554,52 @@ function drawRebarSectionCut(
   // Mặt sàn cao độ chuẩn (nét chuẩn)
   line(ctx, xBase - 4, slabTopY, toAlong(along1) + 4, slabTopY, 0.35, GRAY, [2, 2]);
 
+  let firstBeamForBdim: { x0: number; x1: number; bh: number; bMm: number } | null = null;
+
   for (const seg of segs) {
     const x0 = toAlong(seg.lo);
     const x1 = toAlong(seg.hi);
-    const w = Math.max(x1 - x0, 0.8);
+    const w = Math.max(x1 - x0, 0.5);
     if (seg.kind === "beam") {
-      const bh = Math.max(seg.h * elevS * 0.55, 18);
-      // Đầu dầm = mặt sàn trên; thân dầm xuống dưới
-      rect(ctx, x0, slabTopY, w, slabT + bh, 0.9);
-      line(ctx, x0, slabBotY, x1, slabBotY, 0.45, GRAY);
+      // H = chiều cao tổng từ mặt sàn trên xuống đáy dầm (cùng tỉ lệ với B và Hs)
+      const bh = seg.h * s;
+      const bMm = seg.hi - seg.lo;
+      rect(ctx, x0, slabTopY, w, bh, 0.85, CONCRETE_FILL);
+      // Ranh dày sàn trong thân dầm
+      if (slabT < bh - 0.5) {
+        line(ctx, x0, slabBotY, x1, slabBotY, 0.45, GRAY);
+      }
+      if (!firstBeamForBdim && bMm > 1) {
+        firstBeamForBdim = { x0, x1, bh, bMm };
+      }
       if (seg.name) {
-        textSimple(ctx, seg.name, (x0 + x1) / 2, slabBotY + bh + 9, 5.5, false, "center", GRAY);
+        textSimple(ctx, seg.name, (x0 + x1) / 2, slabTopY + bh + 9, 5.5, false, "center", GRAY);
       }
       continue;
     }
     if (seg.kind === "opening") {
-      // Ô thủng: khung + hai đường chéo (không có sàn)
-      const hOpen = Math.max(slabT + dropS + 10, 18);
+      // Ô thủng: khung đúng chiều dày sàn + hai đường chéo
+      const hOpen = Math.max(slabT, 2);
       rect(ctx, x0, slabTopY, w, hOpen, 0.55);
       line(ctx, x0, slabTopY, x1, slabTopY + hOpen, 0.55, GRAY);
       line(ctx, x0, slabTopY + hOpen, x1, slabTopY, 0.55, GRAY);
       if (seg.label) {
-        textSimple(ctx, seg.label, (x0 + x1) / 2, slabTopY + hOpen / 2 + 2, 6, false, "center", GRAY);
+        textSimple(ctx, seg.label, (x0 + x1) / 2, slabTopY + hOpen + 8, 6, false, "center", GRAY);
       }
       continue;
     }
-    // Sàn thường / sàn thấp
-    const dropPx = seg.drop > 0 ? Math.max(seg.drop * elevS, 14) : 0;
+    // Sàn thường / sàn thấp — Hs cùng tỉ lệ s
+    const dropPx = seg.drop > 0 ? seg.drop * s : 0;
     const top = slabTopY + dropPx;
-    rect(ctx, x0, top, w, slabT, 0.85);
+    rect(ctx, x0, top, w, slabT, 0.85, CONCRETE_FILL);
     if (seg.drop > 0) {
-      // Thành đứng chuyển cấp + hatch sàn thấp
       line(ctx, x0, slabTopY, x0, top + slabT, 0.75);
       line(ctx, x1, slabTopY, x1, top + slabT, 0.75);
       for (const hs of rectDiagonalHatchSegments(seg.lo, 0, seg.hi, Math.max(seg.drop, 1), 180)) {
         const ax = toAlong(hs.xA);
         const bx = toAlong(hs.xB);
-        const ay = top + ((hs.yA / Math.max(seg.drop, 1)) * slabT);
-        const by = top + ((hs.yB / Math.max(seg.drop, 1)) * slabT);
+        const ay = top + (hs.yA / Math.max(seg.drop, 1)) * slabT;
+        const by = top + (hs.yB / Math.max(seg.drop, 1)) * slabT;
         line(ctx, ax, ay, bx, by, 0.35, GRAY);
       }
       textSimple(
@@ -1609,35 +1629,35 @@ function drawRebarSectionCut(
 
   for (const seg of segs) {
     if (seg.kind !== "slab") continue;
-    const x0 = toAlong(seg.lo) + 3;
-    const x1 = toAlong(seg.hi) - 3;
-    if (x1 - x0 < 6) continue;
-    const dropPx = seg.drop > 0 ? Math.max(seg.drop * elevS, 14) : 0;
+    const x0 = toAlong(seg.lo) + 2;
+    const x1 = toAlong(seg.hi) - 2;
+    if (x1 - x0 < 4) continue;
+    const dropPx = seg.drop > 0 ? seg.drop * s : 0;
     const top = slabTopY + dropPx;
-    const yBot = top + slabT * 0.3;
-    const yTopR = top + slabT * 0.7;
+    const yBot = top + slabT * 0.35;
+    const yTopR = top + slabT * 0.65;
     if (hasBotLong) line(ctx, x0, yBot, x1, yBot, 0.55, REBAR_RED);
     if (hasTopLong) line(ctx, x0, yTopR, x1, yTopR, 0.55, REBAR_RED);
-    const n = Math.max(2, Math.min(12, Math.floor((x1 - x0) / 14)));
+    const n = Math.max(2, Math.min(14, Math.floor((x1 - x0) / 12)));
     for (let i = 0; i < n; i++) {
       const px = x0 + ((x1 - x0) * i) / Math.max(1, n - 1);
       if (hasBot) {
-        ctx.page.drawCircle({ x: px, y: ty(yBot), size: 1.8, color: REBAR_RED });
+        ctx.page.drawCircle({ x: px, y: ty(yBot), size: 1.6, color: REBAR_RED });
       }
       if (hasTop) {
         ctx.page.drawCircle({
           x: px,
           y: ty(yTopR),
-          size: 1.8,
+          size: 1.6,
           borderColor: REBAR_RED,
-          borderWidth: 0.65,
+          borderWidth: 0.6,
         });
       }
     }
   }
 
   // Bong bóng trục đầu → cuối dưới mặt cắt
-  const axisBubbleY = slabBotY + beamH + dropS + 22;
+  const axisBubbleY = slabTopY + beamH + dropS + 22;
   for (const ax of axes) {
     const px = toAlong(ax.pos);
     line(ctx, px, slabTopY, px, axisBubbleY - AXIS_BUBBLE_R, 0.35, AXIS_LINE, AXIS_CENTERLINE_DASH);
@@ -1651,12 +1671,27 @@ function drawRebarSectionCut(
     textInAxisBubble(ctx, ax.name, px, axisBubbleY, 6);
   }
 
-  // Dim chiều dày sàn (theo cao độ vẽ)
-  dimV(ctx, toAlong(along1) + 12, slabTopY, slabBotY, `${project.info.thickness}`, 6, "right");
-  if (maxDropMm > 0) {
+  // Dim B (ngang), Hs và H (đứng) — cùng tỉ lệ s
+  const dimX = toAlong(along1) + 14;
+  dimV(ctx, dimX, slabTopY, slabBotY, `${Math.round(slabTmm)}`, 6, "right");
+  if (beamH > slabT + 1) {
+    dimV(ctx, dimX + 16, slabTopY, slabTopY + beamH, `${Math.round(maxBeamHmm)}`, 6, "right");
+  }
+  if (firstBeamForBdim && firstBeamForBdim.x1 - firstBeamForBdim.x0 > 2) {
+    // Dim B trên đầu dầm — cùng tỉ lệ ngang với Hs/H
+    dimH(
+      ctx,
+      firstBeamForBdim.x0,
+      firstBeamForBdim.x1,
+      slabTopY - 5,
+      `${Math.round(firstBeamForBdim.bMm)}`,
+      5.5,
+    );
+  }
+  if (maxDropMm > 0 && dropS > 1) {
     dimV(
       ctx,
-      toAlong(along1) + 26,
+      dimX + 32,
       slabTopY,
       slabTopY + dropS,
       `${Math.round(maxDropMm)}`,
@@ -1666,7 +1701,7 @@ function drawRebarSectionCut(
   }
   textSimple(
     ctx,
-    `TL mặt bằng 1/${project.info.drawingScale || 100} · Lớp BV ${project.info.cover}`,
+    `TL 1/${project.info.drawingScale || 100} · Lớp BV ${project.info.cover}`,
     x + maxW / 2,
     axisBubbleY + 14,
     6.2,
@@ -1865,20 +1900,21 @@ export async function generateSlabPdf(
 
   const rightX = 860;
   const rightW = 780;
-  // Ước lượng chiều cao 2 mặt cắt xếp dọc (cao độ phóng) để không đè bảng TK
+  // Ước lượng chiều cao 2 mặt cắt (B/Hs/H cùng tỉ lệ mặt bằng)
   const estSecH = (() => {
-    const elevS = Math.max(planS * 2.2, 0.16);
     const maxBeam = Math.max(
-      parseBeamSize(project.info.beamSizeX || "220x500").h,
-      parseBeamSize(project.info.beamSizeY || "220x500").h,
-      500,
+      parseBeamSize(project.info.beamSizeX || `${project.info.beamB || 200}x${project.info.beamH || 500}`).h,
+      parseBeamSize(project.info.beamSizeY || `${project.info.beamB || 200}x${project.info.beamH || 500}`).h,
+      project.info.beamH || 500,
     );
-    const maxDrop = Math.max(0, ...(project.lowSlabs ?? []).map((ls) => ls.drop || project.info.lowSlabDrop || 0));
+    const maxDrop = Math.max(
+      0,
+      ...(project.lowSlabs ?? []).map((ls) => ls.drop || 0),
+    );
     const one =
       26 +
-      Math.max(model.thickness * elevS, 8) +
-      Math.max(maxBeam * elevS * 0.55, 22) +
-      Math.max(maxDrop * elevS, maxDrop > 0 ? 14 : 0) +
+      maxBeam * planS +
+      maxDrop * planS +
       22 +
       AXIS_BUBBLE_R +
       24;
@@ -1887,7 +1923,7 @@ export async function generateSlabPdf(
   const scheduleReserve = 260;
   if (topY + estSecH + scheduleReserve > bottomLimit) {
     const overflow = topY + estSecH + scheduleReserve - bottomLimit;
-    planH = Math.max(170, planH - Math.ceil(overflow / 2));
+    planH = Math.max(160, planH - Math.ceil(overflow / 2));
   }
   const planSFinal = planScale(project, planW, planH);
 
