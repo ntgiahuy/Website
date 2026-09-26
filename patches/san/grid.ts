@@ -1532,7 +1532,10 @@ export function slabDistRangeForBar(
   if (axesX.length < 2 || axesY.length < 2) return null;
   const inset = Math.max(0, Math.round(insetMm));
 
-  /** Lan ô theo phương `along` khi dầm vuông góc giữa ô đã mất thân. */
+  /**
+   * Lan ô theo phương `along` khi dầm vuông góc giữa ô đã mất thân.
+   * Không lan vào ô thủng / sàn thấp cắt (không còn thép sàn liên tục).
+   */
   const expandContiguous = (
     ix0: number,
     iy0: number,
@@ -1544,11 +1547,13 @@ export function slabDistRangeForBar(
       let y1 = s0.y1;
       for (let iy = iy0 - 1; iy >= 0; iy--) {
         if (beamCoversOrthogonalSpan(project, "X", axesY[iy + 1]!, ix0)) break;
+        if (!bayHasSlabRebar(project, axesX, axesY, ix0, iy)) break;
         const u = baySlabExtent(project, axesX, axesY, ix0, iy);
         y0 = Math.min(y0, u.y0);
       }
       for (let iy = iy0 + 1; iy < axesY.length - 1; iy++) {
         if (beamCoversOrthogonalSpan(project, "X", axesY[iy]!, ix0)) break;
+        if (!bayHasSlabRebar(project, axesX, axesY, ix0, iy)) break;
         const u = baySlabExtent(project, axesX, axesY, ix0, iy);
         y1 = Math.max(y1, u.y1);
       }
@@ -1558,11 +1563,13 @@ export function slabDistRangeForBar(
     let x1 = s0.x1;
     for (let ix = ix0 - 1; ix >= 0; ix--) {
       if (beamCoversOrthogonalSpan(project, "Y", axesX[ix + 1]!, iy0)) break;
+      if (!bayHasSlabRebar(project, axesX, axesY, ix, iy0)) break;
       const u = baySlabExtent(project, axesX, axesY, ix, iy0);
       x0 = Math.min(x0, u.x0);
     }
     for (let ix = ix0 + 1; ix < axesX.length - 1; ix++) {
       if (beamCoversOrthogonalSpan(project, "Y", axesX[ix]!, iy0)) break;
+      if (!bayHasSlabRebar(project, axesX, axesY, ix, iy0)) break;
       const u = baySlabExtent(project, axesX, axesY, ix, iy0);
       x1 = Math.max(x1, u.x1);
     }
@@ -1597,6 +1604,8 @@ export function slabDistRangeForBar(
       let hit = false;
       for (let iy = 0; iy < axesY.length - 1; iy++) {
         for (let ix = 0; ix < axesX.length - 1; ix++) {
+          // Ô thủng / sàn thấp cắt: không lấy làm neo expand (sàn thấp cắt có nhánh owned riêng)
+          if (!bayHasSlabRebar(project, axesX, axesY, ix, iy)) continue;
           const s = baySlabExtent(project, axesX, axesY, ix, iy);
           if (bar.y < s.y0 - 1 || bar.y > s.y1 + 1) continue;
           if (requireXOverlap && (bx1 < s.x0 - 1 || bx0 > s.x1 + 1)) continue;
@@ -1626,6 +1635,7 @@ export function slabDistRangeForBar(
     let hit = false;
     for (let iy = 0; iy < axesY.length - 1; iy++) {
       for (let ix = 0; ix < axesX.length - 1; ix++) {
+        if (!bayHasSlabRebar(project, axesX, axesY, ix, iy)) continue;
         const s = baySlabExtent(project, axesX, axesY, ix, iy);
         if (bar.x < s.x0 - 1 || bar.x > s.x1 + 1) continue;
         if (requireYOverlap && (by1 < s.y0 - 1 || by0 > s.y1 + 1)) continue;
@@ -1706,6 +1716,12 @@ type DistRangePiece = DistRangeSeg & {
   junction: { x: number; y: number };
 };
 
+/**
+ * Ô neo khoảng rải cho thanh: ưu tiên ô chứa trung điểm;
+ * khi mid nằm trên thân dầm (khe giữa hai ô) → ô giao dài nhất với thanh.
+ * Tránh fallback stripKey=0 khiến mọi thanh mid-trên-dầm gộp một dải sai.
+ * Cho phép neo ở sàn thấp cắt (có thép riêng); bỏ qua ô thủng.
+ */
 function bayIndexForBar(
   project: SlabProject,
   axesX: GridAxis[],
@@ -1713,60 +1729,43 @@ function bayIndexForBar(
   bar: RebarBarSeg,
 ): { bayIndex: number; stripKey: number } | null {
   if (bar.dir === "Y") {
-    const my = (bar.y0 + bar.y1) / 2;
-    let ix = -1;
-    let iy = -1;
+    const by0 = Math.min(bar.y0, bar.y1);
+    const by1 = Math.max(bar.y0, bar.y1);
+    const my = (by0 + by1) / 2;
+    let best: { ix: number; iy: number; score: number } | null = null;
     for (let j = 0; j < axesY.length - 1; j++) {
       for (let i = 0; i < axesX.length - 1; i++) {
+        if (bayKindAt(project, axesX, axesY, i, j) === "opening") continue;
         const s = baySlabExtent(project, axesX, axesY, i, j);
-        if (bar.x >= s.x0 - 1 && bar.x <= s.x1 + 1 && my >= s.y0 - 1 && my <= s.y1 + 1) {
-          ix = i;
-          iy = j;
-          break;
-        }
+        if (bar.x < s.x0 - 1 || bar.x > s.x1 + 1) continue;
+        const overlap = Math.min(by1, s.y1) - Math.max(by0, s.y0);
+        if (overlap <= 1) continue;
+        const containsMid = my >= s.y0 - 1 && my <= s.y1 + 1;
+        const score = (containsMid ? 1e12 : 0) + overlap;
+        if (!best || score > best.score) best = { ix: i, iy: j, score };
       }
-      if (ix >= 0) break;
     }
-    if (ix < 0) {
-      // Thanh đứng xuyên nhiều hàng: lấy cột theo X
-      for (let i = 0; i < axesX.length - 1; i++) {
-        const s = baySlabExtent(project, axesX, axesY, i, 0);
-        if (bar.x >= s.x0 - 1 && bar.x <= s.x1 + 1) {
-          ix = i;
-          break;
-        }
-      }
-      iy = 0;
-    }
-    if (ix < 0) return null;
-    return { bayIndex: ix, stripKey: iy };
+    if (!best) return null;
+    return { bayIndex: best.ix, stripKey: best.iy };
   }
-  const mx = (bar.x0 + bar.x1) / 2;
-  let ix = -1;
-  let iy = -1;
+  const bx0 = Math.min(bar.x0, bar.x1);
+  const bx1 = Math.max(bar.x0, bar.x1);
+  const mx = (bx0 + bx1) / 2;
+  let best: { ix: number; iy: number; score: number } | null = null;
   for (let j = 0; j < axesY.length - 1; j++) {
     for (let i = 0; i < axesX.length - 1; i++) {
+      if (bayKindAt(project, axesX, axesY, i, j) === "opening") continue;
       const s = baySlabExtent(project, axesX, axesY, i, j);
-      if (mx >= s.x0 - 1 && mx <= s.x1 + 1 && bar.y >= s.y0 - 1 && bar.y <= s.y1 + 1) {
-        ix = i;
-        iy = j;
-        break;
-      }
+      if (bar.y < s.y0 - 1 || bar.y > s.y1 + 1) continue;
+      const overlap = Math.min(bx1, s.x1) - Math.max(bx0, s.x0);
+      if (overlap <= 1) continue;
+      const containsMid = mx >= s.x0 - 1 && mx <= s.x1 + 1;
+      const score = (containsMid ? 1e12 : 0) + overlap;
+      if (!best || score > best.score) best = { ix: i, iy: j, score };
     }
-    if (iy >= 0) break;
   }
-  if (iy < 0) {
-    for (let j = 0; j < axesY.length - 1; j++) {
-      const s = baySlabExtent(project, axesX, axesY, 0, j);
-      if (bar.y >= s.y0 - 1 && bar.y <= s.y1 + 1) {
-        iy = j;
-        break;
-      }
-    }
-    ix = 0;
-  }
-  if (iy < 0) return null;
-  return { bayIndex: iy, stripKey: ix };
+  if (!best) return null;
+  return { bayIndex: best.iy, stripKey: best.ix };
 }
 
 /**
@@ -1874,8 +1873,20 @@ export function buildMergedDistRanges(
     for (const p of group) {
       // Cùng bayIndex (nhiều thanh trong 1 ô) hoặc ô kề (+1) → 1 đường liên tục.
       // Khi xóa dầm giữa ô: bay kề mặt dày 0 — gộp để khoảng rải chạm nhau (không kẽ hở ±inset).
-      const prev = run.length ? run[run.length - 1]!.bayIndex : -1;
-      if (!run.length || p.bayIndex === prev || p.bayIndex === prev + 1) {
+      // Không gộp qua ô thủng / sàn thấp cắt (kể khi bayIndex nhảy có vẻ kề).
+      const prev = run.length ? run[run.length - 1]! : null;
+      const canJoin =
+        !!prev &&
+        (p.bayIndex === prev.bayIndex ||
+          (p.bayIndex === prev.bayIndex + 1 &&
+            (() => {
+              // Thanh Y: bayIndex=ix, stripKey=iy; thanh X: bayIndex=iy, stripKey=ix
+              if (p.dir === "Y") {
+                return bayHasSlabRebar(project, axesX, axesY, p.bayIndex, p.stripKey);
+              }
+              return bayHasSlabRebar(project, axesX, axesY, p.stripKey, p.bayIndex);
+            })()));
+      if (!run.length || canJoin) {
         run.push(p);
       } else {
         flush();
@@ -1884,7 +1895,128 @@ export function buildMergedDistRanges(
     }
     flush();
   }
+  return clipMergedDistRangesByVoids(project, out);
+}
+
+/**
+ * Cắt đường khoảng rải tại ô thủng — không vẽ nét xuyên lỗ trống.
+ * (Sàn thấp cắt giữ khoảng rải riêng trong bao ô — không clip ở đây.)
+ */
+export function clipMergedDistRangesByVoids(
+  project: SlabProject,
+  segs: MergedDistRange[],
+): MergedDistRange[] {
+  const voids: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
+  for (const o of project.openings ?? []) {
+    voids.push({ x0: o.x, y0: o.y, x1: o.x + o.w, y1: o.y + o.h });
+  }
+  if (!voids.length) return segs;
+
+  const out: MergedDistRange[] = [];
+  for (const seg of segs) {
+    const parts = splitDistSegAroundVoids(seg, voids);
+    for (const part of parts) {
+      const junctions = seg.junctions.filter((j) => {
+        if (part.dir === "Y") {
+          const x0 = Math.min(part.xA, part.xB);
+          const x1 = Math.max(part.xA, part.xB);
+          return j.x >= x0 - 1 && j.x <= x1 + 1 && Math.abs(j.y - part.yA) <= 1;
+        }
+        const y0 = Math.min(part.yA, part.yB);
+        const y1 = Math.max(part.yA, part.yB);
+        return j.y >= y0 - 1 && j.y <= y1 + 1 && Math.abs(j.x - part.xA) <= 1;
+      });
+      out.push({ ...part, junctions });
+    }
+  }
   return out;
+}
+
+function splitDistSegAroundVoids(
+  seg: MergedDistRange,
+  voids: Array<{ x0: number; y0: number; x1: number; y1: number }>,
+): MergedDistRange[] {
+  if (seg.dir === "Y") {
+    // Đường ngang y ≈ const
+    const y = (seg.yA + seg.yB) / 2;
+    let x0 = Math.min(seg.xA, seg.xB);
+    let x1 = Math.max(seg.xA, seg.xB);
+    const gaps: Array<{ lo: number; hi: number }> = [];
+    for (const v of voids) {
+      if (y <= v.y0 + 1 || y >= v.y1 - 1) continue;
+      const lo = Math.max(x0, v.x0);
+      const hi = Math.min(x1, v.x1);
+      if (hi - lo > 1) gaps.push({ lo, hi });
+    }
+    if (!gaps.length) return [seg];
+    gaps.sort((a, b) => a.lo - b.lo);
+    const parts: MergedDistRange[] = [];
+    let cur = x0;
+    for (const g of gaps) {
+      if (g.lo - cur > 1) {
+        const lenMm = g.lo - cur;
+        parts.push({
+          ...seg,
+          xA: cur,
+          xB: g.lo,
+          yA: y,
+          yB: y,
+          lenMm,
+        });
+      }
+      cur = Math.max(cur, g.hi);
+    }
+    if (x1 - cur > 1) {
+      parts.push({
+        ...seg,
+        xA: cur,
+        xB: x1,
+        yA: y,
+        yB: y,
+        lenMm: x1 - cur,
+      });
+    }
+    return parts;
+  }
+  // Đường đứng x ≈ const
+  const x = (seg.xA + seg.xB) / 2;
+  let y0 = Math.min(seg.yA, seg.yB);
+  let y1 = Math.max(seg.yA, seg.yB);
+  const gaps: Array<{ lo: number; hi: number }> = [];
+  for (const v of voids) {
+    if (x <= v.x0 + 1 || x >= v.x1 - 1) continue;
+    const lo = Math.max(y0, v.y0);
+    const hi = Math.min(y1, v.y1);
+    if (hi - lo > 1) gaps.push({ lo, hi });
+  }
+  if (!gaps.length) return [seg];
+  gaps.sort((a, b) => a.lo - b.lo);
+  const parts: MergedDistRange[] = [];
+  let cur = y0;
+  for (const g of gaps) {
+    if (g.lo - cur > 1) {
+      parts.push({
+        ...seg,
+        xA: x,
+        xB: x,
+        yA: cur,
+        yB: g.lo,
+        lenMm: g.lo - cur,
+      });
+    }
+    cur = Math.max(cur, g.hi);
+  }
+  if (y1 - cur > 1) {
+    parts.push({
+      ...seg,
+      xA: x,
+      xB: x,
+      yA: cur,
+      yB: y1,
+      lenMm: y1 - cur,
+    });
+  }
+  return parts;
 }
 
 /** Đoạn chéo trong hình chữ nhật (clip) theo hằng số x−y = c — nét sàn thấp /. */

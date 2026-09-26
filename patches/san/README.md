@@ -1,4 +1,6 @@
-# Patch: thu hẹp khoảng trống tên sàn trên preview
+# Patch: khoảng rải không bắt qua ô thủng
 
-- Pad trên nhỏ (chỗ tên sàn); pad dim/bubble chỉ trái + dưới.
-- Hình minh họa neo sát dưới tên → phóng to rõ hơn.
+- `expandContiguous` / accumulate dừng tại ô thủng (và ô không còn thép sàn).
+- `bayIndexForBar` neo theo ô giao dài nhất (không fallback stripKey=0 khi mid trên dầm).
+- `buildMergedDistRanges` cắt hình học đường khoảng rải tại ô thủng; không gộp qua lỗ trống.
+- Thanh điển hình cạnh ô thủng vẫn có khoảng rải riêng.
