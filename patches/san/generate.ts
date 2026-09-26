@@ -749,8 +749,8 @@ function dimH(ctx: Ctx, x1: number, x2: number, y: number, label: string, size =
   line(ctx, lo, y, hi, y, 0.45);
   line(ctx, lo, y - 3, lo, y + 3, 0.45);
   line(ctx, hi, y - 3, hi, y + 3, 0.45);
-  // Số nằm ngang — song song đường dim ngang
-  textSimple(ctx, label, (lo + hi) / 2, y - 1, size, false, "center");
+  // Số nằm ngang — hở phía trên đường dim (không đè lên nét)
+  textSimple(ctx, label, (lo + hi) / 2, y - size - 3.5, size, false, "center");
 }
 
 function dimV(
@@ -768,8 +768,9 @@ function dimV(
   line(ctx, x, lo, x, hi, 0.45);
   line(ctx, x - 3, lo, x + 3, lo, 0.45);
   line(ctx, x - 3, hi, x + 3, hi, 0.45);
-  // Số xoay dọc — song song đường dim đứng
-  const tx = labelSide === "left" ? x - 5 : x + 5;
+  // Số xoay dọc — lệch khỏi đường dim (hở ~size + khe)
+  const gap = size + 5;
+  const tx = labelSide === "left" ? x - gap : x + gap;
   textVertical(ctx, label, tx, (lo + hi) / 2, size, false);
 }
 
@@ -1071,16 +1072,37 @@ function drawPlan(
       }
       const label = String(Math.round(seg.lenMm));
       const alongY = Math.abs(seg.yB - seg.yA) >= Math.abs(seg.xB - seg.xA);
+      const distSize = 5.5;
       if (alongY) {
-        textSimple(ctx, label, (pxA + pxB) / 2 + 5, (pyA + pyB) / 2, 5.5, false, "left", DIST_BLUE);
+        // Số bên phải đường khoảng rải đứng — hở khỏi nét
+        textSimple(
+          ctx,
+          label,
+          (pxA + pxB) / 2 + distSize + 5,
+          (pyA + pyB) / 2,
+          distSize,
+          false,
+          "left",
+          DIST_BLUE,
+        );
       } else {
-        textSimple(ctx, label, (pxA + pxB) / 2, (pyA + pyB) / 2 - 6, 5.5, false, "center", DIST_BLUE);
+        // Số phía trên đường khoảng rải ngang — hở khỏi nét
+        textSimple(
+          ctx,
+          label,
+          (pxA + pxB) / 2,
+          (pyA + pyB) / 2 - distSize - 5,
+          distSize,
+          false,
+          "center",
+          DIST_BLUE,
+        );
       }
     }
   }
 
   // —— Đường dim: da dầm + lòng sàn · tim trục · tổng ——
-  const DIM_GAP = 11;
+  const DIM_GAP = 14; // số dim hở khỏi đường (~size+2.5)
   const faceX = faceChainAlongX(project, axesX, axesY);
   const faceY = faceChainAlongY(project, axesX, axesY);
   const axisXMarks = axesX.map((a) => a.pos);
@@ -1828,7 +1850,7 @@ function drawRebarSectionCut(
    * 1) dim tim trục
    * 2) dưới đó: dim bề rộng dầm (B) + lòng sàn
    */
-  const DIM_GAP = 11;
+  const DIM_GAP = 14;
   let yDim = axisBubbleY + AXIS_BUBBLE_R + 7;
   const axisMarksMm = axes.map((a) => a.pos);
   if (axisMarksMm.length >= 2) {

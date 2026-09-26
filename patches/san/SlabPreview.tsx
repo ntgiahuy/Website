@@ -70,6 +70,8 @@ function SvgDimHChain({
     const x1 = X(Math.min(a, b));
     const x2 = X(Math.max(a, b));
     const mid = (x1 + x2) / 2;
+    // Số hở phía trên đường dim (baseline cách nét ≥ fontSize + khe)
+    const labelY = y - fontSize - 3.5;
     nodes.push(
       <g key={`dh-${i}-${mm}`}>
         <line x1={x1} y1={y} x2={x2} y2={y} stroke={DIM_STROKE} strokeWidth="0.9" />
@@ -77,7 +79,7 @@ function SvgDimHChain({
         <line x1={x2} y1={y - DIM_TICK} x2={x2} y2={y + DIM_TICK} stroke={DIM_STROKE} strokeWidth="0.9" />
         <text
           x={mid}
-          y={y - 4}
+          y={labelY}
           fill={DIM_TEXT}
           fontSize={fontSize}
           fontWeight="600"
@@ -112,20 +114,22 @@ function SvgDimVChain({
     const y1 = Y(Math.max(a, b));
     const y2 = Y(Math.min(a, b));
     const mid = (y1 + y2) / 2;
+    // Tâm chữ xoay lệch trái — nửa chiều cao glyph + khe, không đè đường dim
+    const labelX = x - fontSize / 2 - 6;
     nodes.push(
       <g key={`dv-${i}-${mm}`}>
         <line x1={x} y1={y1} x2={x} y2={y2} stroke={DIM_STROKE} strokeWidth="0.9" />
         <line x1={x - DIM_TICK} y1={y1} x2={x + DIM_TICK} y2={y1} stroke={DIM_STROKE} strokeWidth="0.9" />
         <line x1={x - DIM_TICK} y1={y2} x2={x + DIM_TICK} y2={y2} stroke={DIM_STROKE} strokeWidth="0.9" />
         <text
-          x={x - 5}
+          x={labelX}
           y={mid}
           fill={DIM_TEXT}
           fontSize={fontSize}
           fontWeight="600"
           textAnchor="middle"
           dominantBaseline="middle"
-          transform={`rotate(-90 ${x - 5} ${mid})`}
+          transform={`rotate(-90 ${labelX} ${mid})`}
         >
           {mm}
         </text>
@@ -171,11 +175,11 @@ export const SlabPreview = memo(function SlabPreview({
   const H = 420;
   const bleed = useMemo(() => planBeamBleed(project, axesX, axesY), [project, axesX, axesY]);
   // Chừa chỗ: vòng số hiệu + chuỗi dim (da dầm + tim trục) ngoài da dầm ngoài cùng
-  const DIM_GAP = 14;
+  const DIM_GAP = 18; // chừa chỗ số dim hở khỏi đường (font ~7–8)
   /** Khoảng hở mép vòng số hiệu → đường dim đầu (tránh đè số lên bubble). */
-  const DIM_AFTER_BUBBLE = 22;
+  const DIM_AFTER_BUBBLE = 26;
   const DIM_CHAINS = 2; // face + axis
-  const dimBand = DIM_AFTER_BUBBLE + DIM_GAP * DIM_CHAINS + 10;
+  const dimBand = DIM_AFTER_BUBBLE + DIM_GAP * DIM_CHAINS + 14;
   const pad = Math.max(48 + dimBand, AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 12 + dimBand);
   /** Khung vẽ theo da dầm ngoài (kể cả dầm lệch ngoài biên), không cố định 0…plan. */
   const extentW = Math.max(bleed.xMax - bleed.xMin, 1);
@@ -1148,12 +1152,13 @@ export const SlabPreview = memo(function SlabPreview({
                               </g>
                             ))}
                             <text
-                              x={midX + (alongY ? 7 : 0)}
-                              y={midY + (alongY ? 0 : -7)}
+                              x={midX + (alongY ? 14 : 0)}
+                              y={midY + (alongY ? 0 : -14)}
                               fill="#2563eb"
                               fontSize="9"
                               fontWeight="600"
                               textAnchor={alongY ? "start" : "middle"}
+                              dominantBaseline={alongY ? "middle" : "auto"}
                             >
                               {Math.round(seg.lenMm)}
                             </text>
