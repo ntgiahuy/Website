@@ -136,6 +136,25 @@ function rect(
   });
 }
 
+/** Tô hình chữ nhật không viền (bê tông liền khối trên mặt cắt). */
+function fillRect(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: ReturnType<typeof rgb>,
+) {
+  if (w <= 0 || h <= 0) return;
+  ctx.page.drawRectangle({
+    x,
+    y: ty(y + h),
+    width: w,
+    height: h,
+    color: fill,
+  });
+}
+
 /** Tô nhẹ tiết diện bê tông trên mặt cắt (để đọc rõ B / Hs / H). */
 const CONCRETE_FILL = rgb(0.92, 0.92, 0.92);
 
@@ -1681,6 +1700,29 @@ function drawRebarSectionCut(
     faceMarksMm.push(seg.hi);
   }
 
+  /** Mép đoạn có kề dầm → không vẽ nét đứng cắt qua bề dày sàn (bê tông liền khối). */
+  const abutsBeam = (mm: number) =>
+    segs.some(
+      (g) => g.kind === "beam" && (Math.abs(g.lo - mm) < 0.5 || Math.abs(g.hi - mm) < 0.5),
+    );
+
+  /**
+   * Đỉnh nét đứng thân dầm tại một mép:
+   * - Kề sàn → đáy sàn (không cắt qua bề dày sàn, bê tông liền khối)
+   * - Kề ô thủng / mép ngoài → mặt sàn trên (để lộ cạnh dầm)
+   */
+  const stemTopAtFace = (faceMm: number, beamSeg: SectionAlongSeg) => {
+    const neighbor = segs.find(
+      (g) =>
+        g !== beamSeg && (Math.abs(g.lo - faceMm) < 0.5 || Math.abs(g.hi - faceMm) < 0.5),
+    );
+    if (neighbor?.kind === "slab") {
+      const dropPx = neighbor.drop > 0 ? neighbor.drop * s : 0;
+      return slabTopY + dropPx + slabT;
+    }
+    return slabTopY;
+  };
+
   for (const seg of segs) {
     const x0 = toAlong(seg.lo);
     const x1 = toAlong(seg.hi);
@@ -1688,13 +1730,25 @@ function drawRebarSectionCut(
     if (seg.kind === "beam") {
       // H = chiều cao tổng từ mặt sàn trên xuống đáy dầm (cùng tỉ lệ với B và Hs)
       const bh = seg.h * s;
-      rect(ctx, x0, slabTopY, w, bh, 0.85, CONCRETE_FILL);
-      // Ranh dày sàn trong thân dầm
-      if (slabT < bh - 0.5) {
-        line(ctx, x0, slabBotY, x1, slabBotY, 0.45, GRAY);
+      const stemBot = slabTopY + bh;
+      // Tô liền khối với sàn — không viền (tránh nét cắt qua bề dày sàn)
+      fillRect(ctx, x0, slabTopY, w, bh, CONCRETE_FILL);
+      // Mặt trên sàn liên tục qua vị trí dầm
+      line(ctx, x0, slabTopY, x1, slabTopY, 0.85);
+      // Thân dầm: không vẽ nét đứng/ngang cắt qua chỗ kề sàn
+      const leftStemTop = stemTopAtFace(seg.lo, seg);
+      const rightStemTop = stemTopAtFace(seg.hi, seg);
+      if (stemBot > leftStemTop + 0.5) {
+        line(ctx, x0, leftStemTop, x0, stemBot, 0.85);
+      }
+      if (stemBot > rightStemTop + 0.5) {
+        line(ctx, x1, rightStemTop, x1, stemBot, 0.85);
+      }
+      if (stemBot > Math.min(leftStemTop, rightStemTop) + 0.5) {
+        line(ctx, x0, stemBot, x1, stemBot, 0.85);
       }
       if (seg.name) {
-        textSimple(ctx, seg.name, (x0 + x1) / 2, slabTopY + bh + 8, 5.5, false, "center", GRAY);
+        textSimple(ctx, seg.name, (x0 + x1) / 2, stemBot + 8, 5.5, false, "center", GRAY);
       }
       continue;
     }
@@ -1709,13 +1763,19 @@ function drawRebarSectionCut(
       }
       continue;
     }
-    // Sàn thường / sàn thấp — Hs cùng tỉ lệ s
+    // Sàn thường / sàn thấp — Hs cùng tỉ lệ s; không nét đứng tại mép kề dầm
     const dropPx = seg.drop > 0 ? seg.drop * s : 0;
     const top = slabTopY + dropPx;
-    rect(ctx, x0, top, w, slabT, 0.85, CONCRETE_FILL);
+    const bot = top + slabT;
+    fillRect(ctx, x0, top, w, slabT, CONCRETE_FILL);
+    line(ctx, x0, top, x1, top, 0.85);
+    line(ctx, x0, bot, x1, bot, 0.85);
+    if (!abutsBeam(seg.lo)) line(ctx, x0, top, x0, bot, 0.85);
+    if (!abutsBeam(seg.hi)) line(ctx, x1, top, x1, bot, 0.85);
     if (seg.drop > 0) {
-      line(ctx, x0, slabTopY, x0, top + slabT, 0.75);
-      line(ctx, x1, slabTopY, x1, top + slabT, 0.75);
+      // Bậc sàn thấp: nét đứng chỉ ở mép không kề dầm (kề dầm = bê tông liền khối)
+      if (!abutsBeam(seg.lo)) line(ctx, x0, slabTopY, x0, bot, 0.75);
+      if (!abutsBeam(seg.hi)) line(ctx, x1, slabTopY, x1, bot, 0.75);
       for (const hs of rectDiagonalHatchSegments(seg.lo, 0, seg.hi, Math.max(seg.drop, 1), 180)) {
         const ax = toAlong(hs.xA);
         const bx = toAlong(hs.xB);
@@ -1727,7 +1787,7 @@ function drawRebarSectionCut(
         ctx,
         `${seg.label || "ST"} (-${Math.round(seg.drop)})`,
         (x0 + x1) / 2,
-        top + slabT + 9,
+        bot + 9,
         6,
         false,
         "center",

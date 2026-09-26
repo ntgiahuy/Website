@@ -1,4 +1,5 @@
-# Patch: số hiệu trục ngoài cùng → dim trục → dim dầm/sàn → hình
+# Patch: mặt cắt dầm–sàn liền khối
 
-- Preview + PDF mặt bằng / mặt cắt: vòng số hiệu nằm ngoài chuỗi dim.
-- Thứ tự ngoài → vào: số hiệu trục → dim tim trục → dim dầm·sàn → hình vẽ.
+- Bỏ nét ngang đáy sàn cắt qua thân dầm.
+- Bỏ nét đứng cắt qua bề dày sàn tại chỗ kề dầm (bê tông cùng khối).
+- Thân dầm chỉ vẽ dưới đáy sàn kề; cạnh lộ ở ô thủng / mép ngoài giữ nguyên.
