@@ -2042,23 +2042,30 @@ export async function generateSlabPdf(
 
   /**
    * Tiêu đề phía trên (không khung viền):
-   * SHOP DRAWING… đậm lớn → gạch chân trái–phải
-   * → tên sàn (~1/3 cỡ tiêu đề) → dòng bê tông/thép/BV/A1.
+   * SHOP DRAWING… đậm lớn → gạch chân ngang bằng chân dấu ()
+   * → tên sàn + dòng bê tông/thép/BV/A1 (cỡ = 2/3 tiêu đề = gấp đôi 1/3 cũ).
    */
   const shopSize = 28;
-  const subSize = shopSize / 3; // ~9.3pt
+  const subSize = (shopSize / 3) * 2; // gấp đôi cỡ phụ trước đó (~18.7pt)
   const titleY = pagePad + 22;
   textSimple(ctx, SHOP_TITLE, PAGE_W / 2, titleY, shopSize, true, "center");
 
-  const underlineY = titleY + shopSize * 0.55 + 6;
-  line(ctx, pagePad, underlineY, PAGE_W - pagePad, underlineY, 1.1);
+  // Chân gạch ≈ đáy dấu () (baseline textSimple + descent glyph + nửa nét)
+  const underlineW = 1.1;
+  const kitScale = shopSize / ctx.boldKit.unitsPerEm;
+  let parenDescent = 0;
+  for (const g of ctx.boldKit.layout("()").glyphs) {
+    parenDescent = Math.max(parenDescent, -g.cbox.minY * kitScale);
+  }
+  const underlineY = titleY + shopSize * 0.78 + parenDescent + underlineW / 2 + 0.5;
+  line(ctx, pagePad, underlineY, PAGE_W - pagePad, underlineY, underlineW);
 
   const projTitle = `${project.info.name} (SL=${project.info.quantity}; dày=${project.info.thickness}mm)`;
-  const projY = underlineY + 14;
-  textSimple(ctx, "1/1", pagePad, projY, subSize, false, "left");
+  const projY = underlineY + 16;
+  textSimple(ctx, "1/1", pagePad, projY, subSize * 0.75, false, "left");
   textSimple(ctx, projTitle, PAGE_W / 2, projY, subSize, true, "center");
 
-  const gradesY = projY + subSize + 10;
+  const gradesY = projY + subSize + 12;
   textSimple(
     ctx,
     `Bê tông ${project.info.concreteGrade} · Thép ${project.info.steelGrade} · Lớp BV ${project.info.cover}mm · Khổ A1`,
@@ -2077,7 +2084,7 @@ export async function generateSlabPdf(
    */
   const marginX = pagePad;
   const gap = 14;
-  const topY = gradesY + subSize + 16;
+  const topY = gradesY + subSize + 18;
   const bottomLimit = PAGE_H - pagePad;
   const colW = Math.floor((PAGE_W - marginX * 2 - gap) / 2);
   const leftX = marginX;
