@@ -730,17 +730,38 @@ function steelSpecForBar(
   return { dia: row?.dia ?? 10, spacing: row?.spacing ?? 150 };
 }
 
-function textVertical(ctx: Ctx, str: string, cx: number, yMid: number, size = 11, bold = true) {
+/**
+ * Chữ xoay dọc 90° (CCW). `anchorX` = cạnh chữ gần đường dim:
+ * - side left: anchorX là mép phải chữ (chữ nằm bên trái đường)
+ * - side right: anchorX là mép trái chữ (chữ nằm bên phải đường)
+ * Glyph rot90 kéo về −X từ origin ≈ mép phải.
+ */
+function textVerticalBeside(
+  ctx: Ctx,
+  str: string,
+  anchorX: number,
+  yMid: number,
+  size: number,
+  side: "left" | "right",
+  bold = false,
+) {
   const font = bold ? ctx.fontBold : ctx.font;
   const width = font.widthOfTextAtSize(str, size);
+  // rot90: origin ≈ mép phải chữ; thân chữ kéo sang trái ~0.85·size
+  const originX = side === "left" ? anchorX : anchorX + size * 0.85;
   ctx.page.drawText(str, {
-    x: cx - size * 0.35,
+    x: originX,
     y: ty(yMid) - width / 2,
     size,
     font,
     color: BLACK,
     rotate: degrees(90),
   });
+}
+
+/** @deprecated dùng textVerticalBeside cho dim; giữ cho chỗ gọi cũ nếu có */
+function textVertical(ctx: Ctx, str: string, cx: number, yMid: number, size = 11, bold = true) {
+  textVerticalBeside(ctx, str, cx - size * 0.35, yMid, size, "left", bold);
 }
 
 function dimH(ctx: Ctx, x1: number, x2: number, y: number, label: string, size = 6.5) {
@@ -768,10 +789,10 @@ function dimV(
   line(ctx, x, lo, x, hi, 0.45);
   line(ctx, x - 3, lo, x + 3, lo, 0.45);
   line(ctx, x - 3, hi, x + 3, hi, 0.45);
-  // Số xoay dọc — lệch khỏi đường dim (hở ~size + khe)
-  const gap = size + 5;
-  const tx = labelSide === "left" ? x - gap : x + gap;
-  textVertical(ctx, label, tx, (lo + hi) / 2, size, false);
+  // Số sát đường dim của chính chuỗi này (khe nhỏ) — tránh đè sang đường dim hàng bên cạnh
+  const clear = 2.5;
+  const anchorX = labelSide === "left" ? x - clear : x + clear;
+  textVerticalBeside(ctx, label, anchorX, (lo + hi) / 2, size, labelSide, false);
 }
 
 /** Chuỗi dim ngang theo các mốc mm (thế giới → PDF qua toX). */
@@ -1102,7 +1123,9 @@ function drawPlan(
   }
 
   // —— Đường dim: da dầm + lòng sàn · tim trục · tổng ——
-  const DIM_GAP = 14; // số dim hở khỏi đường (~size+2.5)
+  const DIM_GAP_X = 14; // số dim ngang hở phía trên đường
+  /** Khoảng cách chuỗi dim đứng ≥ bề rộng chữ xoay (~size) + 2 khe — tránh số đè đường hàng bên */
+  const DIM_GAP_Y = 20;
   const faceX = faceChainAlongX(project, axesX, axesY);
   const faceY = faceChainAlongY(project, axesX, axesY);
   const axisXMarks = axesX.map((a) => a.pos);
@@ -1112,11 +1135,11 @@ function drawPlan(
   let yDim = edgeBottom + AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 6;
   if (faceX.length >= 2) {
     dimHChain(ctx, faceX, yDim, toX, 5.2); // B dầm + bề rộng sàn
-    yDim += DIM_GAP;
+    yDim += DIM_GAP_X;
   }
   if (axisXMarks.length >= 2) {
     dimHChain(ctx, axisXMarks, yDim, toX, 5.5); // tim trục
-    yDim += DIM_GAP;
+    yDim += DIM_GAP_X;
   }
   dimH(ctx, toX(bleed.xMin), toX(bleed.xMax), yDim, `${Math.round(bleed.xMax - bleed.xMin)}`, 6.5);
   const dimBottomY = yDim;
@@ -1125,11 +1148,11 @@ function drawPlan(
   let xDim = edgeLeft - AXIS_BUBBLE_OFFSET - AXIS_BUBBLE_R - 6;
   if (faceY.length >= 2) {
     dimVChain(ctx, faceY, xDim, toY, 5.2, "left");
-    xDim -= DIM_GAP;
+    xDim -= DIM_GAP_Y;
   }
   if (axisYMarks.length >= 2) {
     dimVChain(ctx, axisYMarks, xDim, toY, 5.5, "left");
-    xDim -= DIM_GAP;
+    xDim -= DIM_GAP_Y;
   }
   dimV(
     ctx,
