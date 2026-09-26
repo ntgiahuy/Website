@@ -1706,21 +1706,38 @@ function drawRebarSectionCut(
       (g) => g.kind === "beam" && (Math.abs(g.lo - mm) < 0.5 || Math.abs(g.hi - mm) < 0.5),
     );
 
+  /** Đoạn kề mép dầm (sàn / ô thủng), nếu có. */
+  const neighborAtFace = (faceMm: number, beamSeg: SectionAlongSeg) =>
+    segs.find(
+      (g) =>
+        g !== beamSeg && (Math.abs(g.lo - faceMm) < 0.5 || Math.abs(g.hi - faceMm) < 0.5),
+    );
+
   /**
    * Đỉnh nét đứng thân dầm tại một mép:
    * - Kề sàn → đáy sàn (không cắt qua bề dày sàn, bê tông liền khối)
    * - Kề ô thủng / mép ngoài → mặt sàn trên (để lộ cạnh dầm)
    */
   const stemTopAtFace = (faceMm: number, beamSeg: SectionAlongSeg) => {
-    const neighbor = segs.find(
-      (g) =>
-        g !== beamSeg && (Math.abs(g.lo - faceMm) < 0.5 || Math.abs(g.hi - faceMm) < 0.5),
-    );
+    const neighbor = neighborAtFace(faceMm, beamSeg);
     if (neighbor?.kind === "slab") {
       const dropPx = neighbor.drop > 0 ? neighbor.drop * s : 0;
       return slabTopY + dropPx + slabT;
     }
     return slabTopY;
+  };
+
+  /**
+   * Sàn thấp kề dầm: nét bậc (cạnh dầm lộ) từ line sàn cao độ chuẩn
+   * xuống line mặt trên sàn thấp — nối với thân dầm bên dưới.
+   */
+  const drawLowSlabStepFace = (faceX: number, faceMm: number, beamSeg: SectionAlongSeg) => {
+    const neighbor = neighborAtFace(faceMm, beamSeg);
+    if (neighbor?.kind !== "slab" || !(neighbor.drop > 0)) return;
+    const dropPx = neighbor.drop * s;
+    if (dropPx < 0.5) return;
+    const lowTop = slabTopY + dropPx;
+    line(ctx, faceX, slabTopY, faceX, lowTop, 0.85);
   };
 
   for (const seg of segs) {
@@ -1735,7 +1752,10 @@ function drawRebarSectionCut(
       fillRect(ctx, x0, slabTopY, w, bh, CONCRETE_FILL);
       // Mặt trên sàn liên tục qua vị trí dầm
       line(ctx, x0, slabTopY, x1, slabTopY, 0.85);
-      // Thân dầm: không vẽ nét đứng/ngang cắt qua chỗ kề sàn
+      // Sàn thấp: nét bậc từ line sàn trên → line mặt sàn thấp
+      drawLowSlabStepFace(x0, seg.lo, seg);
+      drawLowSlabStepFace(x1, seg.hi, seg);
+      // Thân dầm dưới đáy sàn kề — không cắt qua bề dày sàn
       const leftStemTop = stemTopAtFace(seg.lo, seg);
       const rightStemTop = stemTopAtFace(seg.hi, seg);
       if (stemBot > leftStemTop + 0.5) {
