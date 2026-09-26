@@ -176,15 +176,23 @@ export const SlabPreview = memo(function SlabPreview({
   const DIM_CHAINS = 2; // face + axis
   const dimBand =
     DIM_FROM_EDGE + DIM_CHAIN_GAP * DIM_CHAINS + DIM_TO_BUBBLE + AXIS_BUBBLE_R * 2 + 8;
-  const pad = Math.max(56, dimBand + 14);
+  /** Pad lệch: dim/bubble chỉ trái+dưới — trên chừa hẹp cho tên sàn để phóng to hình. */
+  const TITLE_BAND = 24;
+  const padT = TITLE_BAND;
+  const padR = 14;
+  const padL = Math.max(48, dimBand + 10);
+  const padB = Math.max(48, dimBand + 10);
   /** Khung vẽ theo da dầm ngoài (kể cả dầm lệch ngoài biên), không cố định 0…plan. */
   const extentW = Math.max(bleed.xMax - bleed.xMin, 1);
   const extentH = Math.max(bleed.yMax - bleed.yMin, 1);
-  const sx = (W - pad * 2) / extentW;
-  const sy = (H - pad * 2) / extentH;
+  const availW = W - padL - padR;
+  const availH = H - padT - padB;
+  const sx = availW / extentW;
+  const sy = availH / extentH;
   const s = Math.min(sx, sy);
-  const ox = pad + (W - pad * 2 - extentW * s) / 2 - bleed.xMin * s;
-  const oy = pad + (H - pad * 2 - extentH * s) / 2 - (project.planHeight - bleed.yMax) * s;
+  const ox = padL + (availW - extentW * s) / 2 - bleed.xMin * s;
+  // Neo sát dưới tên sàn (không căn giữa theo chiều đứng — tránh khoảng trống lớn)
+  const oy = padT + 4 - (project.planHeight - bleed.yMax) * s;
   const X = (mm: number) => ox + mm * s;
   const Y = (mm: number) => oy + (project.planHeight - mm) * s;
   /** Da dầm ngoài cùng — neo vòng số hiệu / đường dẫn / khung xanh. */
@@ -1164,7 +1172,7 @@ export const SlabPreview = memo(function SlabPreview({
                 </>
               );
             })()}
-            <text x={W / 2} y={18} textAnchor="middle" fill="#79b8ff" fontSize="13" fontWeight="700">
+            <text x={W / 2} y={15} textAnchor="middle" fill="#79b8ff" fontSize="13" fontWeight="700">
               {project.info.name} · {Math.round(project.planWidth)}×{Math.round(project.planHeight)} ×{" "}
               {project.info.thickness}mm
             </text>

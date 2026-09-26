@@ -1,4 +1,4 @@
-# Patch: nét bậc dầm khi kề sàn thấp
+# Patch: thu hẹp khoảng trống tên sàn trên preview
 
-- Mặt cắt: khi sàn thấp kề dầm, vẽ nét đứng từ line sàn cao độ chuẩn xuống mặt trên sàn thấp.
-- Nối với thân dầm bên dưới; vẫn không cắt nét qua bề dày sàn (liền khối).
+- Pad trên nhỏ (chỗ tên sàn); pad dim/bubble chỉ trái + dưới.
+- Hình minh họa neo sát dưới tên → phóng to rõ hơn.
