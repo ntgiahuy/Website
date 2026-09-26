@@ -2050,15 +2050,14 @@ export async function generateSlabPdf(
   const titleY = pagePad + 22;
   textSimple(ctx, SHOP_TITLE, PAGE_W / 2, titleY, shopSize, true, "center");
 
-  // Chân gạch = đáy mực dấu (); nét line căn giữa path → cộng nửa bề dày + khe nhỏ
+  // Chân gạch ≈ đáy dấu () (baseline textSimple + descent glyph + nửa nét)
   const underlineW = 1.1;
   const kitScale = shopSize / ctx.boldKit.unitsPerEm;
   let parenDescent = 0;
   for (const g of ctx.boldKit.layout("()").glyphs) {
     parenDescent = Math.max(parenDescent, -g.cbox.minY * kitScale);
   }
-  // Đỉnh nét gạch ≈ chân dấu (); +1pt chống anti-alias cắt mực
-  const underlineY = titleY + shopSize * 0.78 + parenDescent + underlineW / 2 + 1;
+  const underlineY = titleY + shopSize * 0.78 + parenDescent + underlineW / 2 + 0.5;
   line(ctx, pagePad, underlineY, PAGE_W - pagePad, underlineY, underlineW);
 
   const projTitle = `${project.info.name} (SL=${project.info.quantity}; dày=${project.info.thickness}mm)`;
