@@ -1077,7 +1077,7 @@ export function SlabApp() {
       const [regular, bold] = await Promise.all(fontRes.map((r) => r.then((x) => x.arrayBuffer())));
       const bytes = await generateSlabPdf(project, { regular, bold });
       downloadPdf(bytes, `KetCauSan_${project.info.name.replace(/\s+/g, "_")}.pdf`);
-      setStatus("Đã xuất PDF A2.");
+      setStatus("Đã xuất PDF A1.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Xuất PDF thất bại.");
     } finally {
@@ -1365,7 +1365,7 @@ export function SlabApp() {
               Shop drawing thép sàn
             </div>
             <div className="text-[11px] leading-snug text-zinc-400">
-              Bố trí thép sàn BTCT · thống kê · xuất PDF A2 (tham chiếu shop thép dầm).
+              Bố trí thép sàn BTCT · thống kê · xuất PDF A1 (tham chiếu shop thép dầm).
             </div>
           </div>
         </div>
