@@ -2041,29 +2041,21 @@ export async function generateSlabPdf(
   });
 
   /**
-   * Khung tên phía trên (trong khung trang):
+   * Tiêu đề phía trên (không khung viền):
    * SHOP DRAWING THÉP SÀN (BY GIAHUY.NET) — đậm, chữ lớn.
    */
-  const titleFrameX = pagePad;
-  const titleFrameY = pagePad;
-  const titleFrameW = PAGE_W - pagePad * 2;
-  const titleFrameH = 88;
-  // Khung đôi
-  rect(ctx, titleFrameX, titleFrameY, titleFrameW, titleFrameH, 1.6);
-  rect(ctx, titleFrameX + 4, titleFrameY + 4, titleFrameW - 8, titleFrameH - 8, 0.85);
-  // Đường ngang tách tiêu đề shop / dòng thông tin sàn
-  const titleSplitY = titleFrameY + 56;
-  line(ctx, titleFrameX + 4, titleSplitY, titleFrameX + titleFrameW - 4, titleSplitY, 0.85);
-  textSimple(ctx, SHOP_TITLE, PAGE_W / 2, titleFrameY + 34, 28, true, "center");
+  const titleY = pagePad + 22;
+  const infoY = pagePad + 48;
+  textSimple(ctx, SHOP_TITLE, PAGE_W / 2, titleY, 28, true, "center");
 
   const projTitle = `${project.info.name} (SL=${project.info.quantity}; dày=${project.info.thickness}mm)`;
-  textSimple(ctx, "1/1", titleFrameX + 14, titleFrameY + 74, 10, false, "left");
-  textSimple(ctx, projTitle, PAGE_W / 2, titleFrameY + 74, 12, true, "center");
+  textSimple(ctx, "1/1", pagePad, infoY, 10, false, "left");
+  textSimple(ctx, projTitle, PAGE_W / 2, infoY, 12, true, "center");
   textSimple(
     ctx,
     `Bê tông ${project.info.concreteGrade} · Thép ${project.info.steelGrade} · Lớp BV ${project.info.cover}mm · Khổ A1`,
-    titleFrameX + titleFrameW - 14,
-    titleFrameY + 74,
+    PAGE_W - pagePad,
+    infoY,
     9,
     false,
     "right",
@@ -2077,7 +2069,7 @@ export async function generateSlabPdf(
    */
   const marginX = pagePad;
   const gap = 14;
-  const topY = titleFrameY + titleFrameH + 14;
+  const topY = infoY + 22;
   const bottomLimit = PAGE_H - pagePad;
   const colW = Math.floor((PAGE_W - marginX * 2 - gap) / 2);
   const leftX = marginX;
