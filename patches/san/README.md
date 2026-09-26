@@ -1,5 +1,4 @@
-# Patch: PDF MẶT CẮT THÉP SÀN A-A / B-B
+# Patch: PDF mặt cắt — dim B/sàn dưới dim trục + đường chỉ sắt
 
-- A-A (phương X) phía trên, B-B (phương Y) nằm dưới — cùng cột phải, trên BẢNG THỐNG KÊ.
-- Chiều dài mặt cắt đúng tỉ lệ mặt bằng (trục đầu → trục cuối).
-- Hiện đủ dầm cắt ngang, ô sàn thủng và sàn thấp trên đường cắt.
+- Dim ngang: tim trục, rồi bề rộng dầm + lòng sàn bên dưới.
+- Đường chỉ sắt: STT · Ø · khoảng cách trên mặt cắt A-A / B-B.

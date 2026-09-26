@@ -1482,6 +1482,60 @@ function buildSectionAlongSegs(
 }
 
 /**
+ * Đường chỉ sắt trên mặt cắt: nét dẫn từ điểm trên thép → vòng STT + Ødia a spacing.
+ */
+function drawSectionRebarLeader(
+  ctx: Ctx,
+  tipX: number,
+  tipY: number,
+  labelCx: number,
+  labelCy: number,
+  stt: number,
+  dia: number,
+  spacing: number,
+) {
+  const r = REBAR_MARK_R;
+  // Elbow: tip → ngang → tâm vòng
+  const midX = tipX + (labelCx - tipX) * 0.35;
+  line(ctx, tipX, tipY, midX, labelCy, 0.5, REBAR_RED);
+  line(ctx, midX, labelCy, labelCx - r - 1.5, labelCy, 0.5, REBAR_RED);
+  // Chấm neo tại tip
+  ctx.page.drawCircle({ x: tipX, y: ty(tipY), size: 1.2, color: REBAR_RED });
+  drawRebarCallout(ctx, labelCx, labelCy, stt, dia, spacing, "X");
+}
+
+/** STT + Ø + a theo lớp/phương từ bảng thống kê PDF. */
+function sectionSteelCallout(
+  ctx: Ctx,
+  layer: "bottom" | "top",
+  dir: "X" | "Y",
+): { stt: number; dia: number; spacing: number } | null {
+  const zones = effectiveZones(ctx.project);
+  const z = zones.find((zone) =>
+    layer === "top"
+      ? zone.layer === "top" && zone.direction === dir
+      : (zone.layer === "bottom" || zone.layer === "structural") && zone.direction === dir,
+  );
+  if (!z) return null;
+  const rows = buildPdfScheduleRows(ctx);
+  const row =
+    rows.find(
+      (r) =>
+        r.direction === dir &&
+        (layer === "top" ? r.layer === "top" : r.layer === "bottom" || r.layer === "structural") &&
+        r.dia === z.dia &&
+        r.spacing === z.spacing,
+    ) ??
+    rows.find((r) => r.dia === z.dia && r.spacing === z.spacing && r.direction === dir) ??
+    rows.find((r) => r.dia === z.dia && r.spacing === z.spacing);
+  return {
+    stt: row?.stt ?? 1,
+    dia: z.dia,
+    spacing: z.spacing,
+  };
+}
+
+/**
  * Mặt cắt thép sàn đúng tỉ lệ mặt bằng: từ trục đầu → trục cuối,
  * đủ dầm / ô thủng / sàn thấp trên đường cắt.
  * `cutDir` X → MẶT CẮT A-A; Y → MẶT CẮT B-B.
@@ -1547,14 +1601,22 @@ function drawRebarSectionCut(
   const slabT = slabTmm * s;
   const beamH = maxBeamHmm * s;
   const dropS = maxDropMm * s;
-  const sy = y + 26;
+  // Chừa chỗ đường chỉ sắt phía trên mặt sàn
+  const sy = y + 42;
   const slabTopY = sy;
   const slabBotY = sy + slabT;
 
   // Mặt sàn cao độ chuẩn (nét chuẩn)
   line(ctx, xBase - 4, slabTopY, toAlong(along1) + 4, slabTopY, 0.35, GRAY, [2, 2]);
 
-  let firstBeamForBdim: { x0: number; x1: number; bh: number; bMm: number } | null = null;
+  /** Mốc da dầm + lòng sàn (mm) để dim ngang dưới dim trục. */
+  const faceMarksMm: number[] = [];
+  for (const seg of segs) {
+    if (faceMarksMm.length === 0 || Math.abs(faceMarksMm[faceMarksMm.length - 1]! - seg.lo) > 0.5) {
+      faceMarksMm.push(seg.lo);
+    }
+    faceMarksMm.push(seg.hi);
+  }
 
   for (const seg of segs) {
     const x0 = toAlong(seg.lo);
@@ -1563,17 +1625,13 @@ function drawRebarSectionCut(
     if (seg.kind === "beam") {
       // H = chiều cao tổng từ mặt sàn trên xuống đáy dầm (cùng tỉ lệ với B và Hs)
       const bh = seg.h * s;
-      const bMm = seg.hi - seg.lo;
       rect(ctx, x0, slabTopY, w, bh, 0.85, CONCRETE_FILL);
       // Ranh dày sàn trong thân dầm
       if (slabT < bh - 0.5) {
         line(ctx, x0, slabBotY, x1, slabBotY, 0.45, GRAY);
       }
-      if (!firstBeamForBdim && bMm > 1) {
-        firstBeamForBdim = { x0, x1, bh, bMm };
-      }
       if (seg.name) {
-        textSimple(ctx, seg.name, (x0 + x1) / 2, slabTopY + bh + 9, 5.5, false, "center", GRAY);
+        textSimple(ctx, seg.name, (x0 + x1) / 2, slabTopY + bh + 8, 5.5, false, "center", GRAY);
       }
       continue;
     }
@@ -1615,7 +1673,7 @@ function drawRebarSectionCut(
     }
   }
 
-  // Chấm thép ⊥ mặt cắt trong đoạn sàn (không vẽ trên ô thủng)
+  // Chấm thép ⊥ mặt cắt + nét dọc thanh song song trong đoạn sàn
   const zones = effectiveZones(project);
   const perpDir: "X" | "Y" = cutDir === "X" ? "Y" : "X";
   const hasBot = zones.some(
@@ -1626,6 +1684,9 @@ function drawRebarSectionCut(
     (z) => (z.layer === "bottom" || z.layer === "structural") && z.direction === cutDir,
   );
   const hasTopLong = zones.some((z) => z.layer === "top" && z.direction === cutDir);
+
+  /** Đoạn sàn đầu tiên đủ rộng — neo đường chỉ sắt. */
+  let leaderSlab: { x0: number; x1: number; yBot: number; yTop: number } | null = null;
 
   for (const seg of segs) {
     if (seg.kind !== "slab") continue;
@@ -1654,6 +1715,76 @@ function drawRebarSectionCut(
         });
       }
     }
+    if (!leaderSlab && x1 - x0 > 28) {
+      leaderSlab = { x0, x1, yBot, yTop: yTopR };
+    }
+  }
+
+  // Đường chỉ sắt: số hiệu · Ø · khoảng cách (lớp dưới / lớp trên)
+  if (leaderSlab) {
+    const mid = (leaderSlab.x0 + leaderSlab.x1) / 2;
+    const botInfo = hasBot ? sectionSteelCallout(ctx, "bottom", perpDir) : null;
+    const topInfo = hasTop ? sectionSteelCallout(ctx, "top", perpDir) : null;
+    const longBot = hasBotLong ? sectionSteelCallout(ctx, "bottom", cutDir) : null;
+    const longTop = hasTopLong ? sectionSteelCallout(ctx, "top", cutDir) : null;
+
+    // Lớp dưới (chấm đặc) — chỉ lên trên bên trái
+    if (botInfo) {
+      const tipX = mid - Math.min(24, (leaderSlab.x1 - leaderSlab.x0) * 0.2);
+      drawSectionRebarLeader(
+        ctx,
+        tipX,
+        leaderSlab.yBot,
+        tipX - 36,
+        slabTopY - 16,
+        botInfo.stt,
+        botInfo.dia,
+        botInfo.spacing,
+      );
+    }
+    // Lớp trên (chấm rỗng) — chỉ lên trên bên phải
+    if (topInfo) {
+      const tipX = mid + Math.min(24, (leaderSlab.x1 - leaderSlab.x0) * 0.2);
+      drawSectionRebarLeader(
+        ctx,
+        tipX,
+        leaderSlab.yTop,
+        tipX + 42,
+        slabTopY - 16,
+        topInfo.stt,
+        topInfo.dia,
+        topInfo.spacing,
+      );
+    }
+    // Thanh song song mặt cắt (nét ngang): chỉ khi khác Øa với thép ⊥ cùng lớp
+    const sameSpec = (
+      a: { dia: number; spacing: number } | null,
+      b: { dia: number; spacing: number } | null,
+    ) => !!a && !!b && a.dia === b.dia && a.spacing === b.spacing;
+    if (longBot && !sameSpec(longBot, botInfo)) {
+      drawSectionRebarLeader(
+        ctx,
+        mid,
+        leaderSlab.yBot,
+        mid - 10,
+        slabTopY - 30,
+        longBot.stt,
+        longBot.dia,
+        longBot.spacing,
+      );
+    }
+    if (longTop && !sameSpec(longTop, topInfo)) {
+      drawSectionRebarLeader(
+        ctx,
+        mid,
+        leaderSlab.yTop,
+        mid + 18,
+        slabTopY - 30,
+        longTop.stt,
+        longTop.dia,
+        longTop.spacing,
+      );
+    }
   }
 
   // Bong bóng trục đầu → cuối dưới mặt cắt
@@ -1671,22 +1802,11 @@ function drawRebarSectionCut(
     textInAxisBubble(ctx, ax.name, px, axisBubbleY, 6);
   }
 
-  // Dim B (ngang), Hs và H (đứng) — cùng tỉ lệ s
+  // Dim đứng: Hs + H (phải)
   const dimX = toAlong(along1) + 14;
   dimV(ctx, dimX, slabTopY, slabBotY, `${Math.round(slabTmm)}`, 6, "right");
   if (beamH > slabT + 1) {
     dimV(ctx, dimX + 16, slabTopY, slabTopY + beamH, `${Math.round(maxBeamHmm)}`, 6, "right");
-  }
-  if (firstBeamForBdim && firstBeamForBdim.x1 - firstBeamForBdim.x0 > 2) {
-    // Dim B trên đầu dầm — cùng tỉ lệ ngang với Hs/H
-    dimH(
-      ctx,
-      firstBeamForBdim.x0,
-      firstBeamForBdim.x1,
-      slabTopY - 5,
-      `${Math.round(firstBeamForBdim.bMm)}`,
-      5.5,
-    );
   }
   if (maxDropMm > 0 && dropS > 1) {
     dimV(
@@ -1699,17 +1819,35 @@ function drawRebarSectionCut(
       "right",
     );
   }
+
+  /**
+   * Dim ngang dưới vòng trục:
+   * 1) dim tim trục
+   * 2) dưới đó: dim bề rộng dầm (B) + lòng sàn
+   */
+  const DIM_GAP = 11;
+  let yDim = axisBubbleY + AXIS_BUBBLE_R + 7;
+  const axisMarksMm = axes.map((a) => a.pos);
+  if (axisMarksMm.length >= 2) {
+    dimHChain(ctx, axisMarksMm, yDim, toAlong, 5.5);
+    yDim += DIM_GAP;
+  }
+  if (faceMarksMm.length >= 2) {
+    dimHChain(ctx, faceMarksMm, yDim, toAlong, 5.2);
+    yDim += DIM_GAP;
+  }
+
   textSimple(
     ctx,
     `TL 1/${project.info.drawingScale || 100} · Lớp BV ${project.info.cover}`,
     x + maxW / 2,
-    axisBubbleY + 14,
+    yDim + 2,
     6.2,
     false,
     "center",
     GRAY,
   );
-  return axisBubbleY + 24;
+  return yDim + 16;
 }
 
 /** A-A trên, B-B dưới — cùng tỉ lệ mặt bằng; nằm trên bảng thống kê. */
@@ -1912,15 +2050,18 @@ export async function generateSlabPdf(
       ...(project.lowSlabs ?? []).map((ls) => ls.drop || 0),
     );
     const one =
-      26 +
+      42 +
       maxBeam * planS +
       maxDrop * planS +
       22 +
       AXIS_BUBBLE_R +
-      24;
+      7 +
+      11 + // dim trục
+      11 + // dim B + sàn
+      18;
     return one * 2 + 10;
   })();
-  const scheduleReserve = 260;
+  const scheduleReserve = 240;
   if (topY + estSecH + scheduleReserve > bottomLimit) {
     const overflow = topY + estSecH + scheduleReserve - bottomLimit;
     planH = Math.max(160, planH - Math.ceil(overflow / 2));
