@@ -2042,23 +2042,31 @@ export async function generateSlabPdf(
 
   /**
    * Tiêu đề phía trên (không khung viền):
-   * SHOP DRAWING THÉP SÀN (BY GIAHUY.NET) — đậm, chữ lớn.
+   * SHOP DRAWING… đậm lớn → gạch chân trái–phải
+   * → tên sàn (~1/3 cỡ tiêu đề) → dòng bê tông/thép/BV/A1.
    */
+  const shopSize = 28;
+  const subSize = shopSize / 3; // ~9.3pt
   const titleY = pagePad + 22;
-  const infoY = pagePad + 48;
-  textSimple(ctx, SHOP_TITLE, PAGE_W / 2, titleY, 28, true, "center");
+  textSimple(ctx, SHOP_TITLE, PAGE_W / 2, titleY, shopSize, true, "center");
+
+  const underlineY = titleY + shopSize * 0.55 + 6;
+  line(ctx, pagePad, underlineY, PAGE_W - pagePad, underlineY, 1.1);
 
   const projTitle = `${project.info.name} (SL=${project.info.quantity}; dày=${project.info.thickness}mm)`;
-  textSimple(ctx, "1/1", pagePad, infoY, 10, false, "left");
-  textSimple(ctx, projTitle, PAGE_W / 2, infoY, 12, true, "center");
+  const projY = underlineY + 14;
+  textSimple(ctx, "1/1", pagePad, projY, subSize, false, "left");
+  textSimple(ctx, projTitle, PAGE_W / 2, projY, subSize, true, "center");
+
+  const gradesY = projY + subSize + 10;
   textSimple(
     ctx,
     `Bê tông ${project.info.concreteGrade} · Thép ${project.info.steelGrade} · Lớp BV ${project.info.cover}mm · Khổ A1`,
-    PAGE_W - pagePad,
-    infoY,
-    9,
+    PAGE_W / 2,
+    gradesY,
+    subSize,
     false,
-    "right",
+    "center",
   );
 
   /**
@@ -2069,7 +2077,7 @@ export async function generateSlabPdf(
    */
   const marginX = pagePad;
   const gap = 14;
-  const topY = infoY + 22;
+  const topY = gradesY + subSize + 16;
   const bottomLimit = PAGE_H - pagePad;
   const colW = Math.floor((PAGE_W - marginX * 2 - gap) / 2);
   const leftX = marginX;
