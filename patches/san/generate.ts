@@ -1850,7 +1850,7 @@ function drawRebarSectionCut(
   return yDim + 16;
 }
 
-/** A-A trên, B-B dưới — cùng tỉ lệ mặt bằng; nằm trên bảng thống kê. */
+/** A-A trên, B-B dưới — cùng tỉ lệ mặt bằng (đặt dưới mặt bằng lớp dưới). */
 function drawSectionCutsAboveSchedule(
   ctx: Ctx,
   x: number,
@@ -2022,58 +2022,71 @@ export async function generateSlabPdf(
   );
 
   /**
-   * Một trang: Lớp dưới (trên) + Lớp trên (dưới) cùng cột trái;
-   * phải: Mặt cắt A-A → B-B (xếp dọc, đúng tỉ lệ MB) → Thống kê → Tổng hợp.
+   * Một trang:
+   * Hàng trên: Lớp dưới (trái) | Lớp trên (phải) — cùng hàng, cùng tỉ lệ.
+   * Dưới lớp dưới: Mặt cắt A-A → B-B xếp dọc.
+   * Dưới lớp trên: Bảng thống kê → Tổng hợp.
    */
-  const leftX = 36;
-  const planW = 780;
-  const gap = 10;
+  const marginX = 36;
+  const gap = 12;
   const topY = 62;
   const bottomLimit = PAGE_H - 28;
-  // Chia đôi chiều cao còn lại cho 2 mặt bằng (kèm dim + tiêu đề)
-  const stackBudget = bottomLimit - topY - gap;
-  // Chừa chỗ cột phải: 2 mặt cắt xếp dọc + bảng TK — thu planH nếu cần
-  let planH = Math.max(200, Math.min(320, Math.floor(stackBudget / 2) - 95));
-  const planS = planScale(project, planW, planH);
+  const colW = Math.floor((PAGE_W - marginX * 2 - gap) / 2);
+  const leftX = marginX;
+  const rightX = marginX + colW + gap;
 
-  const rightX = 860;
-  const rightW = 780;
-  // Ước lượng chiều cao 2 mặt cắt (B/Hs/H cùng tỉ lệ mặt bằng)
-  const estSecH = (() => {
+  // Chừa chỗ dưới cột trái cho 2 mặt cắt (+ dim trục / B+sàn)
+  const estSecHFor = (s: number) => {
     const maxBeam = Math.max(
-      parseBeamSize(project.info.beamSizeX || `${project.info.beamB || 200}x${project.info.beamH || 500}`).h,
-      parseBeamSize(project.info.beamSizeY || `${project.info.beamB || 200}x${project.info.beamH || 500}`).h,
+      parseBeamSize(
+        project.info.beamSizeX || `${project.info.beamB || 200}x${project.info.beamH || 500}`,
+      ).h,
+      parseBeamSize(
+        project.info.beamSizeY || `${project.info.beamB || 200}x${project.info.beamH || 500}`,
+      ).h,
       project.info.beamH || 500,
     );
-    const maxDrop = Math.max(
-      0,
-      ...(project.lowSlabs ?? []).map((ls) => ls.drop || 0),
-    );
+    const maxDrop = Math.max(0, ...(project.lowSlabs ?? []).map((ls) => ls.drop || 0));
     const one =
       42 +
-      maxBeam * planS +
-      maxDrop * planS +
+      maxBeam * s +
+      maxDrop * s +
       22 +
       AXIS_BUBBLE_R +
       7 +
-      11 + // dim trục
-      11 + // dim B + sàn
+      11 +
+      11 +
       18;
-    return one * 2 + 10;
-  })();
-  const scheduleReserve = 240;
-  if (topY + estSecH + scheduleReserve > bottomLimit) {
-    const overflow = topY + estSecH + scheduleReserve - bottomLimit;
-    planH = Math.max(160, planH - Math.ceil(overflow / 2));
+    return one * 2 + gap;
+  };
+
+  // planH: đủ cao cho mặt bằng, còn lại cho mặt cắt / bảng TK
+  const scheduleReserve = 220;
+  let planH = Math.max(
+    200,
+    Math.min(420, bottomLimit - topY - estSecHFor(0.06) - gap - 40),
+  );
+  let planS = planScale(project, colW, planH);
+  // Thu planH nếu mặt cắt + phần còn lại không vừa trang
+  for (let i = 0; i < 4; i++) {
+    const secH = estSecHFor(planS);
+    // Ước chiều cao mặt bằng thực (plan box + dim + tiêu đề)
+    const estPlanBlock = planH + 95;
+    if (topY + estPlanBlock + gap + Math.max(secH, scheduleReserve) <= bottomLimit) break;
+    planH = Math.max(170, planH - 30);
+    planS = planScale(project, colW, planH);
   }
-  const planSFinal = planScale(project, planW, planH);
 
-  const afterBottom = drawPlan(ctx, leftX, topY, planW, planH, zones, "bottom");
-  drawPlan(ctx, leftX, afterBottom + gap, planW, planH, zones, "top");
+  const afterBottom = drawPlan(ctx, leftX, topY, colW, planH, zones, "bottom");
+  const afterTop = drawPlan(ctx, rightX, topY, colW, planH, zones, "top");
+  const afterPlans = Math.max(afterBottom, afterTop);
 
-  const afterSections = drawSectionCutsAboveSchedule(ctx, rightX, 62, rightW, planSFinal);
-  const table = drawScheduleTable(ctx, rightX, afterSections + 10);
-  drawSummaryTable(ctx, rightX, afterSections + 10 + table.h + 14);
+  // A-A / B-B nằm dưới mặt bằng lớp dưới (cột trái)
+  drawSectionCutsAboveSchedule(ctx, leftX, afterPlans + gap, colW, planS);
+
+  // Thống kê + tổng hợp dưới mặt bằng lớp trên (cột phải)
+  const table = drawScheduleTable(ctx, rightX, afterPlans + gap);
+  drawSummaryTable(ctx, rightX, afterPlans + gap + table.h + 14);
 
   return pdf.save();
 }
