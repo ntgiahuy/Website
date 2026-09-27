@@ -16,9 +16,9 @@ export const SLAB_REBAR_FACE_INSET_MM = 50;
 
 /** Kích thước mặt bằng tối thiểu / tối đa (mm). Quá lớn → hàng nghìn thanh thép → đơ UI. */
 export const MIN_PLAN_SIZE_MM = 500;
-export const MAX_PLAN_SIZE_MM = 100_000;
-/** Diện tích tối đa (mm²) ≈ 1200 m² — tránh đơ khi cả W và H đều lớn. */
-export const MAX_PLAN_AREA_MM2 = 1_200_000_000;
+export const MAX_PLAN_SIZE_MM = 50_000;
+/** Diện tích tối đa (mm²) ≈ 500 m² — giữ computeModel/preview dưới ~0.3s. */
+export const MAX_PLAN_AREA_MM2 = 500_000_000;
 
 /** Giới hạn bề rộng / chiều dài sàn (mm). */
 export function clampPlanSizeMm(mm: number): number {
@@ -1114,8 +1114,10 @@ export function stripRebarPressMarks(
   axesX: GridAxis[],
   axesY: GridAxis[],
   zones?: RebarZone[],
+  /** Tái sử dụng kết quả `stripRebarBarSegments` đã tính — tránh gọi lại (đơ UI). */
+  precomputedBars?: RebarBarSeg[],
 ): RebarPressMark[] {
-  const allBars = stripRebarBarSegments(project, axesX, axesY);
+  const allBars = precomputedBars ?? stripRebarBarSegments(project, axesX, axesY);
   const bars = typicalLayeredRebarBars(project, allBars, zones ?? project.zones ?? []);
   const marks: RebarPressMark[] = [];
   const eps = 1;
