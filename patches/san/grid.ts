@@ -14,6 +14,19 @@ import { uid } from "./utils";
 /** Thụt thép sàn khỏi da dầm (fallback nếu cover chưa có). */
 export const SLAB_REBAR_FACE_INSET_MM = 50;
 
+/** Kích thước mặt bằng tối thiểu / tối đa (mm). Quá lớn → hàng nghìn thanh thép → đơ UI. */
+export const MIN_PLAN_SIZE_MM = 500;
+export const MAX_PLAN_SIZE_MM = 100_000;
+/** Diện tích tối đa (mm²) ≈ 1200 m² — tránh đơ khi cả W và H đều lớn. */
+export const MAX_PLAN_AREA_MM2 = 1_200_000_000;
+
+/** Giới hạn bề rộng / chiều dài sàn (mm). */
+export function clampPlanSizeMm(mm: number): number {
+  const n = Math.round(Number(mm));
+  if (!Number.isFinite(n)) return MIN_PLAN_SIZE_MM;
+  return Math.min(MAX_PLAN_SIZE_MM, Math.max(MIN_PLAN_SIZE_MM, n));
+}
+
 /** Lớp bảo vệ (mm) — khoảng hở đầu thép so với da dầm = Dày lớp bảo vệ. */
 export function slabCoverMm(project: SlabProject): number {
   const c = Number(project.info?.cover);
@@ -990,11 +1003,14 @@ export function stripRebarSpacingMm(project: SlabProject, dir: "X" | "Y"): numbe
 /**
  * Các vị trí đặt thanh trong [lo, hi] theo khoảng a (tâm khe đều ≈ round(L/a) thanh).
  */
+/** Trần số trạm thép/dải (= MAX/min a) — chỉ khi file lỗi vượt giới hạn kích thước. */
+const MAX_REBAR_STATIONS = Math.ceil(MAX_PLAN_SIZE_MM / 50);
+
 export function rebarStationsAlong(lo: number, hi: number, spacing: number): number[] {
   const a = Math.max(50, Math.round(spacing) || 150);
   const span = hi - lo;
   if (!(span > 1)) return [];
-  const n = Math.max(1, Math.round(span / a));
+  const n = Math.min(MAX_REBAR_STATIONS, Math.max(1, Math.round(span / a)));
   const step = span / n;
   const out: number[] = [];
   for (let i = 0; i < n; i++) out.push(lo + (i + 0.5) * step);
@@ -4165,8 +4181,21 @@ export function setPlanSize(
 ): SlabProject {
   const prevW = project.planWidth || 0;
   const prevH = project.planHeight || 0;
-  const W = Math.max(500, Math.round(widthMm) || 500);
-  const H = Math.max(500, Math.round(heightMm) || 500);
+  let W = clampPlanSizeMm(widthMm);
+  let H = clampPlanSizeMm(heightMm);
+  if (W * H > MAX_PLAN_AREA_MM2) {
+    const widthChanged = W !== prevW;
+    const heightChanged = H !== prevH;
+    if (widthChanged && !heightChanged) {
+      W = clampPlanSizeMm(Math.floor(MAX_PLAN_AREA_MM2 / Math.max(H, 1)));
+    } else if (heightChanged && !widthChanged) {
+      H = clampPlanSizeMm(Math.floor(MAX_PLAN_AREA_MM2 / Math.max(W, 1)));
+    } else {
+      const scale = Math.sqrt(MAX_PLAN_AREA_MM2 / (W * H));
+      W = clampPlanSizeMm(W * scale);
+      H = clampPlanSizeMm(H * scale);
+    }
+  }
   const widthChanged = W !== prevW;
   const heightChanged = H !== prevH;
   if (!widthChanged && !heightChanged) return project;
