@@ -6,11 +6,13 @@ import type {
 } from "./types";
 import { rebarLayerMark } from "./types";
 import {
+  clampPlanSizeMm,
   ensureAxes,
   ensureSectionCuts,
   groupTypicalRebarByBayStrip,
   hooksForRebarBar,
   rebarBarStraightLenMm,
+  setPlanSize,
   slabDistRangeForBar,
   buildMergedDistRanges,
   sortAxes,
@@ -692,7 +694,13 @@ export function normalizeProject(raw: SlabProject): SlabProject {
     axesY,
   };
   const withAxes = ensureAxes(merged);
-  return { ...withAxes, sections: ensureSectionCuts(withAxes) };
+  // Dùng kích thước từ file (đã clamp) — ensureAxes có thể kéo plan về theo trục cũ.
+  const sized = setPlanSize(
+    withAxes,
+    clampPlanSizeMm(Number(raw.planWidth) || withAxes.planWidth),
+    clampPlanSizeMm(Number(raw.planHeight) || withAxes.planHeight),
+  );
+  return { ...sized, sections: ensureSectionCuts(sized) };
 }
 
 export { STOCK_M };

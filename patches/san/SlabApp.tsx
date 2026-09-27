@@ -59,6 +59,8 @@ import {
   renameAxis,
   setAxisSpan,
   setPlanSize,
+  clampPlanSizeMm,
+  MAX_PLAN_SIZE_MM,
   sortAxes,
   suggestNextBeamTypeName,
   syncBeamInfo,
@@ -1524,19 +1526,33 @@ export function SlabApp() {
                   <Field label="Bề rộng sàn" unit="mm">
                     <Input
                       type="number"
+                      min={500}
+                      max={MAX_PLAN_SIZE_MM}
                       value={project.planWidth}
-                      onChange={(e) =>
-                        persist(setPlanSize(project, Number(e.target.value) || 0, project.planHeight))
-                      }
+                      onChange={(e) => {
+                        const raw = Number(e.target.value) || 0;
+                        const next = clampPlanSizeMm(raw);
+                        if (raw > MAX_PLAN_SIZE_MM) {
+                          setStatus(`Bề rộng tối đa ${MAX_PLAN_SIZE_MM} mm (100 m) — đã giới hạn để tránh đơ trang.`);
+                        }
+                        persist(setPlanSize(project, next, project.planHeight));
+                      }}
                     />
                   </Field>
                   <Field label="Chiều dài sàn" unit="mm">
                     <Input
                       type="number"
+                      min={500}
+                      max={MAX_PLAN_SIZE_MM}
                       value={project.planHeight}
-                      onChange={(e) =>
-                        persist(setPlanSize(project, project.planWidth, Number(e.target.value) || 0))
-                      }
+                      onChange={(e) => {
+                        const raw = Number(e.target.value) || 0;
+                        const next = clampPlanSizeMm(raw);
+                        if (raw > MAX_PLAN_SIZE_MM) {
+                          setStatus(`Chiều dài tối đa ${MAX_PLAN_SIZE_MM} mm (100 m) — đã giới hạn để tránh đơ trang.`);
+                        }
+                        persist(setPlanSize(project, project.planWidth, next));
+                      }}
                     />
                   </Field>
                   <Field label="Chênh cao độ sàn thấp" unit="mm">
