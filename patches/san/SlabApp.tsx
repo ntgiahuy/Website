@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   Box,
   Check,
@@ -60,6 +69,7 @@ import {
   setAxisSpan,
   setPlanSize,
   clampPlanSizeMm,
+  MAX_PLAN_AREA_MM2,
   MAX_PLAN_SIZE_MM,
   sortAxes,
   suggestNextBeamTypeName,
@@ -180,6 +190,11 @@ export function SlabApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedBeamPanelRef = useRef<HTMLDivElement>(null);
   const selectedBayPanelRef = useRef<HTMLDivElement>(null);
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  /** Draft ô Bề rộng / Chiều dài — chỉ commit khi blur/Enter (tránh đơ mỗi phím). */
+  const [planWDraft, setPlanWDraft] = useState<string | null>(null);
+  const [planHDraft, setPlanHDraft] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -1054,8 +1069,30 @@ export function SlabApp() {
     persist({ ...project, layoutPreset });
   }
 
-  const model = useMemo(() => computeModel(project), [project]);
+  const deferredProject = useDeferredValue(project);
+  const model = useMemo(() => computeModel(deferredProject), [deferredProject]);
   const zones = useMemo(() => effectiveZones(project), [project]);
+
+  function applyPlanSize(nextW: number, nextH: number) {
+    const wantW = clampPlanSizeMm(nextW);
+    const wantH = clampPlanSizeMm(nextH);
+    if (nextW > MAX_PLAN_SIZE_MM || nextH > MAX_PLAN_SIZE_MM) {
+      setStatus(
+        `Kích thước tối đa ${MAX_PLAN_SIZE_MM} mm (50 m) mỗi cạnh — đã giới hạn để tránh đơ trang.`,
+      );
+    }
+    const cur = projectRef.current;
+    if (wantW === cur.planWidth && wantH === cur.planHeight) return;
+    startTransition(() => {
+      const sized = setPlanSize(projectRef.current, wantW, wantH);
+      if (wantW * wantH > MAX_PLAN_AREA_MM2 && sized.planWidth * sized.planHeight < wantW * wantH) {
+        setStatus(
+          `Diện tích tối đa ~${Math.round(MAX_PLAN_AREA_MM2 / 1_000_000)} m² — đã giới hạn để tránh đơ trang.`,
+        );
+      }
+      persist(sized);
+    });
+  }
 
   async function exportPdf() {
     setBusy(true);
@@ -1528,14 +1565,15 @@ export function SlabApp() {
                       type="number"
                       min={500}
                       max={MAX_PLAN_SIZE_MM}
-                      value={project.planWidth}
-                      onChange={(e) => {
-                        const raw = Number(e.target.value) || 0;
-                        const next = clampPlanSizeMm(raw);
-                        if (raw > MAX_PLAN_SIZE_MM) {
-                          setStatus(`Bề rộng tối đa ${MAX_PLAN_SIZE_MM} mm (100 m) — đã giới hạn để tránh đơ trang.`);
-                        }
-                        persist(setPlanSize(project, next, project.planHeight));
+                      value={planWDraft ?? String(project.planWidth)}
+                      onChange={(e) => setPlanWDraft(e.target.value)}
+                      onBlur={() => {
+                        const raw = Number(planWDraft ?? project.planWidth) || 0;
+                        applyPlanSize(raw, projectRef.current.planHeight);
+                        setPlanWDraft(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                       }}
                     />
                   </Field>
@@ -1544,14 +1582,15 @@ export function SlabApp() {
                       type="number"
                       min={500}
                       max={MAX_PLAN_SIZE_MM}
-                      value={project.planHeight}
-                      onChange={(e) => {
-                        const raw = Number(e.target.value) || 0;
-                        const next = clampPlanSizeMm(raw);
-                        if (raw > MAX_PLAN_SIZE_MM) {
-                          setStatus(`Chiều dài tối đa ${MAX_PLAN_SIZE_MM} mm (100 m) — đã giới hạn để tránh đơ trang.`);
-                        }
-                        persist(setPlanSize(project, project.planWidth, next));
+                      value={planHDraft ?? String(project.planHeight)}
+                      onChange={(e) => setPlanHDraft(e.target.value)}
+                      onBlur={() => {
+                        const raw = Number(planHDraft ?? project.planHeight) || 0;
+                        applyPlanSize(projectRef.current.planWidth, raw);
+                        setPlanHDraft(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                       }}
                     />
                   </Field>

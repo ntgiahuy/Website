@@ -166,6 +166,19 @@ export const SlabPreview = memo(function SlabPreview({
   const zones = useMemo(() => effectiveZones(project), [project]);
   const axesX = useMemo(() => sortAxes(project.axesX ?? []), [project.axesX]);
   const axesY = useMemo(() => sortAxes(project.axesY ?? []), [project.axesY]);
+  /** Một lần / project — tránh gọi stripRebar 2–3 lần trong JSX (đơ khi sàn lớn). */
+  const rebarBars = useMemo(
+    () => (axesX.length >= 2 && axesY.length >= 2 ? stripRebarBarSegments(project, axesX, axesY) : []),
+    [project, axesX, axesY],
+  );
+  const drawBars = useMemo(
+    () => typicalLayeredRebarBars(project, rebarBars, zones),
+    [project, rebarBars, zones],
+  );
+  const pressMarks = useMemo(
+    () => stripRebarPressMarks(project, axesX, axesY, zones, rebarBars),
+    [project, axesX, axesY, zones, rebarBars],
+  );
   const wrapRef = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
 
@@ -892,11 +905,8 @@ export const SlabPreview = memo(function SlabPreview({
             </g>
             {beamNodes}
             {(() => {
-              const bars = stripRebarBarSegments(project, axesX, axesY);
-              /** 2 lớp cùng phương → 2 cây điển hình/phương (lệch dày sàn − BV). */
-              const drawBars = typicalLayeredRebarBars(project, bars, zones);
+              const bars = rebarBars;
               const stroke = "#ef4444";
-              const pressMarks = stripRebarPressMarks(project, axesX, axesY, zones);
               const tick = 70;
               return (
                 <>
