@@ -6,12 +6,12 @@ function send_otp_mail(string $email, string $code, string $link = ''): array {
   $fromEmail = $mailCfg['from_email'] ?? 'noreply@localhost';
   $fromName = $mailCfg['from_name'] ?? 'GIAHUY';
   $mins = (int) (cfg('otp_ttl_minutes') ?? 10);
-  $subject = 'Mã đăng nhập GIAHUY: ' . $code;
+  $subject = 'Mã xác nhận đăng ký GIAHUY: ' . $code;
   $body = "Xin chào,\n\n"
-    . "Mã OTP đăng nhập GIAHUY Shop Drawing của bạn là: {$code}\n"
+    . "Mã OTP xác nhận email đăng ký GIAHUY Shop Drawing của bạn là: {$code}\n"
     . "Mã có hiệu lực trong {$mins} phút.\n";
   if ($link !== '') {
-    $body .= "\nHoặc bấm link xác nhận (cùng hiệu lực):\n{$link}\n";
+    $body .= "\nHoặc bấm link xác nhận đăng ký (cùng hiệu lực):\n{$link}\n";
   }
   $body .= "\nNếu bạn không yêu cầu, hãy bỏ qua email này.\n\nGIAHUY";
 
