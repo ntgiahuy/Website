@@ -61,3 +61,8 @@ if (!ok) return;
 ```
 
 → Tab **Đối tác** **không** kiểm soát được. Phải dùng URL hosting `/shop-drawing/mong/`.
+
+## Tin nhắn sẵn để dán vào agent
+
+- Móng đơn: [prompts/AGENT-MONG-DON.md](./prompts/AGENT-MONG-DON.md)
+- Sàn: [prompts/AGENT-SAN.md](./prompts/AGENT-SAN.md)
