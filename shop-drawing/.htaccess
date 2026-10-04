@@ -1,0 +1,14 @@
+# Bảo vệ file cấu hình & dữ liệu
+<FilesMatch "^(config\.php|config\.sample\.php)$">
+  Require all denied
+</FilesMatch>
+
+# Không liệt kê thư mục
+Options -Indexes
+
+# PHP session / JSON
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+</IfModule>
+
+DirectoryIndex index.html index.php

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thành viên GIAHUY — Email OTP</title>
+  <meta name="description" content="Đăng nhập bằng email OTP để mở khóa Shop Drawing theo thời hạn thành viên." />
+  <link rel="icon" href="../assets/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #0f1419; --bg1: #182029; --ink: #e8eef4; --muted: #93a4b5;
+      --line: rgba(232, 238, 244, 0.12); --amber: #e8a317; --amber-dim: #b87d0d;
+      --ok: #3ecf8e; --danger: #ff6b6b; --max: 980px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: "Be Vietnam Pro", sans-serif; color: var(--ink);
+      background:
+        radial-gradient(900px 480px at 12% -10%, rgba(232, 163, 23, 0.18), transparent 55%),
+        radial-gradient(700px 420px at 90% 0%, rgba(62, 140, 180, 0.16), transparent 50%),
+        linear-gradient(180deg, var(--bg0), var(--bg1) 40%, #10161d);
+      line-height: 1.55;
+    }
+    a { color: var(--amber); }
+    .wrap { width: min(100% - 2rem, var(--max)); margin: 0 auto; }
+    .nav {
+      display: flex; flex-direction: column; gap: 0.85rem;
+      padding: 1rem 0 1.05rem; border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 0.7rem; text-decoration: none; color: inherit; }
+    .brand img { width: 40px; height: 40px; border-radius: 8px; }
+    .brand strong { font-size: 1.12rem; letter-spacing: 0.04em; display: block; }
+    .brand-status { color: var(--muted); font-size: 0.78rem; margin-top: 0.18rem; }
+    .brand-status.is-active { color: var(--ok); }
+    .nav-links { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: 0.84rem; font-weight: 600;
+      padding: 0.42rem 0.72rem; border-radius: 999px; border: 1px solid transparent;
+    }
+    .nav-links a:hover { color: var(--ink); border-color: var(--line); background: rgba(255,255,255,0.04); }
+    @media (min-width: 720px) {
+      .nav { flex-direction: row; align-items: center; justify-content: space-between; }
+    }
+    .hero {
+      padding: 3.2rem 0 2.4rem; min-height: min(60vh, 520px);
+      display: grid; align-content: center; gap: 1.1rem; position: relative;
+    }
+    .hero::before {
+      content: "";
+      position: absolute; inset: 8% -8% auto auto; width: min(52vw, 420px); height: min(52vw, 420px);
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(232,238,244,0.04) 19px),
+        repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(232,238,244,0.04) 19px);
+      mask-image: radial-gradient(circle at center, #000 30%, transparent 72%);
+      pointer-events: none; animation: drift 18s ease-in-out infinite alternate;
+    }
+    @keyframes drift {
+      from { transform: translate3d(0,0,0) rotate(0deg); opacity: 0.7; }
+      to { transform: translate3d(-18px, 12px, 0) rotate(2deg); opacity: 1; }
+    }
+    .hero h1 {
+      margin: 0; font-size: clamp(2rem, 5.2vw, 3.2rem); line-height: 1.08;
+      letter-spacing: -0.035em; max-width: 14ch; position: relative;
+    }
+    .hero p { margin: 0; color: var(--muted); font-size: 1.05rem; max-width: 40ch; position: relative; }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.4rem; position: relative; }
+    .btn {
+      appearance: none; border: 0; cursor: pointer; text-decoration: none;
+      font: inherit; font-weight: 700; border-radius: 10px; padding: 0.85rem 1.15rem;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: transform 0.18s ease, background 0.18s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--amber); color: #1a1203; }
+    .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    section { padding: 2.4rem 0; border-top: 1px solid var(--line); }
+    section h2 { margin: 0 0 0.45rem; font-size: clamp(1.35rem, 3vw, 1.8rem); letter-spacing: -0.02em; }
+    section .lead { margin: 0 0 1.4rem; color: var(--muted); max-width: 52ch; }
+    .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.85rem; }
+    .plan {
+      border: 1px solid var(--line); border-radius: 14px; padding: 1.15rem 1.1rem 1.2rem;
+      background: rgba(255,255,255,0.02);
+    }
+    .plan.featured { border-color: rgba(232,163,23,0.55); }
+    .plan .name { font-weight: 700; margin: 0 0 0.35rem; }
+    .plan .price { font-family: "IBM Plex Mono", monospace; font-size: 1.3rem; margin: 0 0 0.35rem; color: var(--amber); }
+    .plan .hint { margin: 0 0 1rem; color: var(--muted); font-size: 0.9rem; }
+    .plan button { width: 100%; }
+    .panel {
+      border: 1px solid var(--line); border-radius: 14px; padding: 1.2rem; background: rgba(0,0,0,0.18);
+    }
+    label { display: block; font-size: 0.88rem; color: var(--muted); margin-bottom: 0.35rem; }
+    input[type="text"], input[type="email"] {
+      width: 100%; font: inherit; color: var(--ink); background: #0c1116;
+      border: 1px solid var(--line); border-radius: 10px; padding: 0.8rem 0.9rem;
+    }
+    .row-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.85rem; }
+    .status {
+      margin-top: 1rem; padding: 0.85rem 0.95rem; border-radius: 10px;
+      background: rgba(255,255,255,0.03); border: 1px solid var(--line); font-size: 0.95rem;
+    }
+    .status.ok { border-color: rgba(62,207,142,0.35); color: var(--ok); }
+    .status.bad { border-color: rgba(255,107,107,0.35); color: var(--danger); }
+    .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.86rem; word-break: break-all; }
+    .steps { display: grid; gap: 0.9rem; counter-reset: step; }
+    .step { display: grid; grid-template-columns: auto 1fr; gap: 0.8rem; align-items: start; }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      width: 1.7rem; height: 1.7rem; border-radius: 999px; display: grid; place-items: center;
+      background: rgba(232,163,23,0.15); color: var(--amber); font-weight: 700; font-size: 0.85rem;
+    }
+    .step p { margin: 0.15rem 0 0; color: var(--muted); }
+    footer { padding: 2rem 0 2.8rem; color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--line); }
+    #otp-wrap[hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="nav">
+      <a class="brand" href="../">
+        <img src="../assets/icon.png" alt="" width="40" height="40" />
+        <div>
+          <strong>GIAHUY</strong>
+          <span class="brand-status" id="brand-status">Thành viên · Email OTP</span>
+        </div>
+      </a>
+      <nav class="nav-links">
+        <a href="../">Hub shop</a>
+        <a href="#goi">Gói</a>
+        <a href="#dang-nhap">Đăng nhập</a>
+        <a href="#huong-dan">Hướng dẫn</a>
+      </nav>
+    </header>
+
+    <section class="hero" style="border:0;padding-top:2.6rem">
+      <h1>Đăng nhập email.<br />Mở khóa theo hạn.</h1>
+      <p>Nhập email → nhận OTP / link → xác nhận đúng chủ email. Admin cấp gói (3 tháng … vĩnh viễn) gắn với email đó.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#dang-nhap">Đăng nhập bằng email</a>
+        <a class="btn btn-ghost" href="../">Về hub dùng thử</a>
+      </div>
+    </section>
+
+    <section id="goi">
+      <h2>Gói theo thời gian</h2>
+      <p class="lead">Một email thành viên mở khóa toàn bộ tiện ích trên hub trong thời hạn còn hiệu lực.</p>
+      <div class="plans" id="plans"></div>
+    </section>
+
+    <section id="huong-dan">
+      <h2>Cách đăng ký</h2>
+      <div class="steps">
+        <div class="step">
+          <div>
+            <strong>Chọn gói và chuyển khoản</strong>
+            <p id="pay-hint">Nội dung CK: <span class="mono" id="transfer-content">GH 3M email@cua.ban</span></p>
+          </div>
+        </div>
+        <div class="step">
+          <div>
+            <strong>Đăng nhập email (OTP)</strong>
+            <p>Hệ thống gửi mã / link vào hộp thư. Xác nhận xong mới chứng minh đúng chủ email.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div>
+            <strong>Admin cấp quyền</strong>
+            <p>Sau khi nhận tiền, admin gắn gói + ngày hết hạn cho email của bạn trên máy chủ.</p>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:1.2rem">
+        <p style="margin:0 0 0.5rem;color:var(--muted);font-size:0.9rem">Thông tin thanh toán:</p>
+        <p id="pay-info" class="mono" style="margin:0;color:var(--ink)">Đang tải…</p>
+      </div>
+    </section>
+
+    <section id="dang-nhap">
+      <h2>Đăng nhập email</h2>
+      <p class="lead">Không dùng mật khẩu cố định — mỗi lần gửi OTP / link xác nhận vào mail.</p>
+      <div class="panel">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email" placeholder="ban@email.com" />
+        <div class="row-actions">
+          <button type="button" class="btn btn-primary" id="btn-send">Gửi mã OTP</button>
+          <button type="button" class="btn btn-ghost" id="btn-logout">Đăng xuất</button>
+        </div>
+        <div id="otp-wrap" hidden style="margin-top:0.9rem">
+          <label for="otp">Mã OTP</label>
+          <input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456" />
+          <div class="row-actions">
+            <button type="button" class="btn btn-primary" id="btn-verify">Xác nhận OTP</button>
+          </div>
+        </div>
+        <div class="status" id="status" hidden></div>
+      </div>
+    </section>
+
+    <footer>
+      <p>GIAHUY · Thành viên lưu trên hosting PHP: email ↔ gói ↔ ngày hết hạn.</p>
+    </footer>
+  </div>
+
+  <script src="../assets/membership.js"></script>
+  <script>
+    (function () {
+      var statusEl = document.getElementById("status");
+      var emailEl = document.getElementById("email");
+      var otpEl = document.getElementById("otp");
+      var otpWrap = document.getElementById("otp-wrap");
+      var payInfo = document.getElementById("pay-info");
+      var transferContent = document.getElementById("transfer-content");
+      var brandStatus = document.getElementById("brand-status");
+      var plansEl = document.getElementById("plans");
+      var selected = { plan: "3m", price: 249000 };
+      var PAY = {};
+
+      function showStatus(ok, html) {
+        statusEl.hidden = false;
+        statusEl.className = "status " + (ok ? "ok" : "bad");
+        statusEl.innerHTML = html;
+      }
+      function money(n) { return Number(n).toLocaleString("vi-VN") + "đ"; }
+      function updateTransferHint() {
+        transferContent.textContent =
+          "GH " + selected.plan.toUpperCase() + " " + (emailEl.value || "email@cua.ban") + " · " + money(selected.price);
+      }
+
+      async function loadCfg() {
+        var cfg = await GiaHuyMembership.loadPublicConfig();
+        PAY = cfg.pay || {};
+        payInfo.textContent =
+          (PAY.bank || "") + " · STK " + (PAY.account || "") + " · " + (PAY.holder || "") +
+          (PAY.note ? " · " + PAY.note : "");
+        plansEl.innerHTML = "";
+        (cfg.plans || []).forEach(function (p, i) {
+          var art = document.createElement("article");
+          art.className = "plan" + (i === 0 ? " featured" : "");
+          art.innerHTML =
+            '<p class="name">' + p.label + '</p>' +
+            '<p class="price">' + money(p.price) + '</p>' +
+            '<p class="hint">' + (p.days > 20000 ? "Không hết hạn" : p.days + " ngày") + '</p>' +
+            '<button type="button" class="btn ' + (i === 0 ? "btn-primary" : "btn-ghost") + '">Chọn gói này</button>';
+          art.querySelector("button").addEventListener("click", function () {
+            selected = { plan: p.id, price: p.price };
+            updateTransferHint();
+            document.getElementById("huong-dan").scrollIntoView({ behavior: "smooth" });
+          });
+          plansEl.appendChild(art);
+          if (i === 0) selected = { plan: p.id, price: p.price };
+        });
+        updateTransferHint();
+      }
+
+      async function paint() {
+        var me = await GiaHuyMembership.getMe();
+        if (me.email) emailEl.value = me.email;
+        var st = me.member;
+        if (st && st.active) {
+          brandStatus.classList.add("is-active");
+          brandStatus.textContent =
+            "Đang hoạt động · " + (st.plan || "") + " · hết hạn " +
+            GiaHuyMembership.formatExpiry({
+              active: true, plan: st.plan, daysLeft: st.days_left, expiresAtMs: st.expires_at * 1000
+            });
+          showStatus(true, "Email <strong>" + me.email + "</strong> · gói <strong>" + (st.plan || "—") +
+            "</strong> · " + GiaHuyMembership.formatExpiry({
+              active: true, plan: st.plan, daysLeft: st.days_left, expiresAtMs: st.expires_at * 1000
+            }));
+        } else if (me.email) {
+          brandStatus.classList.remove("is-active");
+          brandStatus.textContent = "Đã xác nhận email · chờ cấp gói";
+          showStatus(false, "Email đã xác nhận nhưng chưa có gói còn hạn. Hãy chuyển khoản rồi chờ admin cấp quyền.");
+        } else {
+          brandStatus.classList.remove("is-active");
+          brandStatus.textContent = "Thành viên · Email OTP";
+        }
+      }
+
+      document.getElementById("btn-send").addEventListener("click", async function () {
+        try {
+          var data = await GiaHuyMembership.requestOtp(emailEl.value);
+          otpWrap.hidden = false;
+          showStatus(true, data.message || "Đã gửi OTP.");
+          updateTransferHint();
+        } catch (e) {
+          showStatus(false, (e && e.message) || "Không gửi được.");
+        }
+      });
+      document.getElementById("btn-verify").addEventListener("click", async function () {
+        try {
+          await GiaHuyMembership.verifyOtp(emailEl.value, otpEl.value, "");
+          await paint();
+        } catch (e) {
+          showStatus(false, (e && e.message) || "OTP sai.");
+        }
+      });
+      document.getElementById("btn-logout").addEventListener("click", async function () {
+        await GiaHuyMembership.logout();
+        showStatus(false, "Đã đăng xuất.");
+        brandStatus.classList.remove("is-active");
+        brandStatus.textContent = "Thành viên · Email OTP";
+      });
+      emailEl.addEventListener("input", updateTransferHint);
+
+      (async function () {
+        try { await loadCfg(); } catch (e) { payInfo.textContent = "Không tải được cấu hình API."; }
+        await paint();
+        try {
+          var q = new URLSearchParams(location.search);
+          var em = q.get("email");
+          var tk = q.get("token");
+          if (em && tk) {
+            emailEl.value = em;
+            await GiaHuyMembership.verifyOtp(em, "", tk);
+            await paint();
+            history.replaceState({}, "", location.pathname);
+          }
+        } catch (e) {
+          showStatus(false, (e && e.message) || "Link xác nhận không hợp lệ.");
+        }
+      })();
+    })();
+  </script>
+</body>
+</html>
