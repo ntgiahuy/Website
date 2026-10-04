@@ -1,10 +1,7 @@
 /**
- * GIAHUY Shop Drawing — thành viên email + OTP (hosting PHP).
+ * GIAHUY Shop Drawing — thành viên username + mật khẩu (OTP khi đăng ký).
  *
  * API gốc: /shop-drawing/api/
- * Dùng:
- *   const ok = await GiaHuyMembership.requireActive({ feature: "Xuất PDF" });
- *   if (!ok) return;
  */
 (function (global) {
   "use strict";
@@ -91,6 +88,7 @@
       return {
         active: false,
         reason: "missing",
+        username: "",
         email: "",
         plan: "",
         expiresAt: null,
@@ -101,6 +99,7 @@
     return {
       active: !!member.active,
       reason: member.active ? "ok" : "expired",
+      username: member.username || "",
       email: member.email || "",
       plan: member.plan || "",
       expiresAt: member.expires_at_iso || null,
@@ -118,15 +117,38 @@
     return statusFromMember(me.member);
   }
 
-  async function requestOtp(email) {
-    return api("auth_request.php", { method: "POST", body: { email: email } });
+  async function registerRequest(username, email, password) {
+    return api("auth_register_request.php", {
+      method: "POST",
+      body: { username: username, email: email, password: password },
+    });
   }
 
-  async function verifyOtp(email, code, token) {
-    return api("auth_verify.php", {
+  async function registerVerify(email, code, token) {
+    return api("auth_register_verify.php", {
       method: "POST",
       body: { email: email, code: code || "", token: token || "" },
     });
+  }
+
+  async function login(username, password) {
+    return api("auth_login.php", {
+      method: "POST",
+      body: { username: username, password: password },
+    });
+  }
+
+  /** @deprecated dùng registerRequest */
+  async function requestOtp(email) {
+    return api("auth_register_request.php", {
+      method: "POST",
+      body: { email: email, username: "", password: "" },
+    });
+  }
+
+  /** @deprecated dùng registerVerify */
+  async function verifyOtp(email, code, token) {
+    return registerVerify(email, code, token);
   }
 
   async function logout() {
@@ -154,6 +176,7 @@
       mode: a.mode || "locked",
       canPdf: !!a.can_pdf,
       email: a.email || null,
+      username: a.username || (a.member && a.member.username) || null,
       member: statusFromMember(a.member),
       trial: {
         started: !!(a.trial && a.trial.started),
@@ -201,7 +224,7 @@
     if (access.mode === "member" && access.allowed) return access.member;
     if (access.mode === "trial" && access.allowed && opts.allowTrial) {
       if (opts.feature && /pdf|cad|xuất/i.test(String(opts.feature)) && !access.canPdf) {
-        /* fall through to lock */
+        /* fall through */
       } else {
         return access.member;
       }
@@ -211,11 +234,17 @@
       return null;
     }
     var go = global.confirm(
-      "Cần đăng nhập email thành viên còn hạn để dùng " +
+      "Cần đăng nhập thành viên còn hạn để dùng " +
         (opts.feature || "tính năng này") +
-        ".\n\nMở trang thành viên?"
+        ".\n\nMở trang đăng nhập?"
     );
-    if (go) global.open(opts.activateUrl || ACTIVATE_URL, "_blank", "noopener,noreferrer");
+    if (go) {
+      try {
+        global.open(new URL("../dang-nhap/", API_BASE).href, "_blank", "noopener,noreferrer");
+      } catch (e) {
+        global.open(opts.activateUrl || ACTIVATE_URL, "_blank", "noopener,noreferrer");
+      }
+    }
     return null;
   }
 
@@ -235,6 +264,9 @@
     api: api,
     getMe: getMe,
     getStatus: getStatus,
+    registerRequest: registerRequest,
+    registerVerify: registerVerify,
+    login: login,
     requestOtp: requestOtp,
     verifyOtp: verifyOtp,
     logout: logout,

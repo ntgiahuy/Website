@@ -93,6 +93,9 @@ function db_migrate_sqlite(PDO $pdo): void {
   $pdo->exec(<<<SQL
 CREATE TABLE IF NOT EXISTS members (
   email TEXT PRIMARY KEY,
+  username TEXT NOT NULL DEFAULT '',
+  password_hash TEXT NOT NULL DEFAULT '',
+  email_verified INTEGER NOT NULL DEFAULT 0,
   plan TEXT NOT NULL DEFAULT '',
   expires_at INTEGER NOT NULL,
   note TEXT NOT NULL DEFAULT '',
@@ -107,6 +110,16 @@ CREATE TABLE IF NOT EXISTS otps (
   attempts INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   PRIMARY KEY (email)
+);
+CREATE TABLE IF NOT EXISTS pending_signups (
+  email TEXT PRIMARY KEY,
+  username TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  token_hash TEXT NOT NULL DEFAULT '',
+  expires_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS trials (
   browser_key TEXT PRIMARY KEY,
@@ -123,6 +136,7 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 SQL);
+  db_ensure_member_auth_columns_sqlite($pdo);
   $cols = $pdo->query('PRAGMA table_info(otps)')->fetchAll();
   $names = array_map(static function ($c) {
     return $c['name'];
@@ -130,20 +144,61 @@ SQL);
   if (!in_array('token_hash', $names, true)) {
     $pdo->exec("ALTER TABLE otps ADD COLUMN token_hash TEXT NOT NULL DEFAULT ''");
   }
+  $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_members_username ON members(username) WHERE username != ""');
+}
+
+function db_ensure_member_auth_columns_sqlite(PDO $pdo): void {
+  $cols = $pdo->query('PRAGMA table_info(members)')->fetchAll();
+  $names = array_map(static function ($c) {
+    return $c['name'];
+  }, $cols);
+  if (!in_array('username', $names, true)) {
+    $pdo->exec("ALTER TABLE members ADD COLUMN username TEXT NOT NULL DEFAULT ''");
+  }
+  if (!in_array('password_hash', $names, true)) {
+    $pdo->exec("ALTER TABLE members ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''");
+  }
+  if (!in_array('email_verified', $names, true)) {
+    $pdo->exec('ALTER TABLE members ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
+  }
+}
+
+function db_mysql_has_column(PDO $pdo, string $table, string $column): bool {
+  $st = $pdo->prepare(
+    'SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+  );
+  $st->execute([$table, $column]);
+  $row = $st->fetch();
+  return ((int) ($row['c'] ?? 0)) > 0;
 }
 
 function db_migrate_mysql(PDO $pdo): void {
   $pdo->exec(<<<SQL
 CREATE TABLE IF NOT EXISTS members (
   email VARCHAR(191) NOT NULL PRIMARY KEY,
+  username VARCHAR(64) NULL DEFAULT NULL,
+  password_hash VARCHAR(255) NOT NULL DEFAULT '',
+  email_verified TINYINT NOT NULL DEFAULT 0,
   plan VARCHAR(64) NOT NULL DEFAULT '',
   expires_at INT NOT NULL,
   note TEXT NOT NULL,
   created_at INT NOT NULL,
-  updated_at INT NOT NULL
+  updated_at INT NOT NULL,
+  UNIQUE KEY idx_members_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS otps (
   email VARCHAR(191) NOT NULL PRIMARY KEY,
+  code_hash VARCHAR(255) NOT NULL,
+  token_hash VARCHAR(64) NOT NULL DEFAULT '',
+  expires_at INT NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  created_at INT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS pending_signups (
+  email VARCHAR(191) NOT NULL PRIMARY KEY,
+  username VARCHAR(64) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
   code_hash VARCHAR(255) NOT NULL,
   token_hash VARCHAR(64) NOT NULL DEFAULT '',
   expires_at INT NOT NULL,
@@ -165,6 +220,20 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 SQL);
+  if (!db_mysql_has_column($pdo, 'members', 'username')) {
+    $pdo->exec('ALTER TABLE members ADD COLUMN username VARCHAR(64) NULL DEFAULT NULL');
+    try {
+      $pdo->exec('ALTER TABLE members ADD UNIQUE KEY idx_members_username (username)');
+    } catch (Throwable $e) {
+      // index may already exist
+    }
+  }
+  if (!db_mysql_has_column($pdo, 'members', 'password_hash')) {
+    $pdo->exec("ALTER TABLE members ADD COLUMN password_hash VARCHAR(255) NOT NULL DEFAULT ''");
+  }
+  if (!db_mysql_has_column($pdo, 'members', 'email_verified')) {
+    $pdo->exec('ALTER TABLE members ADD COLUMN email_verified TINYINT NOT NULL DEFAULT 0');
+  }
 }
 
 function setting_get(string $key, ?string $default = null): ?string {

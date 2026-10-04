@@ -28,10 +28,13 @@ function send_otp_mail(string $email, string $code, string $link = ''): array {
     return smtp_send($fromEmail, $fromName, $email, $subject, $body, $mailCfg['smtp'] ?? []);
   }
 
+  $fromHeader = function_exists('mb_encode_mimeheader')
+    ? mb_encode_mimeheader($fromName, 'UTF-8')
+    : '=?UTF-8?B?' . base64_encode($fromName) . '?=';
   $headers = [
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8',
-    'From: ' . sprintf('%s <%s>', mb_encode_mimeheader($fromName, 'UTF-8'), $fromEmail),
+    'From: ' . sprintf('%s <%s>', $fromHeader, $fromEmail),
   ];
   $ok = @mail($email, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, implode("\r\n", $headers));
   return $ok

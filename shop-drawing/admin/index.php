@@ -6,7 +6,7 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin · Thành viên email</title>
+  <title>Admin · Thành viên (username)</title>
   <link rel="icon" href="../assets/icon.png" />
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
   <style>
@@ -72,8 +72,8 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
 </head>
 <body>
   <div class="wrap">
-    <h1 id="page-title">Admin · Thành viên email</h1>
-    <p class="lead" id="page-lead">Cấp / gia hạn gói theo email đã xác nhận OTP. Dữ liệu lưu SQLite trên hosting.</p>
+    <h1 id="page-title">Admin · Thành viên</h1>
+    <p class="lead" id="page-lead">Cấp / gia hạn gói theo <strong>username</strong> đã đăng ký (email xác nhận OTP). Dữ liệu lưu trên hosting.</p>
 
     <?php if (!$configOk): ?>
     <div class="warn">Chưa có <code>config.php</code> — sao chép <code>config.sample.php</code> thành <code>config.php</code>.</div>
@@ -135,8 +135,8 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
           <h2>Cấp quyền thành viên</h2>
           <div class="grid2">
             <div>
-              <label>Email khách</label>
-              <input id="email" type="email" placeholder="khach@email.com" />
+              <label>Username</label>
+              <input id="username" type="text" placeholder="giahuy" autocomplete="off" />
             </div>
             <div>
               <label>Gói</label>
@@ -158,7 +158,7 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
           <div style="overflow:auto">
             <table>
               <thead>
-                <tr><th>Email</th><th>Gói</th><th>Hết hạn</th><th>Trạng thái</th><th>Ghi chú</th></tr>
+                <tr><th>User</th><th>Email</th><th>Gói</th><th>Hết hạn</th><th>Trạng thái</th><th>Ghi chú</th></tr>
               </thead>
               <tbody id="rows"></tbody>
             </table>
@@ -224,8 +224,8 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
       var API = "../api/";
       var titles = {
         members: {
-          title: "Admin · Thành viên email",
-          lead: "Cấp / gia hạn gói theo email đã xác nhận OTP. Dữ liệu lưu SQLite trên hosting.",
+          title: "Admin · Thành viên",
+          lead: "Cấp / gia hạn gói theo username đã đăng ký (email xác nhận OTP).",
         },
         partners: {
           title: "Admin · Đối tác (tên miền iframe)",
@@ -345,13 +345,14 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
         (data.members || []).forEach(function (m) {
           var tr = document.createElement("tr");
           tr.innerHTML =
+            '<td class="mono">' + (m.username || "—") + "</td>" +
             '<td class="mono">' + (m.email || "") + "</td>" +
             "<td>" + (m.plan || "—") + "</td>" +
             "<td>" + moneyDate(m.expires_at) + "</td>" +
             '<td><span class="tag ' + (m.active ? "ok" : "bad") + '">' + (m.active ? "Còn hạn" : "Hết hạn") + "</span></td>" +
             "<td>" + (m.note || "") + "</td>";
           tr.addEventListener("click", function () {
-            document.getElementById("email").value = m.email || "";
+            document.getElementById("username").value = m.username || "";
             if (m.plan) document.getElementById("plan").value = m.plan;
             document.getElementById("note").value = m.note || "";
           });
@@ -448,12 +449,16 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
             method: "POST",
             body: {
               action: "grant",
-              email: document.getElementById("email").value,
+              username: document.getElementById("username").value,
               plan: document.getElementById("plan").value,
               note: document.getElementById("note").value,
             },
           });
-          msg(document.getElementById("grant-msg"), true, "Đã cấp: " + data.member.email + " · hết hạn " + moneyDate(data.member.expires_at));
+          msg(
+            document.getElementById("grant-msg"),
+            true,
+            "Đã cấp: " + (data.member.username || data.member.email) + " · hết hạn " + moneyDate(data.member.expires_at)
+          );
           await loadMembers();
         } catch (e) {
           msg(document.getElementById("grant-msg"), false, e.message);
@@ -461,15 +466,21 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
       });
       document.getElementById("btn-revoke").addEventListener("click", async function () {
         try {
-          await api("admin_members.php", { method: "POST", body: { action: "revoke", email: document.getElementById("email").value } });
+          await api("admin_members.php", {
+            method: "POST",
+            body: { action: "revoke", username: document.getElementById("username").value },
+          });
           msg(document.getElementById("grant-msg"), true, "Đã thu hồi.");
           await loadMembers();
         } catch (e) { msg(document.getElementById("grant-msg"), false, e.message); }
       });
       document.getElementById("btn-delete").addEventListener("click", async function () {
-        if (!confirm("Xóa hẳn email này khỏi DB?")) return;
+        if (!confirm("Xóa hẳn username này khỏi DB?")) return;
         try {
-          await api("admin_members.php", { method: "POST", body: { action: "delete", email: document.getElementById("email").value } });
+          await api("admin_members.php", {
+            method: "POST",
+            body: { action: "delete", username: document.getElementById("username").value },
+          });
           msg(document.getElementById("grant-msg"), true, "Đã xóa.");
           await loadMembers();
         } catch (e) { msg(document.getElementById("grant-msg"), false, e.message); }

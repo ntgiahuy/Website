@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>GIA HUY — Shop Drawing</title>
-  <meta name="description" content="Shop thép móng, cột, dầm, sàn. Đăng nhập email OTP · dùng thử · thành viên theo thời hạn." />
+  <meta name="description" content="Shop thép móng, cột, dầm, sàn. Đăng nhập username + mật khẩu · dùng thử · thành viên theo thời hạn." />
   <link rel="icon" href="./assets/icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,7 +14,7 @@
       --bg0: #0c1218; --bg1: #15202b; --ink: #eef3f8; --muted: #8fa3b6;
       --line: rgba(238, 243, 248, 0.12); --amber: #e8a317; --amber-2: #f0b531;
       --ok: #3ecf8e; --danger: #ff6b6b; --brand: #CE2C90;
-      --header-h: 58px; --tabs-h: 52px; --header-gap: 0.65rem;
+      --header-h: 58px;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; }
@@ -27,33 +27,40 @@
       overflow: hidden;
     }
     a { color: var(--amber); }
-    .shell { height: 100%; display: grid; grid-template-rows: auto auto 1fr; row-gap: var(--header-gap); }
+    .shell { height: 100%; display: grid; grid-template-rows: auto 1fr; }
     .topbar {
-      display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
-      min-height: var(--header-h); padding: 0.55rem 1rem;
+      position: relative;
+      display: flex; align-items: center; gap: 0.65rem;
+      min-height: var(--header-h); padding: 0.45rem 0.85rem;
       border-bottom: 1px solid var(--line);
       background: #0a0e12;
+      z-index: 20;
     }
     .brand {
-      display: flex; align-items: center; gap: 0.7rem;
-      text-decoration: none; color: #fff; min-width: 0;
+      display: flex; align-items: center; gap: 0.65rem;
+      text-decoration: none; color: #fff; min-width: 0; flex: none;
     }
     .brand .custom-logo { width: 40px; height: 40px; flex: none; display: block; }
     .brand strong {
-      font-size: 1.15rem; letter-spacing: 0.08em; font-weight: 800;
+      font-size: 1.1rem; letter-spacing: 0.08em; font-weight: 800;
       color: #fff; white-space: nowrap;
     }
-    .topbar-right { display: flex; align-items: center; gap: 0.55rem; flex: none; }
+    .nav-slot {
+      position: relative;
+      display: flex; align-items: center; gap: 0.4rem;
+      flex: 1; min-width: 0;
+    }
+    .topbar-right { display: flex; align-items: center; gap: 0.45rem; flex: none; margin-left: auto; }
     .chip {
-      font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; font-weight: 600;
-      border: 1px solid var(--line); border-radius: 999px; padding: 0.28rem 0.55rem;
+      font-family: "IBM Plex Mono", monospace; font-size: 0.7rem; font-weight: 600;
+      border: 1px solid var(--line); border-radius: 999px; padding: 0.24rem 0.5rem;
       background: rgba(255,255,255,0.03); color: var(--muted); white-space: nowrap;
-      max-width: 34vw; overflow: hidden; text-overflow: ellipsis;
+      max-width: 22vw; overflow: hidden; text-overflow: ellipsis;
     }
     .chip.live { color: var(--amber); border-color: rgba(232,163,23,0.4); }
     .chip.ok { color: var(--ok); border-color: rgba(62,207,142,0.35); }
     .chip.danger { color: var(--danger); border-color: rgba(255,107,107,0.35); }
-    .account { position: relative; }
+    .account { position: static; display: flex; align-items: center; }
     .account-btn {
       appearance: none; border: 0; background: transparent; color: #fff;
       width: 40px; height: 40px; border-radius: 999px; cursor: pointer;
@@ -62,9 +69,10 @@
     .account-btn:hover { background: rgba(255,255,255,0.06); }
     .account-btn svg { width: 26px; height: 26px; display: block; }
     .account-menu {
-      position: absolute; right: 0; top: calc(100% + 0.45rem);
+      position: absolute; right: 0.85rem; top: 100%;
       min-width: 240px; padding: 0.45rem;
-      border-radius: 14px; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 0 0 14px 14px; border: 1px solid rgba(255,255,255,0.1);
+      border-top: 0;
       background: #1a222c; box-shadow: 0 16px 40px rgba(0,0,0,0.4);
       z-index: 40;
     }
@@ -99,26 +107,22 @@
     .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
     .btn-sm { padding: 0.4rem 0.7rem; font-size: 0.88rem; }
     .btn[hidden], button[hidden], a[hidden] { display: none !important; }
-    .tabs-bar {
-      display: flex; align-items: center; gap: 0.45rem;
-      padding: 0 0.55rem; min-height: var(--tabs-h);
-    }
     .menu-toggle {
       display: none; appearance: none; border: 1px solid var(--line);
       background: rgba(0,0,0,0.22); color: var(--ink);
-      width: 42px; height: 42px; border-radius: 10px; cursor: pointer;
+      width: 40px; height: 40px; border-radius: 10px; cursor: pointer;
       place-items: center; flex: none;
     }
     .menu-toggle svg { width: 22px; height: 22px; }
     .tabs {
-      display: flex; gap: 0.35rem; align-items: center; flex: 1; min-width: 0;
-      min-height: var(--tabs-h); padding: 0.45rem 0.75rem;
-      border: 1px solid var(--line); border-radius: 12px;
+      display: flex; gap: 0.3rem; align-items: center; flex: 1; min-width: 0;
+      padding: 0.2rem; border: 1px solid var(--line); border-radius: 12px;
       background: rgba(0,0,0,0.22); overflow-x: auto;
     }
     .tab {
       appearance: none; border: 0; background: transparent; color: var(--muted);
-      font: inherit; font-weight: 600; padding: 0.55rem 0.95rem; border-radius: 10px;
+      font: inherit; font-weight: 600; font-size: 0.9rem;
+      padding: 0.48rem 0.8rem; border-radius: 10px;
       cursor: pointer; white-space: nowrap;
     }
     .tab:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
@@ -127,8 +131,9 @@
     .tab.soon .soon-tag { margin-left: 0.35rem; font-size: 0.68rem; font-weight: 700; opacity: 0.85; }
     @keyframes tabIn { from { transform: translateY(3px); opacity: 0.6; } to { transform: none; opacity: 1; } }
     .mobile-shop-menu {
-      position: absolute; left: 0.55rem; right: 0.55rem; top: calc(var(--header-h) + var(--header-gap) + 48px);
-      z-index: 30; border: 1px solid var(--line); border-radius: 14px;
+      position: absolute; left: 0; top: calc(100% + 0.35rem);
+      min-width: min(92vw, 280px); z-index: 35;
+      border: 1px solid var(--line); border-radius: 14px;
       background: #141c26; padding: 0.4rem; box-shadow: 0 16px 40px rgba(0,0,0,0.35);
     }
     .mobile-shop-menu[hidden] { display: none !important; }
@@ -192,14 +197,16 @@
     .pay-note strong { color: var(--ink); }
     .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; word-break: break-all; }
     .otp-step[hidden] { display: none !important; }
+    @media (max-width: 900px) {
+      .chip { display: none; }
+      .brand strong { font-size: 1rem; }
+      .tab { font-size: 0.82rem; padding: 0.42rem 0.65rem; }
+    }
     @media (max-width: 760px) {
       body { overflow: auto; }
-      .shell { min-height: 100dvh; height: auto; grid-template-rows: auto auto minmax(70vh, 1fr); position: relative; }
-      .chip { display: none; }
+      .shell { min-height: 100dvh; height: auto; grid-template-rows: auto minmax(70vh, 1fr); }
       .menu-toggle { display: grid; }
       .tabs { display: none; }
-      .tabs-bar { padding: 0 0.55rem; }
-      .mobile-shop-menu { top: calc(var(--header-h) + var(--header-gap) + 52px); }
     }
   </style>
 </head>
@@ -222,6 +229,14 @@
         </svg>
         <strong>GIA HUY</strong>
       </a>
+
+      <div class="nav-slot">
+        <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Mở menu shop" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <nav class="tabs" id="tabs" aria-label="Chọn tiện ích"></nav>
+        <div class="mobile-shop-menu" id="mobile-shop-menu" hidden></div>
+      </div>
 
       <div class="topbar-right">
         <span class="chip" id="status-chip">Đang kiểm tra…</span>
@@ -259,14 +274,6 @@
       </div>
     </header>
 
-    <div class="tabs-bar">
-      <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Mở menu shop" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-      </button>
-      <nav class="tabs" id="tabs" aria-label="Chọn tiện ích"></nav>
-    </div>
-    <div class="mobile-shop-menu" id="mobile-shop-menu" hidden></div>
-
     <main class="workspace" id="workspace">
       <div class="soon-panel" id="soon-panel" aria-live="polite">
         <div>
@@ -293,7 +300,7 @@
           <h1 id="paywall-title">Kích hoạt thành viên</h1>
           <p id="paywall-lead">Chọn gói và chuyển khoản. Admin cấp quyền theo email đã đăng nhập.</p>
           <div class="cta-row">
-            <a class="btn btn-primary" href="./dang-nhap/">Đăng nhập email OTP</a>
+            <a class="btn btn-primary" href="./dang-nhap/">Đăng nhập</a>
             <a class="btn btn-ghost" href="./dang-ky/">Đăng ký</a>
             <a class="btn btn-ghost" href="./thanh-vien/">Xem bảng giá</a>
           </div>
@@ -307,7 +314,6 @@
   <script src="./assets/membership.js"></script>
   <script>
     (function () {
-      var PROFILE_KEY = "giahuy.profile.v1";
       var APPS = [];
       var PLANS = GiaHuyMembership.PLANS.slice();
       var PLAN_PRICES = {};
@@ -356,20 +362,8 @@
         el.className = "msg " + (ok ? "ok" : "bad");
         el.textContent = text || "";
       }
-      function readProfile() {
-        try {
-          return JSON.parse(localStorage.getItem(PROFILE_KEY) || "null") || null;
-        } catch (e) {
-          return null;
-        }
-      }
-      function displayName(email) {
-        var p = readProfile();
-        if (p && p.email && email && p.email.toLowerCase() === String(email).toLowerCase() && p.name) {
-          return p.name;
-        }
-        if (!email) return "—";
-        return String(email).split("@")[0] || email;
+      function isLoggedIn(access) {
+        return !!(access && (access.username || access.email));
       }
       function formatPaidPlan(member) {
         if (!member || !member.active) return "Tài khoản miễn phí";
@@ -427,14 +421,15 @@
         els.gateLead.textContent =
           "Mở các tiện ích shop thép trên cùng một trang. Hết " +
           trialMinutes +
-          " phút thì đăng nhập email thành viên để tiếp tục. Xuất PDF cần thành viên còn hạn.";
+          " phút thì đăng nhập thành viên (username + mật khẩu) để tiếp tục. Xuất PDF cần thành viên còn hạn.";
       }
 
       function loadPayConfig() {
         var c = window.__PAY__ || {};
         var plan = selectedPlan || PLANS[0];
         var price = PLAN_PRICES[plan.id] || 0;
-        var emailHint = (els.accEmail && els.accEmail.textContent !== "—" ? els.accEmail.textContent : "email@cua.ban");
+        var userHint =
+          (els.accName && els.accName.textContent !== "—" ? els.accName.textContent : "username");
         els.payNote.innerHTML =
           "<strong>Chuyển khoản:</strong> " +
           (c.bank || "") +
@@ -445,11 +440,11 @@
           "<br/><strong>Nội dung CK:</strong> <span class='mono'>GH " +
           String(plan.id).toUpperCase() +
           " " +
-          emailHint +
+          userHint +
           "</span> · " +
           money(price) +
           (c.note ? "<br/>" + c.note : "") +
-          "<br/><em>Sau khi CK, admin cấp quyền theo email của bạn.</em>";
+          "<br/><em>Sau khi CK, admin cấp quyền theo username của bạn.</em>";
       }
 
       function ensureFrames() {
@@ -543,12 +538,12 @@
       }
 
       function setAccountMenu(access) {
-        var loggedIn = !!access.email;
+        var loggedIn = isLoggedIn(access);
         els.accountGuest.hidden = loggedIn;
         els.accountMember.hidden = !loggedIn;
         if (!loggedIn) return;
-        els.accName.textContent = displayName(access.email);
-        els.accEmail.textContent = access.email;
+        els.accName.textContent = access.username || (access.member && access.member.username) || "—";
+        els.accEmail.textContent = access.email || (access.member && access.member.email) || "—";
         if (access.mode === "member" && access.member) {
           els.accPlan.className = "plan";
           els.accPlan.textContent = formatPaidPlan(access.member);
@@ -560,18 +555,19 @@
 
       function setChip(access) {
         els.chip.className = "chip";
+        var uname = access.username || (access.member && access.member.username) || "";
         if (access.mode === "member") {
           els.chip.classList.add("ok");
-          els.chip.textContent = "TV · " + displayName(access.email) + " · " + GiaHuyMembership.formatExpiry(access.member);
+          els.chip.textContent = "TV · " + uname + " · " + GiaHuyMembership.formatExpiry(access.member);
         } else if (access.mode === "trial") {
           els.chip.classList.add("live");
           els.chip.textContent = "Dùng thử · " + GiaHuyMembership.formatTrialClock(access.trial.remainingSec);
         } else if (access.mode === "trial_used") {
           els.chip.classList.add("danger");
-          els.chip.textContent = access.email ? "Email đã xác nhận · chưa có gói" : "Hết lượt dùng thử";
+          els.chip.textContent = isLoggedIn(access) ? "Đã đăng nhập · chưa có gói" : "Hết lượt dùng thử";
         } else {
           els.chip.classList.add("danger");
-          els.chip.textContent = access.email ? "Đã đăng nhập · chờ cấp gói" : "Chưa mở khóa";
+          els.chip.textContent = isLoggedIn(access) ? "Đã đăng nhập · chờ cấp gói" : "Chưa mở khóa";
         }
         setAccountMenu(access);
       }
@@ -593,11 +589,11 @@
         if (kind === "trial_used") {
           els.paywallTitle.textContent = "Đã hết dùng thử";
           els.paywallLead.textContent =
-            "Đăng nhập email (OTP) để chứng minh đúng chủ email. Sau khi chuyển khoản, admin cấp gói theo email đó.";
+            "Đăng nhập bằng username + mật khẩu. Sau khi chuyển khoản, admin cấp gói theo username.";
         } else {
           els.paywallTitle.textContent = "Kích hoạt thành viên";
           els.paywallLead.textContent =
-            "Chọn gói và chuyển khoản. Admin cấp quyền theo email đã đăng nhập.";
+            "Chọn gói và chuyển khoản. Admin cấp quyền theo username đã đăng ký.";
         }
         renderPlans();
         loadPayConfig();
@@ -617,7 +613,7 @@
           showWorkspace();
           return access;
         }
-        if (access.mode === "trial_used" || access.email) showPaywall("trial_used");
+        if (access.mode === "trial_used" || isLoggedIn(access)) showPaywall("trial_used");
         else showGate("");
         return access;
       }
@@ -685,7 +681,7 @@
           var em = q.get("email");
           var tk = q.get("token");
           if (em && tk) {
-            await GiaHuyMembership.verifyOtp(em, "", tk);
+            await GiaHuyMembership.registerVerify(em, "", tk);
             access = await refresh();
             if (access.allowed) startTicker();
             history.replaceState({}, "", location.pathname);

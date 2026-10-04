@@ -104,3 +104,15 @@ function normalize_email(?string $email): string {
 function valid_email(string $email): bool {
   return (bool) filter_var($email, FILTER_VALIDATE_EMAIL);
 }
+
+function normalize_username(?string $username): string {
+  return strtolower(trim((string) $username));
+}
+
+function valid_username(string $username): bool {
+  return (bool) preg_match('/^[a-z0-9_]{3,32}$/', $username);
+}
+
+function valid_password(string $password): bool {
+  return strlen($password) >= 6 && strlen($password) <= 128;
+}

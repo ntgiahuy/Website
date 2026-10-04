@@ -20,14 +20,22 @@ if ($method === 'GET') {
 if ($method === 'POST') {
   $body = read_json_body();
   $action = (string) ($body['action'] ?? 'grant');
-  $email = normalize_email((string) ($body['email'] ?? ''));
+  $username = normalize_username((string) ($body['username'] ?? ($body['email'] ?? '')));
+  // Cho phép admin dán email cũ: nếu không phải username hợp lệ thì tìm theo email
+  if (!valid_username($username) && valid_email(normalize_email((string) ($body['username'] ?? ($body['email'] ?? ''))))) {
+    $byEmail = member_row(normalize_email((string) ($body['username'] ?? ($body['email'] ?? ''))));
+    $username = normalize_username((string) ($byEmail['username'] ?? ''));
+  }
 
   if ($action === 'revoke') {
-    json_out(revoke_member($email));
+    json_out(revoke_member($username), valid_username($username) ? 200 : 400);
   }
 
   if ($action === 'delete') {
-    db()->prepare('DELETE FROM members WHERE email = ?')->execute([$email]);
+    if (!valid_username($username)) {
+      json_out(['ok' => false, 'error' => 'Username không hợp lệ.'], 400);
+    }
+    db()->prepare('DELETE FROM members WHERE username = ?')->execute([$username]);
     json_out(['ok' => true]);
   }
 
@@ -36,7 +44,7 @@ if ($method === 'POST') {
     ? (int) $body['days']
     : null;
   $note = trim((string) ($body['note'] ?? ''));
-  $result = grant_member($email, $plan, $days, $note);
+  $result = grant_member($username, $plan, $days, $note);
   json_out($result, !empty($result['ok']) ? 200 : 400);
 }
 
