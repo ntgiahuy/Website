@@ -7,12 +7,15 @@ return [
   // URL gốc khi truy cập: https://domain-cua-ban.com/shop-drawing
   'base_url' => 'https://YOUR-DOMAIN.com/shop-drawing',
 
-  // Bảo mật
-  'admin_user' => 'admin',
-  'admin_pass' => 'DOI_MAT_KHAU_MANH',
+  // Bảo mật — lần đầu: giahuy / GiahuyAdmin (đổi ngay trong Admin)
+  'admin_user' => 'giahuy',
+  'admin_pass' => 'GiahuyAdmin',
   'session_name' => 'GHSID',
   'otp_ttl_minutes' => 10,
   'otp_length' => 6,
+
+  // Trang chuyển hướng khi iframe không được phép / mở thẳng URL shop
+  'embed_deny_redirect' => 'https://www.giahuy.net/',
 
   // Dùng thử xem shop (phút). Xuất PDF chỉ khi đã là thành viên.
   'trial_minutes' => 30,

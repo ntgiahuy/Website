@@ -10,14 +10,44 @@ $body = read_json_body();
 $user = trim((string) ($body['user'] ?? ''));
 $pass = (string) ($body['pass'] ?? '');
 
-$okUser = hash_equals((string) cfg('admin_user', 'admin'), $user);
-$okPass = hash_equals((string) cfg('admin_pass', ''), $pass);
+$cfgUser = (string) cfg('admin_user', 'giahuy');
+$cfgPass = (string) cfg('admin_pass', 'GiahuyAdmin');
+$hash = setting_get('admin_pass_hash');
 
-if (!$okUser || !$okPass || cfg('admin_pass') === 'DOI_MAT_KHAU_MANH') {
-  json_out(['ok' => false, 'error' => 'Sai tài khoản/mật khẩu admin (hoặc chưa đổi mật khẩu mẫu).'], 401);
+$okUser = hash_equals($cfgUser, $user);
+$okPass = false;
+$usingDefault = false;
+
+if ($hash) {
+  $okPass = password_verify($pass, $hash);
+} else {
+  $okPass = hash_equals($cfgPass, $pass);
+  $usingDefault = $okPass && (
+    $cfgPass === 'GiahuyAdmin' ||
+    $cfgPass === 'DOI_MAT_KHAU_MANH' ||
+    setting_get('admin_must_change', '1') === '1'
+  );
+}
+
+if (!$okUser || !$okPass) {
+  json_out(['ok' => false, 'error' => 'Sai tài khoản hoặc mật khẩu admin.'], 401);
+}
+
+$mustChange = $usingDefault || setting_get('admin_must_change') === '1';
+if (!$hash && ($cfgPass === 'GiahuyAdmin' || $cfgPass === 'DOI_MAT_KHAU_MANH')) {
+  $mustChange = true;
 }
 
 session_regenerate_id(true);
 $_SESSION['admin'] = true;
 $_SESSION['admin_at'] = time();
-json_out(['ok' => true]);
+$_SESSION['admin_must_change'] = $mustChange;
+
+json_out([
+  'ok' => true,
+  'must_change_password' => $mustChange,
+  'user' => $cfgUser,
+  'message' => $mustChange
+    ? 'Đăng nhập OK — hãy đổi mật khẩu ngay (lần đầu dùng mật khẩu mặc định).'
+    : 'Đăng nhập OK.',
+]);

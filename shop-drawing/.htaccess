@@ -12,3 +12,9 @@ Options -Indexes
 </IfModule>
 
 DirectoryIndex index.html index.php
+
+# /cot và /cot/ đều vào index.php
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(mong|cot|dam|san)$ $1/ [R=301,L]
+</IfModule>

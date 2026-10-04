@@ -30,16 +30,34 @@ Gói upload vào `public_html/shop-drawing` trên hosting có PHP + SQLite.
 5. Mở thử:
    - Hub: `https://domain/shop-drawing/`
    - Thành viên: `https://domain/shop-drawing/thanh-vien/`
-   - Admin: `https://domain/shop-drawing/admin/`
+   - Admin: `https://domain/shop-drawing/admin/` (lần đầu: `giahuy` / `GiahuyAdmin` — đổi ngay)
+
+## Iframe theo tên miền (mong / cot / dam / san)
+
+Chỉ site có tên miền Admin đã thêm mới nhúng được. Mở thẳng URL hoặc site chưa cấp → chuyển về `https://www.giahuy.net/`.
+
+1. Vào Admin → tab **Tên miền iframe** → thêm `partner.com` (hoặc `www.partner.com`, có/không `https://`)
+2. Trên site đối tác dán:
+
+```html
+<iframe src="https://YOUR-DOMAIN.com/shop-drawing/mong/" width="100%" height="980" style="border:0" allow="download"></iframe>
+<iframe src="https://YOUR-DOMAIN.com/shop-drawing/cot/" width="100%" height="980" style="border:0" allow="download"></iframe>
+<iframe src="https://YOUR-DOMAIN.com/shop-drawing/dam/" width="100%" height="980" style="border:0" allow="download"></iframe>
+<iframe src="https://YOUR-DOMAIN.com/shop-drawing/san/" width="100%" height="980" style="border:0" allow="download"></iframe>
+```
+
+- `www` và không `www` = cùng một tên miền  
+- Dùng cho **mong, cot, dam, san**
 
 ## Cấu trúc
 
 ```
 shop-drawing/
   index.html            # Hub tabs + dùng thử + đăng nhập OTP
+  mong|cot|dam|san/     # Cổng iframe (chỉ domain đã cấp)
   thanh-vien/           # Trang bán / đăng nhập email
-  admin/                # Cấp quyền theo email
-  api/                  # JSON API (OTP, session, members)
+  admin/                # Thành viên + tên miền iframe + đổi MK
+  api/                  # JSON API (OTP, session, members, domains)
   includes/             # PHP core
   assets/membership.js  # Client gọi API
   data/                 # SQLite (không public)
@@ -57,8 +75,10 @@ shop-drawing/
 | `POST api/trial_start.php` | Bắt đầu dùng thử (theo browser key) |
 | `GET  api/access.php` | `allowed` / `mode` / `can_pdf` |
 | `GET  api/config.php` | Plans, pay, apps (công khai) |
-| `POST api/admin_login.php` | Đăng nhập admin |
-| `GET/POST api/admin_members.php` | Liệt kê / cấp / thu hồi |
+| `POST api/admin_login.php` | Đăng nhập admin (`giahuy` / `GiahuyAdmin` lần đầu) |
+| `POST api/admin_password.php` | Đổi mật khẩu admin |
+| `GET/POST api/admin_members.php` | Liệt kê / cấp / thu hồi thành viên |
+| `GET/POST api/admin_domains.php` | Allowlist tên miền iframe |
 
 ## Khóa PDF trong app shop
 

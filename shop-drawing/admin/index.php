@@ -1,13 +1,12 @@
 <?php
 declare(strict_types=1);
-// Trang admin tĩnh + gọi API; bootstrap chỉ để báo nếu thiếu config khi mở trực tiếp PHP.
 $configOk = is_file(dirname(__DIR__) . '/config.php');
 ?><!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Admin · Thành viên email GIAHUY</title>
+  <title>Admin · GIAHUY Shop Drawing</title>
   <link rel="icon" href="../assets/icon.png" />
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
   <style>
@@ -20,7 +19,7 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
       margin: 0; font-family: "Be Vietnam Pro", sans-serif; color: var(--ink);
       background: linear-gradient(180deg, #0f1419, #182029); min-height: 100vh; line-height: 1.5;
     }
-    .wrap { width: min(100% - 2rem, 920px); margin: 0 auto; padding: 1.5rem 0 3rem; }
+    .wrap { width: min(100% - 2rem, 960px); margin: 0 auto; padding: 1.5rem 0 3rem; }
     h1 { font-size: 1.55rem; letter-spacing: -0.02em; margin: 0 0 0.35rem; }
     .lead { color: var(--muted); margin: 0 0 1.4rem; }
     .panel {
@@ -33,6 +32,7 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
       width: 100%; font: inherit; color: var(--ink); background: #0c1116;
       border: 1px solid var(--line); border-radius: 10px; padding: 0.7rem 0.85rem;
     }
+    textarea { min-height: 4.5rem; font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
     @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
     .row { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 0.85rem; }
@@ -57,22 +57,32 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
     .tag { display: inline-block; padding: 0.15rem 0.45rem; border-radius: 999px; font-size: 0.75rem; border: 1px solid var(--line); }
     .tag.ok { color: var(--ok); border-color: rgba(62,207,142,.35); }
     .tag.bad { color: var(--danger); border-color: rgba(255,107,107,.35); }
-    #app[hidden], #login-box[hidden] { display: none !important; }
+    #app[hidden], #login-box[hidden], #pwd-box[hidden] { display: none !important; }
+    .hint { color: var(--muted); font-size: 0.86rem; margin: 0.35rem 0 0; }
+    .tabs-admin { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .tabs-admin button {
+      appearance: none; border: 1px solid var(--line); background: transparent; color: var(--muted);
+      font: inherit; font-weight: 700; border-radius: 999px; padding: 0.45rem 0.85rem; cursor: pointer;
+    }
+    .tabs-admin button.active { background: var(--amber); color: #1a1203; border-color: var(--amber); }
+    .pane[hidden] { display: none !important; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Admin · Thành viên email</h1>
-    <p class="lead">Cấp / gia hạn gói theo email đã xác nhận OTP. Dữ liệu lưu SQLite trên hosting.</p>
+    <h1>Admin · Shop Drawing</h1>
+    <p class="lead">Thành viên email · Tên miền được nhúng iframe · Đổi mật khẩu.</p>
 
     <?php if (!$configOk): ?>
-    <div class="warn">Chưa có <code>config.php</code> — sao chép <code>config.sample.php</code> thành <code>config.php</code> và điền SMTP + mật khẩu admin.</div>
+    <div class="warn">Chưa có <code>config.php</code> — sao chép <code>config.sample.php</code> thành <code>config.php</code>.</div>
+    <?php else: ?>
+    <div class="warn">Lần đầu đăng nhập: <strong>giahuy</strong> / <strong>GiahuyAdmin</strong> — đổi mật khẩu ngay.</div>
     <?php endif; ?>
 
     <div class="panel" id="login-box">
       <h2>Đăng nhập admin</h2>
       <label>Tài khoản</label>
-      <input id="user" autocomplete="username" />
+      <input id="user" autocomplete="username" placeholder="giahuy" />
       <label>Mật khẩu</label>
       <input id="pass" type="password" autocomplete="current-password" />
       <div class="row">
@@ -81,46 +91,125 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
       <p class="msg" id="login-msg"></p>
     </div>
 
+    <div class="panel" id="pwd-box" hidden>
+      <h2>Đổi mật khẩu (bắt buộc lần đầu)</h2>
+      <label>Mật khẩu hiện tại</label>
+      <input id="pwd-current" type="password" autocomplete="current-password" />
+      <label>Mật khẩu mới (≥ 8 ký tự)</label>
+      <input id="pwd-new" type="password" autocomplete="new-password" />
+      <label>Nhập lại mật khẩu mới</label>
+      <input id="pwd-confirm" type="password" autocomplete="new-password" />
+      <div class="row">
+        <button class="btn" type="button" id="btn-pwd">Lưu mật khẩu mới</button>
+      </div>
+      <p class="msg" id="pwd-msg"></p>
+    </div>
+
     <div id="app" hidden>
-      <div class="panel">
-        <h2>Cấp quyền thành viên</h2>
-        <div class="grid2">
-          <div>
-            <label>Email khách</label>
-            <input id="email" type="email" placeholder="khach@email.com" />
-          </div>
-          <div>
-            <label>Gói</label>
-            <select id="plan"></select>
-          </div>
-        </div>
-        <label>Ghi chú (tuỳ chọn)</label>
-        <input id="note" placeholder="Đã CK BIDV…" />
-        <div class="row">
-          <button class="btn" type="button" id="btn-grant">Cấp / Gia hạn</button>
-          <button class="btn ghost" type="button" id="btn-revoke">Thu hồi (hết hạn ngay)</button>
-          <button class="btn danger" type="button" id="btn-delete">Xóa dòng</button>
-          <button class="btn ghost" type="button" id="btn-refresh">Tải lại danh sách</button>
-          <button class="btn ghost" type="button" id="btn-logout">Đăng xuất admin</button>
-        </div>
-        <p class="msg" id="grant-msg"></p>
+      <div class="tabs-admin">
+        <button type="button" class="active" data-pane="domains">Tên miền iframe</button>
+        <button type="button" data-pane="members">Thành viên email</button>
+        <button type="button" data-pane="password">Đổi mật khẩu</button>
+        <button type="button" class="ghost" id="btn-logout" style="margin-left:auto">Đăng xuất</button>
       </div>
 
-      <div class="panel">
-        <h2>Danh sách thành viên</h2>
-        <div style="overflow:auto">
-          <table>
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Gói</th>
-                <th>Hết hạn</th>
-                <th>Trạng thái</th>
-                <th>Ghi chú</th>
-              </tr>
-            </thead>
-            <tbody id="rows"></tbody>
-          </table>
+      <div class="pane" id="pane-domains">
+        <div class="panel">
+          <h2>Thêm tên miền được nhúng</h2>
+          <p class="hint">Chấp nhận <span class="mono">partner.com</span>, <span class="mono">www.partner.com</span>, có/không <span class="mono">https://</span>. www và không www = một tên miền.</p>
+          <div class="grid2">
+            <div>
+              <label>Tên miền</label>
+              <input id="domain" placeholder="partner.com" />
+            </div>
+            <div>
+              <label>Ghi chú</label>
+              <input id="domain-note" placeholder="Đối tác ABC" />
+            </div>
+          </div>
+          <div class="row">
+            <button class="btn" type="button" id="btn-add-domain">Thêm tên miền</button>
+            <button class="btn ghost" type="button" id="btn-reload-domains">Tải lại</button>
+          </div>
+          <p class="msg" id="domain-msg"></p>
+        </div>
+
+        <div class="panel">
+          <h2>Danh sách tên miền đã cấp</h2>
+          <div style="overflow:auto">
+            <table>
+              <thead>
+                <tr><th>Tên miền</th><th>Ghi chú</th><th></th></tr>
+              </thead>
+              <tbody id="domain-rows"></tbody>
+            </table>
+          </div>
+          <p class="hint" id="deny-hint" style="margin-top:0.85rem"></p>
+        </div>
+
+        <div class="panel">
+          <h2>Mã nhúng cho đối tác</h2>
+          <p class="hint">Dán vào site đã được cấp tên miền. Mở thẳng URL hoặc site chưa cấp → chuyển về giahuy.net.</p>
+          <label>mong</label>
+          <textarea id="snip-mong" readonly></textarea>
+          <label>cot</label>
+          <textarea id="snip-cot" readonly></textarea>
+          <label>dam</label>
+          <textarea id="snip-dam" readonly></textarea>
+          <label>san</label>
+          <textarea id="snip-san" readonly></textarea>
+        </div>
+      </div>
+
+      <div class="pane" id="pane-members" hidden>
+        <div class="panel">
+          <h2>Cấp quyền thành viên</h2>
+          <div class="grid2">
+            <div>
+              <label>Email khách</label>
+              <input id="email" type="email" placeholder="khach@email.com" />
+            </div>
+            <div>
+              <label>Gói</label>
+              <select id="plan"></select>
+            </div>
+          </div>
+          <label>Ghi chú (tuỳ chọn)</label>
+          <input id="note" placeholder="Đã CK BIDV…" />
+          <div class="row">
+            <button class="btn" type="button" id="btn-grant">Cấp / Gia hạn</button>
+            <button class="btn ghost" type="button" id="btn-revoke">Thu hồi</button>
+            <button class="btn danger" type="button" id="btn-delete">Xóa dòng</button>
+            <button class="btn ghost" type="button" id="btn-refresh">Tải lại</button>
+          </div>
+          <p class="msg" id="grant-msg"></p>
+        </div>
+        <div class="panel">
+          <h2>Danh sách thành viên</h2>
+          <div style="overflow:auto">
+            <table>
+              <thead>
+                <tr><th>Email</th><th>Gói</th><th>Hết hạn</th><th>Trạng thái</th><th>Ghi chú</th></tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" id="pane-password" hidden>
+        <div class="panel">
+          <h2>Đổi mật khẩu admin</h2>
+          <label>Mật khẩu hiện tại</label>
+          <input id="pwd2-current" type="password" autocomplete="current-password" />
+          <label>Mật khẩu mới</label>
+          <input id="pwd2-new" type="password" autocomplete="new-password" />
+          <label>Nhập lại</label>
+          <input id="pwd2-confirm" type="password" autocomplete="new-password" />
+          <div class="row">
+            <button class="btn" type="button" id="btn-pwd2">Đổi mật khẩu</button>
+          </div>
+          <p class="msg" id="pwd2-msg"></p>
         </div>
       </div>
     </div>
@@ -129,6 +218,7 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
   <script>
     (function () {
       var API = "../api/";
+
       async function api(path, opts) {
         opts = opts || {};
         var res = await fetch(API + path, {
@@ -140,7 +230,9 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
         });
         var data = await res.json().catch(function () { return null; });
         if (!res.ok || !data || data.ok === false) {
-          throw new Error((data && data.error) || ("HTTP " + res.status));
+          var err = new Error((data && data.error) || ("HTTP " + res.status));
+          err.data = data;
+          throw err;
         }
         return data;
       }
@@ -151,6 +243,64 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
       function moneyDate(ts) {
         if (!ts) return "—";
         try { return new Date(ts * 1000).toLocaleString("vi-VN"); } catch (e) { return String(ts); }
+      }
+
+      function showLogin() {
+        document.getElementById("login-box").hidden = false;
+        document.getElementById("pwd-box").hidden = true;
+        document.getElementById("app").hidden = true;
+      }
+      function showPwdGate() {
+        document.getElementById("login-box").hidden = true;
+        document.getElementById("pwd-box").hidden = false;
+        document.getElementById("app").hidden = true;
+      }
+      function showApp() {
+        document.getElementById("login-box").hidden = true;
+        document.getElementById("pwd-box").hidden = true;
+        document.getElementById("app").hidden = false;
+      }
+
+      document.querySelectorAll(".tabs-admin button[data-pane]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          document.querySelectorAll(".tabs-admin button[data-pane]").forEach(function (b) {
+            b.classList.toggle("active", b === btn);
+          });
+          ["domains", "members", "password"].forEach(function (id) {
+            document.getElementById("pane-" + id).hidden = id !== btn.getAttribute("data-pane");
+          });
+        });
+      });
+
+      async function loadDomains() {
+        var data = await api("admin_domains.php");
+        var tb = document.getElementById("domain-rows");
+        tb.innerHTML = "";
+        (data.domains || []).forEach(function (d) {
+          var tr = document.createElement("tr");
+          tr.innerHTML =
+            '<td class="mono">' + d.domain + "</td>" +
+            "<td>" + (d.note || "") + "</td>" +
+            '<td><button type="button" class="btn danger" style="padding:0.35rem 0.65rem">Xóa</button></td>';
+          tr.querySelector("button").addEventListener("click", async function () {
+            if (!confirm("Xóa tên miền " + d.domain + "?")) return;
+            try {
+              await api("admin_domains.php", { method: "POST", body: { action: "remove", domain: d.domain } });
+              await loadDomains();
+              msg(document.getElementById("domain-msg"), true, "Đã xóa " + d.domain);
+            } catch (e) {
+              msg(document.getElementById("domain-msg"), false, e.message);
+            }
+          });
+          tb.appendChild(tr);
+        });
+        var sn = data.snippets || {};
+        document.getElementById("snip-mong").value = sn.mong || "";
+        document.getElementById("snip-cot").value = sn.cot || "";
+        document.getElementById("snip-dam").value = sn.dam || "";
+        document.getElementById("snip-san").value = sn.san || "";
+        document.getElementById("deny-hint").textContent =
+          "Tên miền chưa cấp hoặc mở thẳng URL shop → chuyển về " + (data.deny_redirect || "https://www.giahuy.net/");
       }
 
       async function loadPlans() {
@@ -186,32 +336,82 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
         });
       }
 
-      function showApp(on) {
-        document.getElementById("app").hidden = !on;
-        document.getElementById("login-box").hidden = on;
+      async function afterLogin(mustChange) {
+        if (mustChange) {
+          showPwdGate();
+          return;
+        }
+        showApp();
+        await loadPlans();
+        await loadDomains();
+        await loadMembers();
+      }
+
+      async function changePassword(currentId, newId, confirmId, msgId, thenApp) {
+        try {
+          var data = await api("admin_password.php", {
+            method: "POST",
+            body: {
+              current: document.getElementById(currentId).value,
+              new: document.getElementById(newId).value,
+              confirm: document.getElementById(confirmId).value,
+            },
+          });
+          msg(document.getElementById(msgId), true, data.message || "Đã đổi mật khẩu.");
+          if (thenApp) await afterLogin(false);
+        } catch (e) {
+          msg(document.getElementById(msgId), false, e.message);
+        }
       }
 
       document.getElementById("btn-login").addEventListener("click", async function () {
         try {
-          await api("admin_login.php", {
+          var data = await api("admin_login.php", {
             method: "POST",
             body: {
               user: document.getElementById("user").value,
               pass: document.getElementById("pass").value,
             },
           });
-          msg(document.getElementById("login-msg"), true, "Đăng nhập OK.");
-          showApp(true);
-          await loadPlans();
-          await loadMembers();
+          msg(document.getElementById("login-msg"), true, data.message || "OK");
+          await afterLogin(!!data.must_change_password);
         } catch (e) {
           msg(document.getElementById("login-msg"), false, e.message);
         }
       });
 
+      document.getElementById("btn-pwd").addEventListener("click", function () {
+        changePassword("pwd-current", "pwd-new", "pwd-confirm", "pwd-msg", true);
+      });
+      document.getElementById("btn-pwd2").addEventListener("click", function () {
+        changePassword("pwd2-current", "pwd2-new", "pwd2-confirm", "pwd2-msg", false);
+      });
+
       document.getElementById("btn-logout").addEventListener("click", async function () {
         await api("admin_logout.php", { method: "POST", body: {} });
-        showApp(false);
+        showLogin();
+      });
+
+      document.getElementById("btn-add-domain").addEventListener("click", async function () {
+        try {
+          var data = await api("admin_domains.php", {
+            method: "POST",
+            body: {
+              action: "add",
+              domain: document.getElementById("domain").value,
+              note: document.getElementById("domain-note").value,
+            },
+          });
+          msg(document.getElementById("domain-msg"), true, "Đã thêm: " + data.domain);
+          document.getElementById("domain").value = "";
+          await loadDomains();
+        } catch (e) {
+          msg(document.getElementById("domain-msg"), false, e.message);
+        }
+      });
+      document.getElementById("btn-reload-domains").addEventListener("click", async function () {
+        try { await loadDomains(); msg(document.getElementById("domain-msg"), true, "Đã tải lại."); }
+        catch (e) { msg(document.getElementById("domain-msg"), false, e.message); }
       });
 
       document.getElementById("btn-grant").addEventListener("click", async function () {
@@ -225,54 +425,38 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
               note: document.getElementById("note").value,
             },
           });
-          msg(document.getElementById("grant-msg"), true, "Đã cấp: " + data.member.email + " · hết hạn " + moneyDate(data.member.expires_at));
+          msg(document.getElementById("grant-msg"), true, "Đã cấp: " + data.member.email);
           await loadMembers();
         } catch (e) {
           msg(document.getElementById("grant-msg"), false, e.message);
         }
       });
-
       document.getElementById("btn-revoke").addEventListener("click", async function () {
         try {
-          await api("admin_members.php", {
-            method: "POST",
-            body: { action: "revoke", email: document.getElementById("email").value },
-          });
+          await api("admin_members.php", { method: "POST", body: { action: "revoke", email: document.getElementById("email").value } });
           msg(document.getElementById("grant-msg"), true, "Đã thu hồi.");
           await loadMembers();
-        } catch (e) {
-          msg(document.getElementById("grant-msg"), false, e.message);
-        }
+        } catch (e) { msg(document.getElementById("grant-msg"), false, e.message); }
       });
-
       document.getElementById("btn-delete").addEventListener("click", async function () {
-        if (!confirm("Xóa hẳn email này khỏi DB?")) return;
+        if (!confirm("Xóa hẳn email này?")) return;
         try {
-          await api("admin_members.php", {
-            method: "POST",
-            body: { action: "delete", email: document.getElementById("email").value },
-          });
+          await api("admin_members.php", { method: "POST", body: { action: "delete", email: document.getElementById("email").value } });
           msg(document.getElementById("grant-msg"), true, "Đã xóa.");
           await loadMembers();
-        } catch (e) {
-          msg(document.getElementById("grant-msg"), false, e.message);
-        }
+        } catch (e) { msg(document.getElementById("grant-msg"), false, e.message); }
       });
-
       document.getElementById("btn-refresh").addEventListener("click", async function () {
         try { await loadMembers(); msg(document.getElementById("grant-msg"), true, "Đã tải lại."); }
         catch (e) { msg(document.getElementById("grant-msg"), false, e.message); }
       });
 
-      // Thử session sẵn
       (async function () {
         try {
-          await api("admin_members.php");
-          showApp(true);
-          await loadPlans();
-          await loadMembers();
+          var me = await api("admin_me.php");
+          await afterLogin(!!me.must_change_password);
         } catch (e) {
-          showApp(false);
+          showLogin();
         }
       })();
     })();

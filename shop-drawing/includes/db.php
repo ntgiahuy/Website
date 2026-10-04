@@ -40,6 +40,15 @@ CREATE TABLE IF NOT EXISTS trials (
   started_at INTEGER NOT NULL,
   ends_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS allowed_domains (
+  domain TEXT PRIMARY KEY,
+  note TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 SQL);
 
   // Migration nhẹ nếu DB cũ thiếu cột token_hash
@@ -50,4 +59,19 @@ SQL);
   }
 
   return $pdo;
+}
+
+function setting_get(string $key, ?string $default = null): ?string {
+  $st = db()->prepare('SELECT value FROM settings WHERE key = ?');
+  $st->execute([$key]);
+  $row = $st->fetch();
+  if (!$row) return $default;
+  return (string) $row['value'];
+}
+
+function setting_set(string $key, string $value): void {
+  db()->prepare(
+    'INSERT INTO settings (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  )->execute([$key, $value]);
 }

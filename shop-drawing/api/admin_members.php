@@ -3,6 +3,9 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/includes/bootstrap.php';
 
 require_admin();
+if (!empty($_SESSION['admin_must_change'])) {
+  json_out(['ok' => false, 'error' => 'Cần đổi mật khẩu admin trước.', 'must_change_password' => true], 403);
+}
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
