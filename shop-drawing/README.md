@@ -26,8 +26,22 @@ Gói upload vào `public_html/shop-drawing` trên hosting có PHP + SQLite.
    - `mail` → SMTP hosting (khuyến nghị) hoặc `mode => mail`
    - `pay` → BIDV / STK
    - `apps` → URL iframe shop (github.io hoặc domain riêng)
-4. Quyền ghi thư mục `data/` (chmod `755` hoặc `775`) để tạo `members.sqlite`
+4. Database:
+   - Nếu hosting có SQLite: chmod `755`/`775` cho `data/`
+   - Nếu báo thiếu SQLite (như nhiều host VN): trong `config.php` đặt:
+     ```php
+     'db_driver' => 'mysql',
+     'mysql' => [
+       'host' => 'localhost',
+       'dbname' => 'ten_db_trong_cpanel',
+       'user' => 'ten_user_mysql',
+       'pass' => 'mat_khau',
+       'charset' => 'utf8mb4',
+     ],
+     ```
+     (Tạo DB + user ở cPanel → MySQL Databases, nhớ Add User To Database với All Privileges)
 5. Mở thử:
+
    - Hub: `https://domain/shop-drawing/`
    - Thành viên: `https://domain/shop-drawing/thanh-vien/`
    - Admin: `https://domain/shop-drawing/admin/` (lần đầu: `giahuy` / `GiahuyAdmin` — đổi ngay)  

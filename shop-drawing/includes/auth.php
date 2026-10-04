@@ -86,17 +86,7 @@ function create_and_send_otp(string $email): array {
   $hash = password_hash($code, PASSWORD_DEFAULT);
   $tokenHash = hash('sha256', $token);
 
-  $st = db()->prepare(
-    'INSERT INTO otps (email, code_hash, token_hash, expires_at, attempts, created_at)
-     VALUES (?, ?, ?, ?, 0, ?)
-     ON CONFLICT(email) DO UPDATE SET
-       code_hash = excluded.code_hash,
-       token_hash = excluded.token_hash,
-       expires_at = excluded.expires_at,
-       attempts = 0,
-       created_at = excluded.created_at'
-  );
-  $st->execute([$email, $hash, $tokenHash, $now + ($ttl * 60), $now]);
+  db_upsert_otp($email, $hash, $tokenHash, $now + ($ttl * 60), $now);
 
   $base = rtrim((string) cfg('base_url', ''), '/');
   $link = $base !== ''

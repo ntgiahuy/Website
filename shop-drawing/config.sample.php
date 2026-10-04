@@ -21,8 +21,18 @@ return [
   'trial_minutes' => 30,
   'trial_allow_pdf' => false,
 
-  // SQLite (mặc định) — thư mục data/ phải ghi được (chmod 755 hoặc 775)
-  'db_path' => __DIR__ . '/data/members.sqlite',
+  // Database: 'auto' | 'sqlite' | 'mysql'
+  // Hosting không có SQLite → dùng mysql (tạo DB trong cPanel → MySQL Databases)
+  'db_driver' => 'auto',
+  'db_path' => __DIR__ . '/data/members.sqlite', // chỉ dùng khi sqlite
+  'mysql' => [
+    'host' => 'localhost',
+    'port' => 3306,
+    'dbname' => 'TEN_DATABASE',      // vd. giahuy_shop
+    'user' => 'TEN_USER_MYSQL',      // vd. giahuy_shop
+    'pass' => 'MAT_KHAU_MYSQL',
+    'charset' => 'utf8mb4',
+  ],
 
   // Gửi mail OTP
   // mode: 'smtp' | 'mail' | 'log' (log = ghi OTP vào data/otp-log.txt để thử, không gửi mail)

@@ -54,10 +54,7 @@ function add_allowed_domain(string $input, string $note = ''): array {
     return ['ok' => false, 'error' => 'Tên miền không hợp lệ. Ví dụ: domain.com hoặc https://www.domain.com'];
   }
   $now = time();
-  db()->prepare(
-    'INSERT INTO allowed_domains (domain, note, created_at) VALUES (?, ?, ?)
-     ON CONFLICT(domain) DO UPDATE SET note = excluded.note'
-  )->execute([$domain, trim($note), $now]);
+  db_upsert_domain($domain, trim($note), $now);
   return ['ok' => true, 'domain' => $domain];
 }
 
