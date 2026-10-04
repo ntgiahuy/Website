@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GIAHUYⓒ — Shop Drawing</title>
+  <title>GIA HUY — Shop Drawing</title>
   <meta name="description" content="Shop thép móng, cột, dầm, sàn. Đăng nhập email OTP · dùng thử · thành viên theo thời hạn." />
   <link rel="icon" href="./assets/icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -13,14 +13,15 @@
     :root {
       --bg0: #0c1218; --bg1: #15202b; --ink: #eef3f8; --muted: #8fa3b6;
       --line: rgba(238, 243, 248, 0.12); --amber: #e8a317; --amber-2: #f0b531;
-      --ok: #3ecf8e; --danger: #ff6b6b; --tabs-h: 52px; --header-gap: 0.75rem;
+      --ok: #3ecf8e; --danger: #ff6b6b; --brand: #CE2C90;
+      --header-h: 58px; --tabs-h: 52px; --header-gap: 0.65rem;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; height: 100%; }
     body {
       font-family: "Be Vietnam Pro", sans-serif; color: var(--ink);
       background:
-        radial-gradient(900px 420px at 8% -8%, rgba(232, 163, 23, 0.16), transparent 55%),
+        radial-gradient(900px 420px at 8% -8%, rgba(206, 44, 144, 0.12), transparent 55%),
         radial-gradient(700px 380px at 92% 0%, rgba(74, 109, 136, 0.22), transparent 50%),
         linear-gradient(165deg, var(--bg0), var(--bg1) 45%, #0e1620);
       overflow: hidden;
@@ -28,30 +29,64 @@
     a { color: var(--amber); }
     .shell { height: 100%; display: grid; grid-template-rows: auto auto 1fr; row-gap: var(--header-gap); }
     .topbar {
-      display: flex; flex-direction: column; gap: 0.55rem;
-      padding: 0.7rem 1rem 0.65rem; border-bottom: 1px solid var(--line);
-      background: rgba(8, 12, 16, 0.55); backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+      min-height: var(--header-h); padding: 0.55rem 1rem;
+      border-bottom: 1px solid var(--line);
+      background: #0a0e12;
     }
-    .topbar-row { display: flex; align-items: center; justify-content: space-between; gap: 0.65rem; min-width: 0; }
-    .topbar-row.actions-row { justify-content: flex-end; }
-    .brand { display: flex; align-items: center; gap: 0.65rem; text-decoration: none; color: inherit; min-width: 0; }
-    .brand img { width: 34px; height: 34px; border-radius: 8px; flex: none; }
-    .brand strong { font-size: 1.08rem; letter-spacing: 0.04em; display: block; line-height: 1.05; font-weight: 800; }
-    .brand .mark { font-size: 0.5em; vertical-align: top; line-height: 1; margin-left: 0.06em; font-weight: 700; }
-    .brand span { color: var(--muted); font-size: 0.72rem; }
-    .top-actions { display: flex; align-items: center; gap: 0.55rem; flex-wrap: nowrap; justify-content: flex-end; }
+    .brand {
+      display: flex; align-items: center; gap: 0.7rem;
+      text-decoration: none; color: #fff; min-width: 0;
+    }
+    .brand .custom-logo { width: 40px; height: 40px; flex: none; display: block; }
+    .brand strong {
+      font-size: 1.15rem; letter-spacing: 0.08em; font-weight: 800;
+      color: #fff; white-space: nowrap;
+    }
+    .topbar-right { display: flex; align-items: center; gap: 0.55rem; flex: none; }
     .chip {
-      font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; font-weight: 600;
-      border: 1px solid var(--line); border-radius: 999px; padding: 0.32rem 0.65rem;
-      background: rgba(255,255,255,0.03); color: var(--muted); white-space: nowrap; flex: none;
+      font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; font-weight: 600;
+      border: 1px solid var(--line); border-radius: 999px; padding: 0.28rem 0.55rem;
+      background: rgba(255,255,255,0.03); color: var(--muted); white-space: nowrap;
+      max-width: 34vw; overflow: hidden; text-overflow: ellipsis;
     }
-    .chip.live { color: var(--amber); border-color: rgba(232,163,23,0.4); animation: pulse 1.6s ease-in-out infinite; }
+    .chip.live { color: var(--amber); border-color: rgba(232,163,23,0.4); }
     .chip.ok { color: var(--ok); border-color: rgba(62,207,142,0.35); }
     .chip.danger { color: var(--danger); border-color: rgba(255,107,107,0.35); }
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(232,163,23,0); }
-      50% { box-shadow: 0 0 0 4px rgba(232,163,23,0.12); }
+    .account { position: relative; }
+    .account-btn {
+      appearance: none; border: 0; background: transparent; color: #fff;
+      width: 40px; height: 40px; border-radius: 999px; cursor: pointer;
+      display: grid; place-items: center; padding: 0;
     }
+    .account-btn:hover { background: rgba(255,255,255,0.06); }
+    .account-btn svg { width: 26px; height: 26px; display: block; }
+    .account-menu {
+      position: absolute; right: 0; top: calc(100% + 0.45rem);
+      min-width: 240px; padding: 0.45rem;
+      border-radius: 14px; border: 1px solid rgba(255,255,255,0.1);
+      background: #1a222c; box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+      z-index: 40;
+    }
+    .account-menu[hidden] { display: none !important; }
+    .account-menu a, .account-menu button {
+      width: 100%; appearance: none; border: 0; background: transparent;
+      color: #fff; font: inherit; font-weight: 600; font-size: 0.95rem;
+      display: flex; align-items: center; gap: 0.7rem;
+      padding: 0.75rem 0.8rem; border-radius: 10px; cursor: pointer;
+      text-decoration: none; text-align: left;
+    }
+    .account-menu a:hover, .account-menu button:hover { background: rgba(255,255,255,0.06); }
+    .account-menu svg { width: 20px; height: 20px; flex: none; opacity: 0.95; }
+    .account-info {
+      padding: 0.75rem 0.85rem 0.55rem; color: var(--ink);
+      border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 0.25rem;
+    }
+    .account-info .label { color: var(--muted); font-size: 0.78rem; margin-bottom: 0.15rem; }
+    .account-info .row { font-size: 0.92rem; margin: 0.2rem 0; line-height: 1.35; word-break: break-word; }
+    .account-info .row strong { font-weight: 700; color: #fff; }
+    .account-info .plan { color: var(--amber); font-weight: 700; margin-top: 0.45rem; }
+    .account-info .plan.free { color: var(--muted); }
     .btn {
       appearance: none; border: 0; cursor: pointer; text-decoration: none;
       font: inherit; font-weight: 700; border-radius: 10px; padding: 0.55rem 0.9rem;
@@ -64,10 +99,22 @@
     .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
     .btn-sm { padding: 0.4rem 0.7rem; font-size: 0.88rem; }
     .btn[hidden], button[hidden], a[hidden] { display: none !important; }
+    .tabs-bar {
+      display: flex; align-items: center; gap: 0.45rem;
+      padding: 0 0.55rem; min-height: var(--tabs-h);
+    }
+    .menu-toggle {
+      display: none; appearance: none; border: 1px solid var(--line);
+      background: rgba(0,0,0,0.22); color: var(--ink);
+      width: 42px; height: 42px; border-radius: 10px; cursor: pointer;
+      place-items: center; flex: none;
+    }
+    .menu-toggle svg { width: 22px; height: 22px; }
     .tabs {
-      display: flex; gap: 0.35rem; align-items: center; min-height: var(--tabs-h);
-      padding: 0.45rem 0.75rem; margin: 0 0.35rem; border: 1px solid var(--line);
-      border-radius: 12px; background: rgba(0,0,0,0.22); overflow-x: auto;
+      display: flex; gap: 0.35rem; align-items: center; flex: 1; min-width: 0;
+      min-height: var(--tabs-h); padding: 0.45rem 0.75rem;
+      border: 1px solid var(--line); border-radius: 12px;
+      background: rgba(0,0,0,0.22); overflow-x: auto;
     }
     .tab {
       appearance: none; border: 0; background: transparent; color: var(--muted);
@@ -79,11 +126,20 @@
     .tab.soon { opacity: 0.72; }
     .tab.soon .soon-tag { margin-left: 0.35rem; font-size: 0.68rem; font-weight: 700; opacity: 0.85; }
     @keyframes tabIn { from { transform: translateY(3px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+    .mobile-shop-menu {
+      position: absolute; left: 0.55rem; right: 0.55rem; top: calc(var(--header-h) + var(--header-gap) + 48px);
+      z-index: 30; border: 1px solid var(--line); border-radius: 14px;
+      background: #141c26; padding: 0.4rem; box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+    }
+    .mobile-shop-menu[hidden] { display: none !important; }
+    .mobile-shop-menu .tab {
+      display: flex; width: 100%; text-align: left; border-radius: 10px;
+    }
     .workspace { position: relative; min-height: 0; background: #070b10; }
     .soon-panel {
       display: none; height: 100%; place-items: center; padding: 1.5rem; text-align: center;
       color: var(--muted);
-      background: radial-gradient(520px 280px at 50% 30%, rgba(232,163,23,0.08), transparent 65%), #070b10;
+      background: radial-gradient(520px 280px at 50% 30%, rgba(206,44,144,0.08), transparent 65%), #070b10;
     }
     .soon-panel.active { display: grid; }
     .soon-panel h2 { margin: 0 0 0.45rem; color: var(--ink); font-size: 1.35rem; letter-spacing: -0.02em; }
@@ -92,7 +148,7 @@
     .workspace iframe.active { display: block; }
     .gate, .paywall {
       position: absolute; inset: 0; display: grid; place-items: center; padding: 1.25rem;
-      background: radial-gradient(600px 320px at 50% 20%, rgba(232,163,23,0.12), transparent 60%), rgba(7, 11, 16, 0.92);
+      background: radial-gradient(600px 320px at 50% 20%, rgba(206,44,144,0.1), transparent 60%), rgba(7, 11, 16, 0.92);
       backdrop-filter: blur(6px); z-index: 5; overflow: auto;
     }
     .gate[hidden], .paywall[hidden] { display: none !important; }
@@ -136,39 +192,80 @@
     .pay-note strong { color: var(--ink); }
     .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; word-break: break-all; }
     .otp-step[hidden] { display: none !important; }
-    @media (max-width: 640px) {
+    @media (max-width: 760px) {
       body { overflow: auto; }
-      .shell { min-height: 100dvh; height: auto; grid-template-rows: auto auto minmax(70vh, 1fr); }
-      .brand span { display: none; }
-      .chip { font-size: 0.72rem; padding: 0.28rem 0.55rem; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; }
-      .top-actions { width: 100%; }
-      .top-actions .btn { flex: 1 1 auto; justify-content: center; }
+      .shell { min-height: 100dvh; height: auto; grid-template-rows: auto auto minmax(70vh, 1fr); position: relative; }
+      .chip { display: none; }
+      .menu-toggle { display: grid; }
+      .tabs { display: none; }
+      .tabs-bar { padding: 0 0.55rem; }
+      .mobile-shop-menu { top: calc(var(--header-h) + var(--header-gap) + 52px); }
     }
   </style>
 </head>
 <body>
   <div class="shell">
     <header class="topbar">
-      <div class="topbar-row">
-        <a class="brand" href="./">
-          <img src="./assets/icon.png" width="34" height="34" alt="" />
-          <div>
-            <strong>GIAHUY<span class="mark">ⓒ</span></strong>
-            <span>Móng · Cột · Dầm · Sàn · Vách</span>
-          </div>
-        </a>
+      <a class="brand" href="./" aria-label="GIA HUY">
+        <svg class="custom-logo" width="40" height="40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280" fill="#CE2C90" role="img" aria-labelledby="logoTitle">
+          <title id="logoTitle">GH</title>
+          <path fill-rule="evenodd" d="M640 84 0 572h1280L640 84Zm0 126L166 572h948L640 210Z"></path>
+          <rect x="570" y="334" width="63" height="63"></rect>
+          <rect x="652" y="334" width="63" height="63"></rect>
+          <rect x="570" y="416" width="63" height="63"></rect>
+          <rect x="652" y="416" width="63" height="63"></rect>
+          <path d="M161 575h97v333.23A192 192 0 0 0 531 949.62V779h87v213.22A282 282 0 0 1 161 920.54V575Z"></path>
+          <rect x="406" y="779" width="125" height="86"></rect>
+          <rect x="693" y="575" width="93" height="491"></rect>
+          <rect x="1026" y="575" width="93" height="491"></rect>
+          <rect x="693" y="780" width="426" height="87"></rect>
+        </svg>
+        <strong>GIA HUY</strong>
+      </a>
+
+      <div class="topbar-right">
         <span class="chip" id="status-chip">Đang kiểm tra…</span>
-      </div>
-      <div class="topbar-row actions-row">
-        <div class="top-actions">
-          <a class="btn btn-ghost btn-sm" href="./thanh-vien/">Thành viên</a>
-          <button type="button" class="btn btn-ghost btn-sm" id="btn-logout" hidden>Đăng xuất</button>
-          <button type="button" class="btn btn-primary btn-sm" id="btn-open-pay" hidden>Đăng ký</button>
+        <div class="account">
+          <button type="button" class="account-btn" id="account-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Tài khoản">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+              <circle cx="12" cy="12" r="9.25"></circle>
+              <circle cx="12" cy="9.2" r="3.1"></circle>
+              <path d="M6.4 18.2c1.5-2.7 3.5-4 5.6-4s4.1 1.3 5.6 4"></path>
+            </svg>
+          </button>
+          <div class="account-menu" id="account-menu" role="menu" hidden>
+            <div id="account-guest">
+              <a href="./dang-nhap/" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 7h7v10h-7"/><path d="M12 12H4"/><path d="m7 9 3 3-3 3"/></svg>
+                Đăng nhập
+              </a>
+              <a href="./dang-ky/" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="8" r="3"/><path d="M4.5 18.2c1.3-2.5 3.1-3.7 5.5-3.7"/><path d="M17 8v6"/><path d="M14 11h6"/></svg>
+                Đăng ký
+              </a>
+            </div>
+            <div id="account-member" hidden>
+              <div class="account-info">
+                <div class="label">Thông tin thành viên</div>
+                <div class="row">Thành viên: <strong id="acc-name">—</strong></div>
+                <div class="row">Mail: <strong id="acc-email">—</strong></div>
+                <div class="plan free" id="acc-plan">Tài khoản miễn phí</div>
+              </div>
+              <a href="./thanh-vien/" role="menuitem">Gói thành viên</a>
+              <button type="button" id="btn-logout" role="menuitem">Đăng xuất</button>
+            </div>
+          </div>
         </div>
       </div>
     </header>
 
-    <nav class="tabs" id="tabs" aria-label="Chọn tiện ích"></nav>
+    <div class="tabs-bar">
+      <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Mở menu shop" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <nav class="tabs" id="tabs" aria-label="Chọn tiện ích"></nav>
+    </div>
+    <div class="mobile-shop-menu" id="mobile-shop-menu" hidden></div>
 
     <main class="workspace" id="workspace">
       <div class="soon-panel" id="soon-panel" aria-live="polite">
@@ -184,7 +281,8 @@
           <p id="gate-lead">Mở các tiện ích shop thép trên cùng một trang. Hết giờ dùng thử thì đăng nhập email thành viên để tiếp tục.</p>
           <div class="cta-row">
             <button type="button" class="btn btn-primary" id="btn-start-trial">Bắt đầu dùng thử</button>
-            <button type="button" class="btn btn-ghost" id="btn-have-login">Đăng nhập email</button>
+            <a class="btn btn-ghost" href="./dang-nhap/">Đăng nhập</a>
+            <a class="btn btn-ghost" href="./dang-ky/">Đăng ký</a>
           </div>
           <p class="msg bad" id="gate-msg" hidden></p>
         </div>
@@ -192,27 +290,13 @@
 
       <div class="paywall" id="paywall" hidden>
         <div class="card wide">
-          <h1 id="paywall-title">Đăng nhập / Đăng ký thành viên</h1>
-          <p id="paywall-lead">Nhập email → nhận OTP / link → xác nhận. Admin cấp gói theo email sau khi bạn chuyển khoản.</p>
-
-          <div class="login-box">
-            <div>
-              <label for="email">Email</label>
-              <input id="email" type="email" autocomplete="email" placeholder="ban@email.com" />
-            </div>
-            <div class="cta-row">
-              <button type="button" class="btn btn-primary" id="btn-send-otp">Gửi mã OTP</button>
-            </div>
-            <div class="otp-step" id="otp-step" hidden>
-              <label for="otp">Mã OTP (6 số)</label>
-              <input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" maxlength="8" />
-              <div class="cta-row">
-                <button type="button" class="btn btn-primary" id="btn-verify-otp">Xác nhận</button>
-              </div>
-            </div>
-            <p class="msg" id="login-msg" hidden></p>
+          <h1 id="paywall-title">Kích hoạt thành viên</h1>
+          <p id="paywall-lead">Chọn gói và chuyển khoản. Admin cấp quyền theo email đã đăng nhập.</p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="./dang-nhap/">Đăng nhập email OTP</a>
+            <a class="btn btn-ghost" href="./dang-ky/">Đăng ký</a>
+            <a class="btn btn-ghost" href="./thanh-vien/">Xem bảng giá</a>
           </div>
-
           <div class="plans" id="plans"></div>
           <div class="pay-note" id="pay-note">Đang tải thông tin thanh toán…</div>
         </div>
@@ -223,6 +307,7 @@
   <script src="./assets/membership.js"></script>
   <script>
     (function () {
+      var PROFILE_KEY = "giahuy.profile.v1";
       var APPS = [];
       var PLANS = GiaHuyMembership.PLANS.slice();
       var PLAN_PRICES = {};
@@ -240,23 +325,27 @@
 
       var els = {
         tabs: document.getElementById("tabs"),
+        mobileMenu: document.getElementById("mobile-shop-menu"),
+        menuToggle: document.getElementById("menu-toggle"),
         workspace: document.getElementById("workspace"),
         gate: document.getElementById("gate"),
         paywall: document.getElementById("paywall"),
         chip: document.getElementById("status-chip"),
-        btnPay: document.getElementById("btn-open-pay"),
         btnLogout: document.getElementById("btn-logout"),
         gateMsg: document.getElementById("gate-msg"),
         gateTitle: document.getElementById("gate-title"),
         gateLead: document.getElementById("gate-lead"),
         plans: document.getElementById("plans"),
         payNote: document.getElementById("pay-note"),
-        loginMsg: document.getElementById("login-msg"),
-        email: document.getElementById("email"),
-        otp: document.getElementById("otp"),
-        otpStep: document.getElementById("otp-step"),
         paywallTitle: document.getElementById("paywall-title"),
         paywallLead: document.getElementById("paywall-lead"),
+        accountBtn: document.getElementById("account-btn"),
+        accountMenu: document.getElementById("account-menu"),
+        accountGuest: document.getElementById("account-guest"),
+        accountMember: document.getElementById("account-member"),
+        accName: document.getElementById("acc-name"),
+        accEmail: document.getElementById("acc-email"),
+        accPlan: document.getElementById("acc-plan"),
       };
 
       function money(n) {
@@ -266,6 +355,37 @@
         el.hidden = !text;
         el.className = "msg " + (ok ? "ok" : "bad");
         el.textContent = text || "";
+      }
+      function readProfile() {
+        try {
+          return JSON.parse(localStorage.getItem(PROFILE_KEY) || "null") || null;
+        } catch (e) {
+          return null;
+        }
+      }
+      function displayName(email) {
+        var p = readProfile();
+        if (p && p.email && email && p.email.toLowerCase() === String(email).toLowerCase() && p.name) {
+          return p.name;
+        }
+        if (!email) return "—";
+        return String(email).split("@")[0] || email;
+      }
+      function formatPaidPlan(member) {
+        if (!member || !member.active) return "Tài khoản miễn phí";
+        if (member.plan === "lifetime" || (member.daysLeft && member.daysLeft > 20000)) {
+          return "Tài khoản trả phí: · Vĩnh viễn";
+        }
+        var dateStr = "";
+        try {
+          if (member.expiresAtMs) {
+            var dt = new Date(member.expiresAtMs);
+            dateStr = dt.getDate() + "/" + (dt.getMonth() + 1) + "/" + dt.getFullYear();
+          }
+        } catch (e) {}
+        var d = member.daysLeft || 0;
+        if (dateStr) return "Tài khoản trả phí: · " + dateStr + " (còn " + d + " ngày)";
+        return "Tài khoản trả phí: · " + (GiaHuyMembership.formatExpiry(member) || "đang hoạt động");
       }
 
       async function loadConfig() {
@@ -281,12 +401,24 @@
         } catch (e) {}
         if (!APPS.length) {
           APPS = [
-            { id: "mong", name: "Shop drawing móng đơn", url: "./mong/", blurb: "PDF / DXF" },
-            { id: "cot", name: "Shop drawing cột", url: "./cot/", blurb: "PDF A1" },
-            { id: "dam", name: "Shop drawing dầm", url: "./dam/", blurb: "PDF A2" },
-            { id: "san", name: "Shop drawing sàn", url: "./san/", blurb: "Shop drawing sàn" },
-            { id: "vach", name: "Shop drawing vách", url: "", blurb: "Sắp ra mắt", comingSoon: true },
+            { id: "mong", name: "Shop thép móng", url: "./mong/", blurb: "PDF / DXF" },
+            { id: "cot", name: "Shop thép cột", url: "./cot/", blurb: "PDF A1" },
+            { id: "dam", name: "Shop thép dầm", url: "./dam/", blurb: "PDF A2" },
+            { id: "san", name: "Shop thép sàn", url: "./san/", blurb: "Shop thép sàn" },
+            { id: "vach", name: "Shop thép vách", url: "", blurb: "Sắp ra mắt", comingSoon: true },
           ];
+        } else {
+          APPS = APPS.map(function (app) {
+            var map = {
+              mong: "Shop thép móng",
+              cot: "Shop thép cột",
+              dam: "Shop thép dầm",
+              san: "Shop thép sàn",
+              vach: "Shop thép vách",
+            };
+            if (map[app.id]) return Object.assign({}, app, { name: map[app.id] });
+            return app;
+          });
         }
         if (!Object.keys(PLAN_PRICES).length) {
           PLAN_PRICES = { "3m": 249000, "6m": 449000, "1y": 799000, "2y": 1399000, "3y": 1899000, lifetime: 4999000 };
@@ -302,6 +434,7 @@
         var c = window.__PAY__ || {};
         var plan = selectedPlan || PLANS[0];
         var price = PLAN_PRICES[plan.id] || 0;
+        var emailHint = (els.accEmail && els.accEmail.textContent !== "—" ? els.accEmail.textContent : "email@cua.ban");
         els.payNote.innerHTML =
           "<strong>Chuyển khoản:</strong> " +
           (c.bank || "") +
@@ -312,7 +445,7 @@
           "<br/><strong>Nội dung CK:</strong> <span class='mono'>GH " +
           String(plan.id).toUpperCase() +
           " " +
-          (els.email.value || "email@cua.ban") +
+          emailHint +
           "</span> · " +
           money(price) +
           (c.note ? "<br/>" + c.note : "") +
@@ -333,16 +466,30 @@
         });
       }
 
+      function makeTabButton(app, forMobile) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tab" + (app.id === currentApp ? " active" : "") + (app.comingSoon ? " soon" : "");
+        btn.innerHTML = app.comingSoon ? app.name + '<span class="soon-tag">sắp có</span>' : app.name;
+        btn.addEventListener("click", function () {
+          selectApp(app.id);
+          if (forMobile) closeMobileMenu();
+        });
+        return btn;
+      }
+
       function renderTabs() {
         els.tabs.innerHTML = "";
+        els.mobileMenu.innerHTML = "";
         APPS.forEach(function (app) {
-          var btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "tab" + (app.id === currentApp ? " active" : "") + (app.comingSoon ? " soon" : "");
-          btn.innerHTML = app.comingSoon ? app.name + '<span class="soon-tag">sắp có</span>' : app.name;
-          btn.addEventListener("click", function () { selectApp(app.id); });
-          els.tabs.appendChild(btn);
+          els.tabs.appendChild(makeTabButton(app, false));
+          els.mobileMenu.appendChild(makeTabButton(app, true));
         });
+      }
+
+      function closeMobileMenu() {
+        els.mobileMenu.hidden = true;
+        els.menuToggle.setAttribute("aria-expanded", "false");
       }
 
       function selectApp(id) {
@@ -364,7 +511,6 @@
           var on = key === id;
           frame.classList.toggle("active", on);
           if (on && app && !app.comingSoon) {
-            // Mỗi tab một cổng riêng; không dùng url "app/" chung
             var src = app.url;
             if (!src || src === "app/" || src === "./app/" || src === "app") {
               src = "./" + app.id + "/";
@@ -396,26 +542,38 @@
         });
       }
 
+      function setAccountMenu(access) {
+        var loggedIn = !!access.email;
+        els.accountGuest.hidden = loggedIn;
+        els.accountMember.hidden = !loggedIn;
+        if (!loggedIn) return;
+        els.accName.textContent = displayName(access.email);
+        els.accEmail.textContent = access.email;
+        if (access.mode === "member" && access.member) {
+          els.accPlan.className = "plan";
+          els.accPlan.textContent = formatPaidPlan(access.member);
+        } else {
+          els.accPlan.className = "plan free";
+          els.accPlan.textContent = "Tài khoản miễn phí";
+        }
+      }
+
       function setChip(access) {
         els.chip.className = "chip";
-        els.btnLogout.hidden = !access.email;
         if (access.mode === "member") {
           els.chip.classList.add("ok");
-          els.chip.textContent = "TV · " + (access.email || "") + " · " + GiaHuyMembership.formatExpiry(access.member);
-          els.btnPay.hidden = true;
+          els.chip.textContent = "TV · " + displayName(access.email) + " · " + GiaHuyMembership.formatExpiry(access.member);
         } else if (access.mode === "trial") {
           els.chip.classList.add("live");
           els.chip.textContent = "Dùng thử · " + GiaHuyMembership.formatTrialClock(access.trial.remainingSec);
-          els.btnPay.hidden = false;
         } else if (access.mode === "trial_used") {
           els.chip.classList.add("danger");
           els.chip.textContent = access.email ? "Email đã xác nhận · chưa có gói" : "Hết lượt dùng thử";
-          els.btnPay.hidden = false;
         } else {
           els.chip.classList.add("danger");
           els.chip.textContent = access.email ? "Đã đăng nhập · chờ cấp gói" : "Chưa mở khóa";
-          els.btnPay.hidden = false;
         }
+        setAccountMenu(access);
       }
 
       function showGate(msg) {
@@ -437,9 +595,9 @@
           els.paywallLead.textContent =
             "Đăng nhập email (OTP) để chứng minh đúng chủ email. Sau khi chuyển khoản, admin cấp gói theo email đó.";
         } else {
-          els.paywallTitle.textContent = "Đăng nhập / Đăng ký thành viên";
+          els.paywallTitle.textContent = "Kích hoạt thành viên";
           els.paywallLead.textContent =
-            "Nhập email → nhận OTP / link → xác nhận. Admin cấp gói theo email sau khi bạn chuyển khoản.";
+            "Chọn gói và chuyển khoản. Admin cấp quyền theo email đã đăng nhập.";
         }
         renderPlans();
         loadPayConfig();
@@ -477,6 +635,27 @@
         }, 1000);
       }
 
+      els.accountBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var open = els.accountMenu.hidden;
+        els.accountMenu.hidden = !open;
+        els.accountBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      document.addEventListener("click", function () {
+        els.accountMenu.hidden = true;
+        els.accountBtn.setAttribute("aria-expanded", "false");
+      });
+      els.accountMenu.addEventListener("click", function (e) { e.stopPropagation(); });
+
+      els.menuToggle.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var open = els.mobileMenu.hidden;
+        els.mobileMenu.hidden = !open;
+        els.menuToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      document.addEventListener("click", function () { closeMobileMenu(); });
+      els.mobileMenu.addEventListener("click", function (e) { e.stopPropagation(); });
+
       document.getElementById("btn-start-trial").addEventListener("click", async function () {
         var result = await GiaHuyMembership.startTrial();
         if (!result.ok) {
@@ -488,36 +667,10 @@
         startTicker();
       });
 
-      document.getElementById("btn-have-login").addEventListener("click", function () { showPaywall("manual"); });
-      els.btnPay.addEventListener("click", function () { showPaywall("manual"); });
       els.btnLogout.addEventListener("click", async function () {
         await GiaHuyMembership.logout();
         location.reload();
       });
-
-      document.getElementById("btn-send-otp").addEventListener("click", async function () {
-        try {
-          var data = await GiaHuyMembership.requestOtp(els.email.value);
-          els.otpStep.hidden = false;
-          showMsg(els.loginMsg, true, data.message || "Đã gửi OTP.");
-          loadPayConfig();
-        } catch (e) {
-          showMsg(els.loginMsg, false, (e && e.message) || "Không gửi được OTP.");
-        }
-      });
-
-      document.getElementById("btn-verify-otp").addEventListener("click", async function () {
-        try {
-          await GiaHuyMembership.verifyOtp(els.email.value, els.otp.value, "");
-          showMsg(els.loginMsg, true, "Đã xác nhận email.");
-          var access = await refresh();
-          if (access.allowed) startTicker();
-        } catch (e) {
-          showMsg(els.loginMsg, false, (e && e.message) || "OTP không đúng.");
-        }
-      });
-
-      els.email.addEventListener("input", loadPayConfig);
 
       (async function init() {
         await loadConfig();
@@ -527,22 +680,18 @@
         var access = await refresh();
         if (access.allowed) startTicker();
 
-        // Magic link: ?email=&token=
         try {
           var q = new URLSearchParams(location.search);
           var em = q.get("email");
           var tk = q.get("token");
           if (em && tk) {
-            els.email.value = em;
-            showPaywall("manual");
             await GiaHuyMembership.verifyOtp(em, "", tk);
-            showMsg(els.loginMsg, true, "Đã xác nhận qua link email.");
             access = await refresh();
             if (access.allowed) startTicker();
             history.replaceState({}, "", location.pathname);
           }
         } catch (e) {
-          if (e && e.message) showMsg(els.loginMsg, false, e.message);
+          if (e && e.message) showMsg(els.gateMsg, false, e.message);
         }
       })();
     })();

@@ -71,10 +71,10 @@ return [
   //   url     = cổng hub/iframe đối tác → ./mong/ | ./cot/ | ./dam/ | ./san/
   //   content = thư mục build agent trong cổng → app/  (shop-drawing/{id}/app/)
   'apps' => [
-    ['id' => 'mong', 'name' => 'Shop drawing móng đơn', 'url' => './mong/', 'content' => 'app/', 'blurb' => 'PDF / DXF'],
-    ['id' => 'cot', 'name' => 'Shop drawing cột', 'url' => './cot/', 'content' => 'app/', 'blurb' => 'PDF A1'],
-    ['id' => 'dam', 'name' => 'Shop drawing dầm', 'url' => './dam/', 'content' => 'app/', 'blurb' => 'PDF A2'],
-    ['id' => 'san', 'name' => 'Shop drawing sàn', 'url' => './san/', 'content' => 'app/', 'blurb' => 'Shop drawing sàn'],
-    ['id' => 'vach', 'name' => 'Shop drawing vách', 'url' => '', 'content' => '', 'blurb' => 'Sắp ra mắt', 'comingSoon' => true],
+    ['id' => 'mong', 'name' => 'Shop thép móng', 'url' => './mong/', 'content' => 'app/', 'blurb' => 'PDF / DXF'],
+    ['id' => 'cot', 'name' => 'Shop thép cột', 'url' => './cot/', 'content' => 'app/', 'blurb' => 'PDF A1'],
+    ['id' => 'dam', 'name' => 'Shop thép dầm', 'url' => './dam/', 'content' => 'app/', 'blurb' => 'PDF A2'],
+    ['id' => 'san', 'name' => 'Shop thép sàn', 'url' => './san/', 'content' => 'app/', 'blurb' => 'Shop thép sàn'],
+    ['id' => 'vach', 'name' => 'Shop thép vách', 'url' => '', 'content' => '', 'blurb' => 'Sắp ra mắt', 'comingSoon' => true],
   ],
 ];
