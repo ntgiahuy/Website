@@ -22,15 +22,24 @@ public_html/shop-drawing/
 
 ## Kết luận
 
-| Agent | Upload vào | Sửa code để đọc tab Đối tác? |
-|-------|------------|------------------------------|
-| Móng đơn | `shop-drawing/mong/app/` | **Không** |
-| Cột | `shop-drawing/cot/app/` | **Không** |
-| Dầm | `shop-drawing/dam/app/` | **Không** |
-| Sàn | `shop-drawing/san/app/` | **Không** |
+| Agent | Upload vào | Tab Đối tác? | Header hub? | Auth thành viên? |
+|-------|------------|--------------|-------------|------------------|
+| Móng đơn | `shop-drawing/mong/app/` | **Không** (cổng PHP) | **Không** | **Có** nếu khóa PDF: dùng `membership.js` hosting |
+| Cột | `shop-drawing/cot/app/` | **Không** | **Không** | **Có** nếu khóa PDF |
+| Dầm | `shop-drawing/dam/app/` | **Không** | **Không** | **Có** nếu khóa PDF |
+| Sàn | `shop-drawing/san/app/` | **Không** | **Không** | **Có** nếu khóa PDF |
 
-Tab **Đối tác** chỉ ảnh hưởng cổng `.../mong|cot|dam|san/` (file `index.php`).  
-App trong `app/` chỉ hiện sau khi cổng cho phép.
+Tab **Đối tác** chỉ ảnh hưởng cổng `.../mong|cot|dam|san/` (`index.php`).  
+Header / đăng nhập / đăng ký nằm ở hub `shop-drawing/index.html`, `dang-nhap/`, `dang-ky/`.
+
+Auth hiện tại: đăng ký username+email+mật khẩu (OTP lần đầu) · đăng nhập username+mật khẩu · admin cấp theo username.  
+App shop **không** tự làm form email OTP. Khóa PDF:
+
+```html
+<script src="/shop-drawing/assets/membership.js"
+        data-api="/shop-drawing/api/"
+        data-activate-url="/shop-drawing/dang-nhap/"></script>
+```
 
 ## Đối tác nhúng
 

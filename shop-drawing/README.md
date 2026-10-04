@@ -1,13 +1,13 @@
-# GIAHUY Shop Drawing — hosting PHP (email OTP)
+# GIAHUY Shop Drawing — hosting PHP (username + mật khẩu)
 
-Gói upload vào `public_html/shop-drawing` trên hosting có PHP + SQLite.
+Gói upload vào `public_html/shop-drawing` trên hosting có PHP + SQLite/MySQL.
 
 ## Luồng thành viên
 
-1. Khách nhập **email**
-2. Hệ thống gửi **OTP + link** vào mail (SMTP hoặc `mail()`)
-3. Khách xác nhận → session đăng nhập
-4. Admin cấp **gói + ngày hết hạn** gắn với email (lưu SQLite)
+1. Khách **đăng ký**: username + email + mật khẩu
+2. Hệ thống gửi **OTP** vào mail — chỉ lần đăng ký đầu, để xác nhận email
+3. Khách **đăng nhập**: username + mật khẩu
+4. Admin cấp **gói + ngày hết hạn** theo **username**
 5. Hub cho xem shop khi còn hạn / đang dùng thử; xuất PDF cần thành viên
 
 ## Upload
@@ -43,9 +43,11 @@ Gói upload vào `public_html/shop-drawing` trên hosting có PHP + SQLite.
 5. Mở thử:
 
    - Hub: `https://domain/shop-drawing/`
-   - Thành viên: `https://domain/shop-drawing/thanh-vien/`
+   - Đăng nhập: `https://domain/shop-drawing/dang-nhap/` (username + mật khẩu)
+   - Đăng ký: `https://domain/shop-drawing/dang-ky/`
+   - Thành viên / bảng giá: `https://domain/shop-drawing/thanh-vien/`
    - Admin: `https://domain/shop-drawing/admin/` (lần đầu: `giahuy` / `GiahuyAdmin` — đổi ngay)  
-     · Tab **Thành viên** · Tab **Đối tác**
+     · Tab **Thành viên** (cấp theo username) · Tab **Đối tác**
 
 ## Iframe theo tên miền (mong / cot / dam / san)
 
@@ -68,7 +70,9 @@ Chỉ site có tên miền Admin → tab **Đối tác** đã thêm mới nhúng
 
 ```
 shop-drawing/
-  index.html              # Hub + dùng thử + OTP
+  index.html              # Hub + dùng thử + header
+  dang-nhap/              # Username + mật khẩu
+  dang-ky/                # Username + email + mật khẩu + OTP
   mong|cot|dam|san/
     index.php             # Cổng kiểm tra domain (Đối tác)
     app/                  # ← upload build agent (index.html + assets)
@@ -86,8 +90,9 @@ shop-drawing/
 
 | Endpoint | Mô tả |
 |----------|--------|
-| `POST api/auth_request.php` | `{ email }` → gửi OTP + link |
-| `POST api/auth_verify.php` | `{ email, code }` hoặc `{ email, token }` |
+| `POST api/auth_register_request.php` | `{ username, email, password }` → gửi OTP đăng ký |
+| `POST api/auth_register_verify.php` | `{ email, code }` hoặc `{ email, token }` |
+| `POST api/auth_login.php` | `{ username, password }` |
 | `GET  api/auth_me.php` | Session + member hiện tại |
 | `POST api/auth_logout.php` | Đăng xuất |
 | `POST api/trial_start.php` | Bắt đầu dùng thử (theo browser key) |
@@ -95,7 +100,7 @@ shop-drawing/
 | `GET  api/public-config.php` | Plans, pay, apps (công khai) |
 | `POST api/admin_login.php` | Đăng nhập admin (`giahuy` / `GiahuyAdmin` lần đầu) |
 | `POST api/admin_password.php` | Đổi mật khẩu admin |
-| `GET/POST api/admin_members.php` | Liệt kê / cấp / thu hồi thành viên |
+| `GET/POST api/admin_members.php` | Cấp / thu hồi theo **username** |
 | `GET/POST api/admin_domains.php` | Allowlist tên miền iframe |
 
 ## Khóa PDF trong app shop
@@ -105,7 +110,7 @@ Trong app (mong/cot/dam/san) thêm:
 ```html
 <script src="https://YOUR-DOMAIN.com/shop-drawing/assets/membership.js"
         data-api="https://YOUR-DOMAIN.com/shop-drawing/api/"
-        data-activate-url="https://YOUR-DOMAIN.com/shop-drawing/thanh-vien/"></script>
+        data-activate-url="https://YOUR-DOMAIN.com/shop-drawing/dang-nhap/"></script>
 ```
 
 ```js

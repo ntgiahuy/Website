@@ -4,7 +4,7 @@ Copy toàn bộ khối dưới đây gửi cho agent repo `mong`:
 
 ---
 
-App móng đơn sẽ **upload nằm trong hosting**:
+App móng đơn **upload tĩnh** vào hosting:
 
 ```
 public_html/shop-drawing/mong/app/
@@ -12,34 +12,43 @@ public_html/shop-drawing/mong/app/
   (toàn bộ assets build)
 ```
 
-Không tự kiểm tra / lưu danh sách tên miền đối tác.
+## Không làm trong app móng
 
-Domain đối tác do hosting quản lý:
-`https://YOUR-DOMAIN.com/shop-drawing/admin/` → tab **Đối tác** (ví dụ `domain.com`).
-
-Site đối tác nhúng **cổng** (không nhúng thẳng `/mong/app/`):
+- Không tự kiểm tra / lưu danh sách tên miền đối tác. Tab **Đối tác** do hosting: `https://YOUR-DOMAIN.com/shop-drawing/admin/` → tab Đối tác. Cổng `shop-drawing/mong/index.php` đã khóa iframe.
+- Không tự làm trang đăng ký / đăng nhập / OTP / mật khẩu trong app móng. Auth nằm ở hub hosting.
+- Không nhúng thẳng `.../mong/app/`. Đối tác nhúng cổng:
 
 ```html
 <iframe src="https://YOUR-DOMAIN.com/shop-drawing/mong/" width="100%" height="980" style="border:0" allow="download"></iframe>
 ```
 
-`shop-drawing/mong/index.php` kiểm tra domain rồi mới mở nội dung trong `mong/app/`.
+## Auth hosting (đã đổi — cần khớp)
 
-Việc agent cần làm:
-1. Build app tĩnh (Vite/… → `dist` hoặc tương đương).
-2. Output/deploy path = `shop-drawing/mong/app/` (có `index.html` ở gốc thư mục đó).
-3. Base path nếu cần: `/shop-drawing/mong/app/` (hoặc relative `./`) để asset load đúng trên hosting.
-4. (Tuỳ chọn) Khóa Xuất PDF bằng membership hosting:
+Thành viên **không còn đăng nhập bằng email OTP**.
+
+- Đăng ký (hub): username + email + mật khẩu → **OTP chỉ khi đăng ký lần đầu** để xác nhận email.
+- Đăng nhập (hub): **username + mật khẩu**.
+- Admin cấp gói theo **username**.
+
+Khóa **Xuất PDF / DXF** (và tính năng trả phí) bằng file hosting, không copy JS cũ:
 
 ```html
 <script src="/shop-drawing/assets/membership.js"
         data-api="/shop-drawing/api/"
-        data-activate-url="/shop-drawing/thanh-vien/"></script>
+        data-activate-url="/shop-drawing/dang-nhap/"></script>
 ```
 
 ```js
 const ok = await GiaHuyMembership.requireActive({ feature: "Xuất PDF", app: "mong" });
 if (!ok) return;
+// Xuất PDF / DXF
 ```
 
-Không publish đối tác bằng URL github.io nếu muốn khóa theo tab Đối tác.
+Nếu popup khóa: mở `/shop-drawing/dang-nhap/` (username + mật khẩu), **không** mở form email OTP, **không** dùng `requestOtp` / `verifyOtp`.
+
+## Build
+
+1. Build tĩnh (Vite/… → `dist`).
+2. Deploy vào `shop-drawing/mong/app/` (`index.html` ở gốc thư mục đó).
+3. Base path: `/shop-drawing/mong/app/` hoặc `./`.
+4. Không publish đối tác bằng github.io nếu muốn khóa theo tab Đối tác.
