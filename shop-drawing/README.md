@@ -48,21 +48,24 @@ Chỉ site có tên miền Admin → tab **Đối tác** đã thêm mới nhúng
 ```
 
 - `www` và không `www` = cùng một tên miền  
-- Agents móng/cột/dầm/sàn **không cần sửa** để nhận domain — xem [DOITAC-AGENTS.md](./DOITAC-AGENTS.md)
+- Agents móng/cột/dầm/sàn **upload vào** `shop-drawing/{mong|cot|dam|san}/app/` — **không** tự đọc tab Đối tác; xem [DOITAC-AGENTS.md](./DOITAC-AGENTS.md)
 
 ## Cấu trúc
 
 ```
 shop-drawing/
-  index.html            # Hub tabs + dùng thử + đăng nhập OTP
-  mong|cot|dam|san/     # Cổng iframe (chỉ domain đã cấp)
-  thanh-vien/           # Trang bán / đăng nhập email
-  admin/                # Thành viên + tên miền iframe + đổi MK
-  api/                  # JSON API (OTP, session, members, domains)
-  includes/             # PHP core
-  assets/membership.js  # Client gọi API
-  data/                 # SQLite (không public)
-  config.sample.php     # Mẫu — copy thành config.php
+  index.html              # Hub + dùng thử + OTP
+  mong|cot|dam|san/
+    index.php             # Cổng kiểm tra domain (Đối tác)
+    app/                  # ← upload build agent (index.html + assets)
+  thanh-vien/
+  admin/                  # Tab Thành viên · Tab Đối tác
+  api/
+  includes/
+  assets/membership.js
+  data/
+  config.sample.php
+  prompts/                # Tin nhắn dán vào từng agent
 ```
 
 ## API chính

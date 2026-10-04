@@ -30,8 +30,9 @@ if ($method === 'GET') {
       'embed_url' => $src,
       'iframe' => $html,
       // Agent shop không cần đọc danh sách domain — cổng hosting kiểm tra.
-      'agent_change' => 'none',
-      'agent_note' => 'Không sửa app ' . $id . ' để nhận domain. Đối tác nhúng URL hosting /shop-drawing/' . $id . '/; PHP kiểm tra tên miền từ tab Đối tác.',
+      'agent_change' => 'upload_to_app_folder',
+      'agent_note' => 'Upload build vào shop-drawing/' . $id . '/app/. Không đọc tab Đối tác trong app. Đối tác nhúng /shop-drawing/' . $id . '/ (cổng index.php).',
+      'upload_path' => 'shop-drawing/' . $id . '/app/',
     ];
   }
   json_out([

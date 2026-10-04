@@ -38,6 +38,11 @@ function list_allowed_domains(): array {
 function domain_is_allowed(string $hostOrUrl): bool {
   $norm = normalize_domain($hostOrUrl);
   if ($norm === '') return false;
+  // Cùng máy hosting (hub /shop-drawing/) luôn được nhúng
+  $own = normalize_domain((string) ($_SERVER['HTTP_HOST'] ?? ''));
+  if ($own !== '' && $norm === $own) {
+    return true;
+  }
   $st = db()->prepare('SELECT 1 FROM allowed_domains WHERE domain = ? LIMIT 1');
   $st->execute([$norm]);
   return (bool) $st->fetchColumn();

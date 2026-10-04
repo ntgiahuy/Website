@@ -57,12 +57,13 @@ return [
     'note' => 'Nội dung CK: GH + gói + email',
   ],
 
-  // Shop iframe (có thể trỏ github.io hoặc subdomain riêng)
+  // Shop nằm TRONG hosting: shop-drawing/{mong|cot|dam|san}/app/ (upload build agent vào đó)
+  // url mặc định 'app/' = thư mục con cạnh index.php cổng domain
   'apps' => [
-    ['id' => 'mong', 'name' => 'Shop thép móng', 'url' => 'https://ntgiahuy.github.io/mong/', 'blurb' => 'PDF / DXF'],
-    ['id' => 'cot', 'name' => 'Shop thép cột', 'url' => 'https://ntgiahuy.github.io/cot/', 'blurb' => 'PDF A1'],
-    ['id' => 'dam', 'name' => 'Shop thép dầm', 'url' => 'https://ntgiahuy.github.io/dam/', 'blurb' => 'PDF A2'],
-    ['id' => 'san', 'name' => 'Shop thép sàn', 'url' => 'https://ntgiahuy.github.io/san/', 'blurb' => 'Shop drawing sàn'],
-    ['id' => 'vach', 'name' => 'Shop thép vách', 'url' => '', 'blurb' => 'Sắp ra mắt', 'comingSoon' => true],
+    ['id' => 'mong', 'name' => 'Shop drawing móng đơn', 'url' => 'app/', 'blurb' => 'PDF / DXF'],
+    ['id' => 'cot', 'name' => 'Shop drawing cột', 'url' => 'app/', 'blurb' => 'PDF A1'],
+    ['id' => 'dam', 'name' => 'Shop drawing dầm', 'url' => 'app/', 'blurb' => 'PDF A2'],
+    ['id' => 'san', 'name' => 'Shop drawing sàn', 'url' => 'app/', 'blurb' => 'Shop drawing sàn'],
+    ['id' => 'vach', 'name' => 'Shop drawing vách', 'url' => '', 'blurb' => 'Sắp ra mắt', 'comingSoon' => true],
   ],
 ];

@@ -12,14 +12,21 @@ function embed_redirect_deny(): void {
   exit;
 }
 
+/** URL nội dung shop — mặc định thư mục con app/ (upload agent vào shop-drawing/{id}/app/). */
 function embed_app_url(string $appId): string {
   $apps = cfg('apps', []);
   foreach ($apps as $app) {
     if (($app['id'] ?? '') === $appId) {
-      return (string) ($app['url'] ?? '');
+      $url = trim((string) ($app['url'] ?? ''));
+      if ($url !== '') return $url;
+      break;
     }
   }
-  return '';
+  return 'app/';
+}
+
+function embed_own_host(): string {
+  return normalize_domain((string) ($_SERVER['HTTP_HOST'] ?? ''));
 }
 
 function embed_referer_host(): string {
@@ -32,15 +39,13 @@ function embed_referer_host(): string {
 /**
  * Kiểm tra quyền nhúng iframe.
  * - Mở thẳng URL (Sec-Fetch-Dest: document) → từ chối
- * - Iframe + Referer thuộc allowlist → cho phép
- * - Iframe không Referer: vẫn render, JS kiểm tra tiếp (referrer/ancestorOrigins)
+ * - Iframe + Referer thuộc allowlist (hoặc chính hosting) → cho phép
  */
 function embed_server_decision(): array {
   $dest = strtolower((string) ($_SERVER['HTTP_SEC_FETCH_DEST'] ?? ''));
   $mode = strtolower((string) ($_SERVER['HTTP_SEC_FETCH_MODE'] ?? ''));
   $refererHost = embed_referer_host();
 
-  // Điều hướng top-level rõ ràng
   if ($dest === 'document' || ($mode === 'navigate' && $dest !== 'iframe')) {
     return ['allow' => false, 'reason' => 'top_level', 'host' => $refererHost];
   }
@@ -52,11 +57,9 @@ function embed_server_decision(): array {
     if ($refererHost !== '' && domain_is_allowed($refererHost)) {
       return ['allow' => true, 'reason' => 'referer_ok', 'host' => $refererHost];
     }
-    // Iframe nhưng thiếu Referer — để JS quyết
     return ['allow' => true, 'reason' => 'iframe_no_referer', 'host' => '', 'needs_js' => true];
   }
 
-  // Trình duyệt cũ không gửi Sec-Fetch-*: Referer hợp lệ → cho qua, JS vẫn chặn nếu không nằm trong iframe
   if ($refererHost !== '') {
     if (domain_is_allowed($refererHost)) {
       return ['allow' => true, 'reason' => 'referer_ok_legacy', 'host' => $refererHost, 'needs_js' => true];
@@ -64,7 +67,6 @@ function embed_server_decision(): array {
     return ['allow' => false, 'reason' => 'domain_denied', 'host' => $refererHost];
   }
 
-  // Không có tín hiệu iframe / Referer → coi như mở thẳng URL
   return ['allow' => false, 'reason' => 'no_signal', 'host' => ''];
 }
 
@@ -75,6 +77,20 @@ function render_embed_shop(string $appId): void {
   }
 
   $shopUrl = embed_app_url($appId);
+  $appDir = dirname(__DIR__) . '/' . $appId . '/app';
+  if ($shopUrl === 'app/' || str_starts_with($shopUrl, 'app/')) {
+    if (!is_dir($appDir) || (!is_file($appDir . '/index.html') && !is_file($appDir . '/index.php'))) {
+      http_response_code(503);
+      header('Content-Type: text/html; charset=utf-8');
+      echo '<!DOCTYPE html><meta charset="utf-8"><title>Chưa upload shop</title>';
+      echo '<body style="font-family:sans-serif;background:#111;color:#eee;padding:2rem">';
+      echo '<p>Chưa có file shop trong <code>shop-drawing/' . htmlspecialchars($appId) . '/app/</code>.</p>';
+      echo '<p>Upload bản build của agent vào thư mục đó (cần có <code>index.html</code>).</p>';
+      echo '</body>';
+      exit;
+    }
+  }
+
   if ($shopUrl === '') {
     http_response_code(404);
     header('Content-Type: text/plain; charset=utf-8');
@@ -89,7 +105,13 @@ function render_embed_shop(string $appId): void {
     $allowedHosts[] = $d;
     $allowedHosts[] = 'www.' . $d;
   }
-  $allowedHosts = array_values(array_unique($allowedHosts));
+  // Cho phép hub / cùng hosting nhúng (không cần thêm vào tab Đối tác)
+  $own = embed_own_host();
+  if ($own !== '') {
+    $allowedHosts[] = $own;
+    $allowedHosts[] = 'www.' . $own;
+  }
+  $allowedHosts = array_values(array_unique(array_filter($allowedHosts)));
   $deny = embed_deny_url();
   $csp = frame_ancestors_csp();
 
@@ -141,7 +163,6 @@ function render_embed_shop(string $appId): void {
         catch (e) { location.replace(DENY); }
       }
 
-      // Mở thẳng URL (không nằm trong iframe) → về giahuy.net
       var inFrame = false;
       try { inFrame = window.top !== window.self; } catch (e) { inFrame = true; }
       if (!inFrame) { goDeny(); return; }
@@ -163,7 +184,6 @@ function render_embed_shop(string $appId): void {
         if (!hostAllowed(parentHost)) goDeny();
         return;
       }
-      // Không đọc được parent: chỉ giữ nếu server đã xác nhận Referer
       if (!SERVER_OK) goDeny();
     })();
   </script>

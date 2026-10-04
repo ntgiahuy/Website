@@ -1,68 +1,51 @@
-# Agents Shop Drawing · nhận domain từ tab Đối tác?
+# Agents Shop Drawing · upload trong `shop-drawing/` + domain Đối tác
 
-## Kết luận ngắn
-
-| Agent / app | Cần sửa để nhận domain từ tab Đối tác? |
-|-------------|----------------------------------------|
-| Shop drawing **móng đơn** (`mong`) | **Không** |
-| Shop drawing **cột** (`cot`) | **Không** |
-| Shop drawing **dầm** (`dam`) | **Không** |
-| Shop drawing **sàn** (`san`) | **Không** |
-
-Danh sách tên miền ở Admin → **Đối tác** chỉ được đọc bởi cổng PHP trên hosting:
+## Cấu trúc hosting
 
 ```
-https://YOUR-DOMAIN.com/shop-drawing/mong/
-https://YOUR-DOMAIN.com/shop-drawing/cot/
-https://YOUR-DOMAIN.com/shop-drawing/dam/
-https://YOUR-DOMAIN.com/shop-drawing/san/
+public_html/shop-drawing/
+  admin/                 # Thành viên + Đối tác
+  api/
+  mong/
+    index.php            # Cổng kiểm tra domain
+    app/                 # ← upload build agent móng đơn
+  cot/
+    index.php
+    app/                 # ← upload build agent cột
+  dam/
+    index.php
+    app/                 # ← upload build agent dầm
+  san/
+    index.php
+    app/                 # ← upload build agent sàn
 ```
 
-App shop (github.io / repo riêng) chỉ là nội dung bên trong iframe sau khi cổng đã cho phép.
+## Kết luận
 
-## Việc đúng của từng phía
+| Agent | Upload vào | Sửa code để đọc tab Đối tác? |
+|-------|------------|------------------------------|
+| Móng đơn | `shop-drawing/mong/app/` | **Không** |
+| Cột | `shop-drawing/cot/app/` | **Không** |
+| Dầm | `shop-drawing/dam/app/` | **Không** |
+| Sàn | `shop-drawing/san/app/` | **Không** |
 
-### Hosting `shop-drawing` (đã có)
-1. Admin thêm `domain.com` ở tab **Đối tác**
-2. Site đối tác nhúng iframe trỏ tới `/shop-drawing/{mong|cot|dam|san}/`
-3. PHP kiểm tra Referer / parent domain ∈ allowlist  
-   - Đúng → hiện shop  
-   - Sai / mở thẳng → `https://www.giahuy.net/`
+Tab **Đối tác** chỉ ảnh hưởng cổng `.../mong|cot|dam|san/` (file `index.php`).  
+App trong `app/` chỉ hiện sau khi cổng cho phép.
 
-### Agents móng / cột / dầm / sàn — **không** làm
-- Không gọi API `admin_domains`
-- Không tự giữ danh sách domain đối tác
-- Không nhúng iframe từ `*.github.io/...` trên site đối tác nếu muốn khóa theo domain (sẽ **bỏ qua** allowlist)
-
-### Agents móng / cột / dầm / sàn — chỉ cần (tuỳ chọn)
-1. Giữ URL app đúng trong `shop-drawing/config.php` → `apps[].url`  
-   (vd. `https://ntgiahuy.github.io/mong/`)
-2. Nếu muốn khóa **Xuất PDF** theo thành viên email hosting:
+## Đối tác nhúng
 
 ```html
-<script src="https://YOUR-DOMAIN.com/shop-drawing/assets/membership.js"
-        data-api="https://YOUR-DOMAIN.com/shop-drawing/api/"
-        data-activate-url="https://YOUR-DOMAIN.com/shop-drawing/thanh-vien/"></script>
+<iframe src="https://YOUR-DOMAIN.com/shop-drawing/mong/" ...></iframe>
+<iframe src="https://YOUR-DOMAIN.com/shop-drawing/cot/" ...></iframe>
+<iframe src="https://YOUR-DOMAIN.com/shop-drawing/dam/" ...></iframe>
+<iframe src="https://YOUR-DOMAIN.com/shop-drawing/san/" ...></iframe>
 ```
 
-```js
-const ok = await GiaHuyMembership.requireActive({ feature: "Xuất PDF", app: "mong" });
-if (!ok) return;
-```
+Không nhúng `.../mong/app/` trực tiếp.
 
-(`app` lần lượt: `mong` | `cot` | `dam` | `san`)
+## Tin nhắn dán agent
 
-## Sai lầm thường gặp
-
-Đối tác dán thẳng:
-
-```html
-<iframe src="https://ntgiahuy.github.io/mong/" ...></iframe>
-```
-
-→ Tab **Đối tác** **không** kiểm soát được. Phải dùng URL hosting `/shop-drawing/mong/`.
-
-## Tin nhắn sẵn để dán vào agent
-
-- Móng đơn: [prompts/AGENT-MONG-DON.md](./prompts/AGENT-MONG-DON.md)
-- Sàn: [prompts/AGENT-SAN.md](./prompts/AGENT-SAN.md)
+- [prompts/AGENT-MONG-DON.md](./prompts/AGENT-MONG-DON.md)
+- [prompts/AGENT-COT.md](./prompts/AGENT-COT.md)
+- [prompts/AGENT-DAM.md](./prompts/AGENT-DAM.md)
+- [prompts/AGENT-SAN.md](./prompts/AGENT-SAN.md)

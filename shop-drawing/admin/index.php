@@ -204,7 +204,7 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
         <div class="panel">
           <h2>Mã nhúng cho đối tác</h2>
           <p class="hint">Dán vào site đã được cấp tên miền ở tab Đối tác. Mở thẳng URL hoặc site chưa cấp → chuyển về giahuy.net.</p>
-          <p class="hint" style="margin-top:0.5rem"><strong>Shop apps (mong/cot/dam/san) không cần sửa code để nhận domain</strong> — cổng hosting <span class="mono">/shop-drawing/{mong|cot|dam|san}/</span> tự kiểm tra tên miền từ tab Đối tác.</p>
+          <p class="hint" style="margin-top:0.5rem">Upload build agent vào <span class="mono">shop-drawing/{mong|cot|dam|san}/app/</span>. Cổng <span class="mono">.../mong/</span> (v.v.) kiểm tra tên miền từ tab Đối tác rồi mới mở <span class="mono">app/</span>. Agents <strong>không</strong> tự đọc danh sách domain.</p>
 
           <p class="snip-label">Shop drawing móng đơn <span>· mong</span></p>
           <textarea id="snip-mong" readonly></textarea>

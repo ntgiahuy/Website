@@ -11,7 +11,8 @@ Options -Indexes
   Header set X-Content-Type-Options "nosniff"
 </IfModule>
 
-DirectoryIndex index.html index.php
+# Cổng shop ưu tiên index.php (kiểm tra domain); app nằm trong */app/
+DirectoryIndex index.php index.html
 
 # /cot và /cot/ đều vào index.php
 <IfModule mod_rewrite.c>
