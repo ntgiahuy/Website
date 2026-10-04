@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Chuẩn hóa tên miền: bỏ https://, path, www. → partner.com
+ * Chuẩn hóa tên miền: bỏ https://, path, www. → domain.com
  */
 function normalize_domain(string $input): string {
   $s = trim(strtolower($input));
@@ -46,7 +46,7 @@ function domain_is_allowed(string $hostOrUrl): bool {
 function add_allowed_domain(string $input, string $note = ''): array {
   $domain = normalize_domain($input);
   if ($domain === '') {
-    return ['ok' => false, 'error' => 'Tên miền không hợp lệ. Ví dụ: partner.com hoặc https://www.partner.com'];
+    return ['ok' => false, 'error' => 'Tên miền không hợp lệ. Ví dụ: domain.com hoặc https://www.domain.com'];
   }
   $now = time();
   db()->prepare(

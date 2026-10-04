@@ -30,14 +30,15 @@ Gói upload vào `public_html/shop-drawing` trên hosting có PHP + SQLite.
 5. Mở thử:
    - Hub: `https://domain/shop-drawing/`
    - Thành viên: `https://domain/shop-drawing/thanh-vien/`
-   - Admin: `https://domain/shop-drawing/admin/` (lần đầu: `giahuy` / `GiahuyAdmin` — đổi ngay)
+   - Admin: `https://domain/shop-drawing/admin/` (lần đầu: `giahuy` / `GiahuyAdmin` — đổi ngay)  
+     · Tab **Thành viên** · Tab **Đối tác**
 
 ## Iframe theo tên miền (mong / cot / dam / san)
 
-Chỉ site có tên miền Admin đã thêm mới nhúng được. Mở thẳng URL hoặc site chưa cấp → chuyển về `https://www.giahuy.net/`.
+Chỉ site có tên miền Admin → tab **Đối tác** đã thêm mới nhúng được. Mở thẳng URL hoặc site chưa cấp → chuyển về `https://www.giahuy.net/`.
 
-1. Vào Admin → tab **Tên miền iframe** → thêm `partner.com` (hoặc `www.partner.com`, có/không `https://`)
-2. Trên site đối tác dán:
+1. Admin → tab **Đối tác** → thêm `domain.com` (hoặc `www.domain.com`, có/không `https://`)
+2. Trên site đối tác dán mã nhúng (cũng hiện sẵn trong tab Đối tác):
 
 ```html
 <iframe src="https://YOUR-DOMAIN.com/shop-drawing/mong/" width="100%" height="980" style="border:0" allow="download"></iframe>
@@ -47,7 +48,7 @@ Chỉ site có tên miền Admin đã thêm mới nhúng được. Mở thẳng 
 ```
 
 - `www` và không `www` = cùng một tên miền  
-- Dùng cho **mong, cot, dam, san**
+- Agents móng/cột/dầm/sàn **không cần sửa** để nhận domain — xem [DOITAC-AGENTS.md](./DOITAC-AGENTS.md)
 
 ## Cấu trúc
 
