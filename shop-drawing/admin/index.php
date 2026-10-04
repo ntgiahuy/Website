@@ -327,7 +327,7 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
       }
 
       async function loadPlans() {
-        var cfg = await api("config.php");
+        var cfg = await api("public-config.php");
         var sel = document.getElementById("plan");
         sel.innerHTML = "";
         (cfg.plans || []).forEach(function (p) {

@@ -78,7 +78,7 @@ shop-drawing/
 | `POST api/auth_logout.php` | Đăng xuất |
 | `POST api/trial_start.php` | Bắt đầu dùng thử (theo browser key) |
 | `GET  api/access.php` | `allowed` / `mode` / `can_pdf` |
-| `GET  api/config.php` | Plans, pay, apps (công khai) |
+| `GET  api/public-config.php` | Plans, pay, apps (công khai) |
 | `POST api/admin_login.php` | Đăng nhập admin (`giahuy` / `GiahuyAdmin` lần đầu) |
 | `POST api/admin_password.php` | Đổi mật khẩu admin |
 | `GET/POST api/admin_members.php` | Liệt kê / cấp / thu hồi thành viên |

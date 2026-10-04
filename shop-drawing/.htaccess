@@ -1,4 +1,4 @@
-# Bảo vệ file cấu hình & dữ liệu
+# Bảo vệ file cấu hình bí mật (không chặn api/public-config.php)
 <FilesMatch "^(config\.php|config\.sample\.php)$">
   Require all denied
 </FilesMatch>

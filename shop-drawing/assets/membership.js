@@ -168,7 +168,7 @@
   }
 
   async function loadPublicConfig() {
-    return api("config.php");
+    return api("public-config.php");
   }
 
   function formatExpiry(status) {
