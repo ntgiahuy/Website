@@ -11,7 +11,9 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($method === 'GET') {
   $rows = db()->query('SELECT * FROM members ORDER BY updated_at DESC LIMIT 500')->fetchAll();
-  $list = array_map(static fn($r) => member_public($r), $rows);
+  $list = array_map(static function ($r) {
+    return member_public($r);
+  }, $rows);
   json_out(['ok' => true, 'members' => $list]);
 }
 

@@ -1,7 +1,19 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/polyfills.php';
+
 header_remove('X-Powered-By');
+
+if (PHP_VERSION_ID < 70400) {
+  http_response_code(500);
+  header('Content-Type: application/json; charset=utf-8');
+  echo json_encode([
+    'ok' => false,
+    'error' => 'Hosting cần PHP >= 7.4 (hiện tại: ' . PHP_VERSION . '). Đổi phiên bản PHP trong cPanel.',
+  ], JSON_UNESCAPED_UNICODE);
+  exit;
+}
 
 $configFile = dirname(__DIR__) . '/config.php';
 if (!is_file($configFile)) {
@@ -9,16 +21,24 @@ if (!is_file($configFile)) {
   header('Content-Type: application/json; charset=utf-8');
   echo json_encode([
     'ok' => false,
-    'error' => 'Thiếu config.php — sao chép config.sample.php thành config.php và điền thông tin.',
+    'error' => 'Thiếu config.php — trên hosting chạy: cp config.sample.php config.php rồi điền thông tin.',
   ], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
 /** @var array $CONFIG */
 $CONFIG = require $configFile;
+if (!is_array($CONFIG)) {
+  http_response_code(500);
+  header('Content-Type: application/json; charset=utf-8');
+  echo json_encode([
+    'ok' => false,
+    'error' => 'config.php phải return [...] — kiểm tra lại cú pháp file.',
+  ], JSON_UNESCAPED_UNICODE);
+  exit;
+}
 
 session_name($CONFIG['session_name'] ?? 'GHSID');
-// Cookie path theo thư mục shop-drawing (vd. /shop-drawing)
 $cookiePath = '/';
 $script = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
 if (preg_match('#^(.*?/shop-drawing)(?:/|$)#', $script, $m)) {
@@ -26,13 +46,21 @@ if (preg_match('#^(.*?/shop-drawing)(?:/|$)#', $script, $m)) {
 } elseif (!empty($CONFIG['cookie_path'])) {
   $cookiePath = (string) $CONFIG['cookie_path'];
 }
-session_set_cookie_params([
-  'lifetime' => 0,
-  'path' => $cookiePath,
-  'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
-  'httponly' => true,
-  'samesite' => 'Lax',
-]);
+$secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+  || ((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+
+if (PHP_VERSION_ID >= 70300) {
+  session_set_cookie_params([
+    'lifetime' => 0,
+    'path' => $cookiePath,
+    'secure' => $secure,
+    'httponly' => true,
+    'samesite' => 'Lax',
+  ]);
+} else {
+  session_set_cookie_params(0, $cookiePath, '', $secure, true);
+}
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
   session_start();
 }
@@ -70,8 +98,7 @@ function read_json_body(): array {
 }
 
 function normalize_email(?string $email): string {
-  $email = strtolower(trim((string) $email));
-  return $email;
+  return strtolower(trim((string) $email));
 }
 
 function valid_email(string $email): bool {

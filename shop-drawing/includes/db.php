@@ -5,10 +5,17 @@ function db(): PDO {
   static $pdo = null;
   if ($pdo instanceof PDO) return $pdo;
 
+  if (!class_exists('PDO') || !in_array('sqlite', PDO::getAvailableDrivers(), true)) {
+    throw new RuntimeException('Hosting thiếu PDO SQLite. Trong cPanel → Select PHP Version → bật pdo_sqlite + sqlite.');
+  }
+
   $path = (string) cfg('db_path');
   $dir = dirname($path);
   if (!is_dir($dir)) {
     mkdir($dir, 0755, true);
+  }
+  if (!is_writable($dir)) {
+    throw new RuntimeException('Thư mục data/ không ghi được. Chmod 755 hoặc 775 cho shop-drawing/data/.');
   }
 
   $pdo = new PDO('sqlite:' . $path, null, null, [
@@ -53,7 +60,9 @@ SQL);
 
   // Migration nhẹ nếu DB cũ thiếu cột token_hash
   $cols = $pdo->query("PRAGMA table_info(otps)")->fetchAll();
-  $names = array_map(static fn($c) => $c['name'], $cols);
+  $names = array_map(static function ($c) {
+    return $c['name'];
+  }, $cols);
   if (!in_array('token_hash', $names, true)) {
     $pdo->exec("ALTER TABLE otps ADD COLUMN token_hash TEXT NOT NULL DEFAULT ''");
   }

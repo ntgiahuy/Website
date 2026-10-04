@@ -72,8 +72,13 @@
     var data = await res.json().catch(function () {
       return null;
     });
-    if (!res.ok || !data) {
-      var err = new Error((data && data.error) || "Lỗi máy chủ (" + res.status + ").");
+    if (!res.ok || !data || data.ok === false) {
+      var msg =
+        (data && data.error) ||
+        (res.status === 500
+          ? "Lỗi máy chủ (500). Mở /shop-drawing/api/health.php để xem nguyên nhân."
+          : "Lỗi máy chủ (" + res.status + ").");
+      var err = new Error(msg);
       err.status = res.status;
       err.data = data;
       throw err;
