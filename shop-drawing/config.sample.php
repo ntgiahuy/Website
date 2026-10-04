@@ -67,13 +67,14 @@ return [
     'note' => 'Nội dung CK: GH + gói + email',
   ],
 
-  // Shop nằm TRONG hosting: shop-drawing/{mong|cot|dam|san}/app/ (upload build agent vào đó)
-  // url mặc định 'app/' = thư mục con cạnh index.php cổng domain
+  // Shop trên hosting:
+  //   url     = cổng hub/iframe đối tác → ./mong/ | ./cot/ | ./dam/ | ./san/
+  //   content = thư mục build agent trong cổng → app/  (shop-drawing/{id}/app/)
   'apps' => [
-    ['id' => 'mong', 'name' => 'Shop drawing móng đơn', 'url' => 'app/', 'blurb' => 'PDF / DXF'],
-    ['id' => 'cot', 'name' => 'Shop drawing cột', 'url' => 'app/', 'blurb' => 'PDF A1'],
-    ['id' => 'dam', 'name' => 'Shop drawing dầm', 'url' => 'app/', 'blurb' => 'PDF A2'],
-    ['id' => 'san', 'name' => 'Shop drawing sàn', 'url' => 'app/', 'blurb' => 'Shop drawing sàn'],
-    ['id' => 'vach', 'name' => 'Shop drawing vách', 'url' => '', 'blurb' => 'Sắp ra mắt', 'comingSoon' => true],
+    ['id' => 'mong', 'name' => 'Shop drawing móng đơn', 'url' => './mong/', 'content' => 'app/', 'blurb' => 'PDF / DXF'],
+    ['id' => 'cot', 'name' => 'Shop drawing cột', 'url' => './cot/', 'content' => 'app/', 'blurb' => 'PDF A1'],
+    ['id' => 'dam', 'name' => 'Shop drawing dầm', 'url' => './dam/', 'content' => 'app/', 'blurb' => 'PDF A2'],
+    ['id' => 'san', 'name' => 'Shop drawing sàn', 'url' => './san/', 'content' => 'app/', 'blurb' => 'Shop drawing sàn'],
+    ['id' => 'vach', 'name' => 'Shop drawing vách', 'url' => '', 'content' => '', 'blurb' => 'Sắp ra mắt', 'comingSoon' => true],
   ],
 ];

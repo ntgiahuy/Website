@@ -363,7 +363,17 @@
           var frame = frames[key];
           var on = key === id;
           frame.classList.toggle("active", on);
-          if (on && !frame.src && app && app.url) frame.src = app.url;
+          if (on && app && !app.comingSoon) {
+            // Mỗi tab một cổng riêng; không dùng url "app/" chung
+            var src = app.url;
+            if (!src || src === "app/" || src === "./app/" || src === "app") {
+              src = "./" + app.id + "/";
+            }
+            if (frame.dataset.loadedSrc !== src) {
+              frame.src = src;
+              frame.dataset.loadedSrc = src;
+            }
+          }
         });
       }
 

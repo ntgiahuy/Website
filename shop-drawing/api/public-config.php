@@ -6,7 +6,31 @@ try {
 
   $pay = cfg('pay', []);
   $plans = cfg('plans', []);
-  $apps = cfg('apps', []);
+  $rawApps = cfg('apps', []);
+  $base = rtrim((string) cfg('base_url', ''), '/');
+
+  // Chuẩn hóa URL hub: mỗi app một cổng riêng ./mong/ ./cot/ ...
+  $apps = [];
+  foreach ($rawApps as $app) {
+    if (!is_array($app)) continue;
+    $id = (string) ($app['id'] ?? '');
+    $row = $app;
+    $coming = !empty($app['comingSoon']);
+    if ($id !== '' && !$coming) {
+      // Nếu config cũ để url = app/ cho mọi app → sửa thành cổng theo id
+      $url = trim((string) ($app['url'] ?? ''));
+      if ($url === '' || $url === 'app/' || $url === './app/' || $url === 'app') {
+        $row['url'] = $base !== '' ? ($base . '/' . $id . '/') : ('./' . $id . '/');
+      } elseif (preg_match('#^\./#', $url) || preg_match('#^https?://#i', $url)) {
+        $row['url'] = $url;
+      } else {
+        $row['url'] = $base !== '' ? ($base . '/' . $id . '/') : ('./' . $id . '/');
+      }
+    }
+    // Không lộ đường dẫn nội bộ content ra client nếu không cần
+    unset($row['content']);
+    $apps[] = $row;
+  }
 
   json_out([
     'ok' => true,

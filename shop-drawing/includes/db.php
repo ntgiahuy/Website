@@ -5,17 +5,19 @@ function db_driver(): string {
   $d = strtolower((string) (cfg('db_driver') ?? 'auto'));
   if ($d === 'mysql' || $d === 'sqlite') return $d;
 
-  // auto: ưu tiên sqlite nếu có; không thì mysql nếu đã cấu hình
-  if (class_exists('PDO') && in_array('sqlite', PDO::getAvailableDrivers(), true)) {
-    return 'sqlite';
-  }
+  $hasSqlite = class_exists('PDO') && in_array('sqlite', PDO::getAvailableDrivers(), true);
+  $hasMysql = class_exists('PDO') && in_array('mysql', PDO::getAvailableDrivers(), true);
   $mysql = cfg('mysql', []);
-  if (is_array($mysql) && !empty($mysql['dbname']) && !empty($mysql['user'])) {
-    if (class_exists('PDO') && in_array('mysql', PDO::getAvailableDrivers(), true)) {
-      return 'mysql';
-    }
-  }
-  return 'sqlite';
+  $mysqlReady = is_array($mysql)
+    && !empty($mysql['dbname'])
+    && !empty($mysql['user'])
+    && $mysql['dbname'] !== 'TEN_DATABASE'
+    && $mysql['user'] !== 'TEN_USER_MYSQL';
+
+  // auto: sqlite nếu có; không thì mysql (phổ biến trên hosting cPanel)
+  if ($hasSqlite) return 'sqlite';
+  if ($hasMysql) return 'mysql';
+  return $mysqlReady ? 'mysql' : 'sqlite';
 }
 
 function db_is_mysql(): bool {

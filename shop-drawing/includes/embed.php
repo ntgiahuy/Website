@@ -12,13 +12,19 @@ function embed_redirect_deny(): void {
   exit;
 }
 
-/** URL nội dung shop — mặc định thư mục con app/ (upload agent vào shop-drawing/{id}/app/). */
+/**
+ * URL nội dung trong cổng embed — luôn là thư mục app/ cạnh index.php
+ * (không dùng apps.url của hub, tránh mọi tab cùng mở móng).
+ */
 function embed_app_url(string $appId): string {
   $apps = cfg('apps', []);
   foreach ($apps as $app) {
     if (($app['id'] ?? '') === $appId) {
+      $content = trim((string) ($app['content'] ?? ''));
+      if ($content !== '') return $content;
+      // Tương thích cũ: chỉ lấy url nếu là đường dẫn nội dung app/, không phải ./cot/
       $url = trim((string) ($app['url'] ?? ''));
-      if ($url !== '') return $url;
+      if ($url === 'app/' || $url === './app/' || $url === 'app') return 'app/';
       break;
     }
   }
