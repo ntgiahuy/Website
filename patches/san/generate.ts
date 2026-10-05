@@ -2473,7 +2473,7 @@ function drawScheduleTable(ctx: Ctx, x: number, y: number) {
     true,
   );
 
-  // LỚP: 1 chữ đứng đậm / nhóm (Thép lớp dưới | Thép lớp trên) — giống TÊN CK
+  // LỚP: 1 chữ đứng đậm / nhóm (Lớp dưới | Lớp trên) — giống TÊN CK
   let gi = 0;
   while (gi < rows.length) {
     const key = layerKeyOf(rows[gi]!.layer);
