@@ -273,30 +273,45 @@
     .msg { margin-top: 0.65rem; font-size: 0.9rem; }
     .msg.ok { color: var(--ok); }
     .msg.bad { color: var(--danger); }
-    .pay-note {
-      margin-top: 0.9rem; padding: 0.75rem 0.85rem; border-radius: 10px;
-      border: 1px solid var(--line); background: rgba(0,0,0,0.25);
-      font-size: 0.86rem; color: var(--muted);
+    .pay-boxes {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+      margin-top: 0.95rem;
     }
-    .pay-note strong { color: var(--ink); }
-    .pay-box {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem 1.25rem;
-      margin-top: 0.95rem; padding: 0.95rem 1rem;
+    .pay-table {
+      min-width: 0; padding: 0.9rem 0.95rem;
       border-radius: 12px; border: 1px solid var(--line);
       background: rgba(0,0,0,0.25);
     }
-    .pay-box .pay-col { min-width: 0; }
-    .pay-box .pay-row {
-      display: grid; grid-template-columns: 8.2rem minmax(0, 1fr); gap: 0.35rem;
-      align-items: baseline; margin: 0.32rem 0; font-size: 0.88rem; line-height: 1.4;
+    .pay-table .pay-row {
+      display: grid; grid-template-columns: 8.6rem minmax(0, 1fr); gap: 0.35rem;
+      align-items: center; margin: 0.22rem 0; padding: 0.32rem 0.45rem;
+      border-radius: 8px; font-size: 0.88rem; line-height: 1.4;
+      transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
     }
-    .pay-box .pay-row span { color: var(--muted); font-weight: 500; }
-    .pay-box .pay-row strong { color: var(--ink); font-weight: 700; word-break: break-word; }
+    .pay-table .pay-row span { color: var(--muted); font-weight: 500; }
+    .pay-table .pay-row strong { color: var(--ink); font-weight: 700; word-break: break-word; }
+    .pay-table .pay-row.is-active {
+      background: rgba(232,163,23,0.22);
+      border: 1px solid rgba(232,163,23,0.55);
+      box-shadow: inset 0 0 0 1px rgba(232,163,23,0.12);
+    }
+    .pay-table .pay-row.is-active span,
+    .pay-table .pay-row.is-active strong { color: #f6d27a; }
+    .pay-table .pay-row.is-flash {
+      animation: payFlash 0.7s ease;
+    }
+    @keyframes payFlash {
+      0% { background: rgba(232,163,23,0.55); }
+      100% { background: rgba(232,163,23,0.22); }
+    }
+    .huong-cta {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem;
+      margin-top: 0.9rem;
+    }
+    .huong-cta .btn { width: 100%; justify-content: center; min-height: 2.7rem; }
     @media (max-width: 760px) {
-      .pay-box { grid-template-columns: 1fr; gap: 0.55rem; }
-      .pay-box .pay-col + .pay-col {
-        padding-top: 0.55rem; border-top: 1px solid var(--line);
-      }
+      .pay-boxes { grid-template-columns: 1fr; }
+      .pay-table .pay-row { grid-template-columns: 7.6rem minmax(0, 1fr); }
     }
     .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; word-break: break-all; }
     .otp-step[hidden] { display: none !important; }
@@ -463,19 +478,21 @@
                 </div>
               </div>
             </div>
-            <div class="pay-box" id="pay-box">
-              <div class="pay-col">
-                <div class="pay-row"><span>Bạn đang chọn gói</span><strong id="pay-plan-label">—</strong></div>
-                <div class="pay-row"><span>Số tiền</span><strong id="pay-amount">—</strong></div>
-                <div class="pay-row"><span>Nội dung CK</span><strong class="mono" id="pay-ck">GH username</strong></div>
+            <div class="pay-boxes">
+              <div class="pay-table" id="pay-table-plan">
+                <div class="pay-row is-active" id="pay-plan-row">
+                  <span>Bạn đang chọn gói:</span><strong id="pay-plan-label">—</strong>
+                </div>
+                <div class="pay-row"><span>Số tiền:</span><strong id="pay-amount">—</strong></div>
+                <div class="pay-row"><span>Nội dung CK:</span><strong class="mono" id="pay-ck">GH username</strong></div>
               </div>
-              <div class="pay-col">
-                <div class="pay-row"><span>Chuyển khoản</span><strong id="pay-bank">—</strong></div>
-                <div class="pay-row"><span>Tên tài khoản</span><strong id="pay-holder">—</strong></div>
-                <div class="pay-row"><span>Số tài khoản</span><strong class="mono" id="pay-account">—</strong></div>
+              <div class="pay-table" id="pay-table-bank">
+                <div class="pay-row"><span>Chuyển khoản:</span><strong id="pay-bank">—</strong></div>
+                <div class="pay-row"><span>Tên tài khoản:</span><strong id="pay-holder">—</strong></div>
+                <div class="pay-row"><span>Số tài khoản:</span><strong class="mono" id="pay-account">—</strong></div>
               </div>
             </div>
-            <div class="cta-auth" style="margin-top:0.9rem">
+            <div class="huong-cta">
               <a class="btn btn-primary" href="./dang-ky/">Đăng ký ngay</a>
               <a class="btn btn-ghost" href="./dang-nhap/">Đăng nhập</a>
             </div>
@@ -522,16 +539,18 @@
                 </div>
               </div>
             </div>
-            <div class="pay-box" id="pay-box-pay">
-              <div class="pay-col">
-                <div class="pay-row"><span>Bạn đang chọn gói</span><strong id="pay-plan-label-pay">—</strong></div>
-                <div class="pay-row"><span>Số tiền</span><strong id="pay-amount-pay">—</strong></div>
-                <div class="pay-row"><span>Nội dung CK</span><strong class="mono" id="pay-ck-pay">GH username</strong></div>
+            <div class="pay-boxes">
+              <div class="pay-table">
+                <div class="pay-row is-active" id="pay-plan-row-pay">
+                  <span>Bạn đang chọn gói:</span><strong id="pay-plan-label-pay">—</strong>
+                </div>
+                <div class="pay-row"><span>Số tiền:</span><strong id="pay-amount-pay">—</strong></div>
+                <div class="pay-row"><span>Nội dung CK:</span><strong class="mono" id="pay-ck-pay">GH username</strong></div>
               </div>
-              <div class="pay-col">
-                <div class="pay-row"><span>Chuyển khoản</span><strong id="pay-bank-pay">—</strong></div>
-                <div class="pay-row"><span>Tên tài khoản</span><strong id="pay-holder-pay">—</strong></div>
-                <div class="pay-row"><span>Số tài khoản</span><strong class="mono" id="pay-account-pay">—</strong></div>
+              <div class="pay-table">
+                <div class="pay-row"><span>Chuyển khoản:</span><strong id="pay-bank-pay">—</strong></div>
+                <div class="pay-row"><span>Tên tài khoản:</span><strong id="pay-holder-pay">—</strong></div>
+                <div class="pay-row"><span>Số tài khoản:</span><strong class="mono" id="pay-account-pay">—</strong></div>
               </div>
             </div>
           </section>
@@ -576,12 +595,14 @@
         plans: document.getElementById("plans"),
         transferContent: document.getElementById("transfer-content"),
         transferContentPay: document.getElementById("transfer-content-pay"),
+        payPlanRow: document.getElementById("pay-plan-row"),
         payPlanLabel: document.getElementById("pay-plan-label"),
         payAmount: document.getElementById("pay-amount"),
         payCk: document.getElementById("pay-ck"),
         payBank: document.getElementById("pay-bank"),
         payHolder: document.getElementById("pay-holder"),
         payAccount: document.getElementById("pay-account"),
+        payPlanRowPay: document.getElementById("pay-plan-row-pay"),
         payPlanLabelPay: document.getElementById("pay-plan-label-pay"),
         payAmountPay: document.getElementById("pay-amount-pay"),
         payCkPay: document.getElementById("pay-ck-pay"),
@@ -679,7 +700,20 @@
           " phút thì đăng nhập thành viên (username + mật khẩu) để tiếp tục. Xuất PDF cần thành viên còn hạn.";
       }
 
-      function loadPayConfig() {
+      function highlightPlanRow(flash) {
+        [els.payPlanRow, els.payPlanRowPay].forEach(function (row) {
+          if (!row) return;
+          row.classList.add("is-active");
+          if (flash) {
+            row.classList.remove("is-flash");
+            void row.offsetWidth;
+            row.classList.add("is-flash");
+          }
+        });
+      }
+
+      function loadPayConfig(opts) {
+        var flash = !!(opts && opts.flash);
         var c = window.__PAY__ || {};
         var plan = selectedPlan || PLANS[0];
         var price = PLAN_PRICES[(plan && plan.id) || ""] || 0;
@@ -704,6 +738,7 @@
         fill(els.payPlanLabelPay, els.payAmountPay, els.payCkPay, els.payBankPay, els.payHolderPay, els.payAccountPay);
         if (els.transferContent) els.transferContent.textContent = ck + " · " + amount;
         if (els.transferContentPay) els.transferContentPay.textContent = ck + " · " + amount;
+        highlightPlanRow(flash);
       }
 
       function scrollToHuongDan(fromPaywall) {
@@ -739,7 +774,7 @@
           art.querySelector("button").addEventListener("click", function () {
             selectedPlan = plan;
             renderPlans();
-            loadPayConfig();
+            loadPayConfig({ flash: true });
             scrollToHuongDan(fromPaywall);
           });
           container.appendChild(art);
