@@ -211,6 +211,20 @@
       display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem;
     }
     .card .cta-auth .btn { justify-content: center; width: 100%; }
+    @media (min-width: 761px) {
+      .card .cta-stack {
+        grid-template-columns: 1.35fr 1fr 1fr;
+        align-items: stretch;
+      }
+      .card .cta-stack > .btn-primary {
+        width: auto; white-space: nowrap;
+      }
+      .card .cta-auth { display: contents; }
+      .card .cta-stack > .btn,
+      .card .cta-stack .btn {
+        width: 100%; min-height: 2.75rem;
+      }
+    }
     .feature-grid {
       display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.7rem;
     }
