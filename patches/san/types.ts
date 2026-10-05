@@ -5,6 +5,13 @@ export const SPACING_OPTIONS = [100, 125, 150, 175, 200, 250, 300];
 
 export type RebarLayer = "bottom" | "top" | "structural";
 export type RebarDir = "X" | "Y";
+
+/** Tên vùng thép theo lớp: Lớp dưới / Lớp trên / Cấu tạo. */
+export function rebarLayerMark(layer: RebarLayer): string {
+  if (layer === "top") return "Lớp trên";
+  if (layer === "structural") return "Cấu tạo";
+  return "Lớp dưới";
+}
 export type LayoutPreset = "manual" | "simple2" | "economy2";
 export type BarShapeKind = "straight" | "hooked" | "mesh";
 
@@ -96,7 +103,7 @@ export interface BeamSegShift {
 
 /**
  * Đối tượng đang chọn trên mặt bằng:
- * - bay: ô sàn giữa hai cặp trục
+ * - bay: ô sàn giữa 4 dầm (lưới trục gắn dầm; dầm cắt giữa ô → tách thành nhiều ô)
  * - beam: một đoạn dầm giữa hai trục giao (không phải cả thanh đầu→cuối)
  * - axis: số hiệu / nhịp trục (X hoặc Y)
  */
@@ -170,18 +177,27 @@ export interface Economy2Layer {
   structuralHook: number;
   distToCenter: number;
   textHeight: number;
-  hatAlongShort: boolean;
+  /** @deprecated Thép mũ luôn bố trí cả X và Y — giữ để đọc file cũ. */
+  hatAlongShort?: boolean;
 }
 
 export interface SectionCut {
   id: string;
   name: string;
   textHeight: number;
-  /** Cắt theo phương X hoặc Y tại vị trí `at`. */
+  /**
+   * Cắt theo phương trục X → mặt cắt tại vị trí X = `at`;
+   * Cắt theo phương trục Y → mặt cắt tại vị trí Y = `at`.
+   */
   direction: RebarDir;
+  /** Vị trí cắt tuyệt đối (mm) — đồng bộ từ trục + offset. */
   at: number;
   from: number;
   to: number;
+  /** Trục tham chiếu (id trong axesX / axesY theo `direction`). */
+  axisId?: string;
+  /** Khoảng cách từ trục chọn trở ra (mm); `at` = pos(trục) + offsetMm. */
+  offsetMm?: number;
 }
 
 /** Loại dầm đã lưu (D1, D2…) — dùng để gán tên/kích thước cho đoạn trên mặt bằng. */
@@ -230,10 +246,11 @@ export const TABS: { id: TabId; label: string }[] = [
   { id: "plan", label: "Thông tin sàn" },
   { id: "axes", label: "Số liệu trục" },
   { id: "beams", label: "Số liệu dầm" },
-  { id: "draw", label: "Vẽ thép sàn" },
-  { id: "economy2", label: "Thép 2 lớp tiết kiệm" },
-  { id: "simple2", label: "Thép 2 lớp đơn giản" },
+  { id: "draw", label: "Bố trí sàn" },
   { id: "section", label: "Mặt cắt" },
   { id: "model3d", label: "Mô hình 3D" },
   { id: "info", label: "Thông tin xuất" },
 ];
+
+/** Tick trong tab Bố trí sàn (không còn là tab riêng). */
+export type LayoutPanelId = "manual" | "economy2" | "simple2";
