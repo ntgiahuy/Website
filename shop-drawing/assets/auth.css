@@ -147,3 +147,16 @@ a { color: var(--auth-blue-deep); text-decoration: none; }
   color: var(--auth-muted);
   font-size: 0.9rem;
 }
+.site-copy {
+  display: block;
+  text-align: center;
+  margin-top: 0.85rem;
+  color: var(--auth-muted);
+  font-size: 0.86rem;
+}
+.site-copy a {
+  color: var(--auth-accent, #5b6cff);
+  font-weight: 700;
+  text-decoration: none;
+}
+.site-copy a:hover { text-decoration: underline; }
