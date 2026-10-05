@@ -64,7 +64,7 @@ return [
     'bank' => 'Ngân hàng BIDV',
     'account' => '0362118138',
     'holder' => 'NGUYEN THANH NHAT',
-    'note' => 'Nội dung CK: GH + gói + email',
+    'note' => 'Nội dung CK: GH + username',
   ],
 
   // Shop trên hosting:
@@ -75,6 +75,5 @@ return [
     ['id' => 'cot', 'name' => 'Shop thép cột', 'url' => './cot/', 'content' => 'app/', 'blurb' => 'PDF A1'],
     ['id' => 'dam', 'name' => 'Shop thép dầm', 'url' => './dam/', 'content' => 'app/', 'blurb' => 'PDF A2'],
     ['id' => 'san', 'name' => 'Shop thép sàn', 'url' => './san/', 'content' => 'app/', 'blurb' => 'Shop thép sàn'],
-    ['id' => 'vach', 'name' => 'Shop thép vách', 'url' => '', 'content' => '', 'blurb' => 'Sắp ra mắt', 'comingSoon' => true],
   ],
 ];

@@ -170,7 +170,7 @@
         <div class="step">
           <div>
             <strong>Chọn gói và chuyển khoản</strong>
-            <p id="pay-hint">Nội dung CK: <span class="mono" id="transfer-content">GH 3M username</span></p>
+            <p id="pay-hint">Nội dung CK: <span class="mono" id="transfer-content">GH username</span></p>
           </div>
         </div>
         <div class="step">
@@ -212,7 +212,7 @@
       function money(n) { return Number(n).toLocaleString("vi-VN") + "đ"; }
       function updateTransferHint() {
         transferContent.textContent =
-          "GH " + selected.plan.toUpperCase() + " " + hintUser + " · " + money(selected.price);
+          "GH " + hintUser + " · " + money(selected.price);
       }
 
       async function loadCfg() {

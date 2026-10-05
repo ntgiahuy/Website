@@ -367,7 +367,7 @@
       var currentApp = (function () {
         try {
           var q = new URLSearchParams(location.search).get("app");
-          if (q && /^(mong|cot|dam|san|vach)$/.test(q)) return q;
+          if (q && /^(mong|cot|dam|san)$/.test(q)) return q;
         } catch (e) {}
         return "mong";
       })();
@@ -456,16 +456,14 @@
             { id: "cot", name: "Shop thép cột", url: "./cot/", blurb: "PDF A1" },
             { id: "dam", name: "Shop thép dầm", url: "./dam/", blurb: "PDF A2" },
             { id: "san", name: "Shop thép sàn", url: "./san/", blurb: "Shop thép sàn" },
-            { id: "vach", name: "Shop thép vách", url: "", blurb: "Sắp ra mắt", comingSoon: true },
           ];
         } else {
-          APPS = APPS.map(function (app) {
+          APPS = APPS.filter(function (app) { return app.id !== "vach"; }).map(function (app) {
             var map = {
               mong: "Shop thép móng",
               cot: "Shop thép cột",
               dam: "Shop thép dầm",
               san: "Shop thép sàn",
-              vach: "Shop thép vách",
             };
             if (map[app.id]) return Object.assign({}, app, { name: map[app.id] });
             return app;
@@ -495,8 +493,6 @@
           "</span> · " +
           (c.holder || "") +
           "<br/><strong>Nội dung CK:</strong> <span class='mono'>GH " +
-          String(plan.id).toUpperCase() +
-          " " +
           userHint +
           "</span> · " +
           money(price) +
