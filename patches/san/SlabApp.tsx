@@ -2263,7 +2263,7 @@ export function SlabApp() {
                   {(
                     [
                       ["manual", "Vẽ thép sàn"],
-                      ["economy2", "Thép 2 lớn tiết kiệm"],
+                      ["economy2", "Thép 2 lớp tiết kiệm"],
                       ["simple2", "Thép 2 lớp đơn giản"],
                     ] as const
                   ).map(([mode, label]) => (
@@ -2278,6 +2278,82 @@ export function SlabApp() {
                       {label}
                     </label>
                   ))}
+                  <label className="mt-1 flex items-center gap-2 text-xs text-zinc-300">
+                    <Checkbox
+                      checked={project.info.showDistRange !== false}
+                      onCheckedChange={(v) => {
+                        const on = Boolean(v);
+                        setZoneForm({ ...zoneForm, showSpacing: on });
+                        persist({
+                          ...project,
+                          info: { ...project.info, showDistRange: on },
+                          zones: project.zones.map((z) => ({ ...z, showSpacing: on })),
+                        });
+                      }}
+                    />
+                    Hiện / Ẩn khoảng rải thép sàn
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-zinc-300">
+                    <Checkbox
+                      checked={project.info.optimizeCut !== false}
+                      onCheckedChange={(v) => {
+                        persist({
+                          ...project,
+                          info: { ...project.info, optimizeCut: Boolean(v) },
+                        });
+                      }}
+                    />
+                    Cắt thép sàn tối ưu (thép cây ≤ 11,7 m)
+                  </label>
+                  {project.info.optimizeCut !== false && (
+                    <div className="space-y-1.5 rounded border border-zinc-700/80 bg-zinc-900/60 p-2">
+                      <Field label="Cách cắt" wide>
+                        <select
+                          className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
+                          value={project.info.optimizeCutMode === "byStock" ? "byStock" : "avoidZones"}
+                          onChange={(e) => {
+                            const optimizeCutMode =
+                              e.target.value === "byStock" ? "byStock" : "avoidZones";
+                            persist({
+                              ...project,
+                              info: { ...project.info, optimizeCutMode },
+                            });
+                          }}
+                        >
+                          <option value="avoidZones">
+                            Cắt tránh vùng: ưu tiên 11,7 m, dài→ngắn trong vùng nối
+                          </option>
+                          <option value="byStock">Cắt theo 11,7 m (nối liên tiếp)</option>
+                        </select>
+                      </Field>
+                      <Field label="Chiều dài nối" wide>
+                        <select
+                          className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
+                          value={
+                            project.info.lapMul === 30 || project.info.lapMul === 35
+                              ? project.info.lapMul
+                              : 40
+                          }
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            const lapMul = n === 30 || n === 35 || n === 40 ? n : 40;
+                            persist({
+                              ...project,
+                              info: { ...project.info, lapMul },
+                            });
+                          }}
+                        >
+                          <option value={30}>Nối 30D</option>
+                          <option value={35}>Nối 35D</option>
+                          <option value={40}>Nối 40D</option>
+                        </select>
+                      </Field>
+                      <p className="text-[10px] leading-snug text-zinc-500">
+                        Thép dài hơn 11,7 m phải nối. Cắt tránh vùng: lớp dưới chỉ nối trong vùng thép
+                        mũ (Thép 2 lớp tiết kiệm); lớp trên chỉ nối ngoài vùng mũ.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2378,82 +2454,6 @@ export function SlabApp() {
                         </select>
                       </Field>
                     </div>
-                    <label className="mt-2 flex items-center gap-2 text-xs text-zinc-300">
-                      <Checkbox
-                        checked={project.info.showDistRange !== false}
-                        onCheckedChange={(v) => {
-                          const on = Boolean(v);
-                          setZoneForm({ ...zoneForm, showSpacing: on });
-                          persist({
-                            ...project,
-                            info: { ...project.info, showDistRange: on },
-                            zones: project.zones.map((z) => ({ ...z, showSpacing: on })),
-                          });
-                        }}
-                      />
-                      Hiện / Ẩn khoảng rải thép sàn
-                    </label>
-                    <label className="mt-2 flex items-center gap-2 text-xs text-zinc-300">
-                      <Checkbox
-                        checked={project.info.optimizeCut !== false}
-                        onCheckedChange={(v) => {
-                          persist({
-                            ...project,
-                            info: { ...project.info, optimizeCut: Boolean(v) },
-                          });
-                        }}
-                      />
-                      Cắt thép sàn tối ưu (thép cây ≤ 11,7 m)
-                    </label>
-                    {project.info.optimizeCut !== false && (
-                      <div className="mt-1.5 space-y-1.5 rounded border border-zinc-700/80 bg-zinc-950/50 p-2">
-                        <Field label="Cách cắt" wide>
-                          <select
-                            className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
-                            value={project.info.optimizeCutMode === "byStock" ? "byStock" : "avoidZones"}
-                            onChange={(e) => {
-                              const optimizeCutMode =
-                                e.target.value === "byStock" ? "byStock" : "avoidZones";
-                              persist({
-                                ...project,
-                                info: { ...project.info, optimizeCutMode },
-                              });
-                            }}
-                          >
-                            <option value="avoidZones">
-                              Cắt tránh vùng: ưu tiên 11,7 m, dài→ngắn trong vùng nối
-                            </option>
-                            <option value="byStock">Cắt theo 11,7 m (nối liên tiếp)</option>
-                          </select>
-                        </Field>
-                        <Field label="Chiều dài nối" wide>
-                          <select
-                            className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
-                            value={
-                              project.info.lapMul === 30 || project.info.lapMul === 35
-                                ? project.info.lapMul
-                                : 40
-                            }
-                            onChange={(e) => {
-                              const n = Number(e.target.value);
-                              const lapMul = n === 30 || n === 35 || n === 40 ? n : 40;
-                              persist({
-                                ...project,
-                                info: { ...project.info, lapMul },
-                              });
-                            }}
-                          >
-                            <option value={30}>Nối 30D</option>
-                            <option value={35}>Nối 35D</option>
-                            <option value={40}>Nối 40D</option>
-                          </select>
-                        </Field>
-                        <p className="text-[10px] leading-snug text-zinc-500">
-                          Thép dài hơn 11,7 m phải nối. Cắt tránh vùng: lớp dưới chỉ nối trong vùng thép
-                          mũ (Thép 2 lớp tiết kiệm); lớp trên chỉ nối ngoài vùng mũ.
-                        </p>
-                      </div>
-                    )}
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button
                         size="sm"
