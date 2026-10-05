@@ -392,7 +392,12 @@ export function cutPiecesWithMarks(
     lapMm: lapLengthMm(dia, lapMulOf(project)),
     cutsMm: cuts,
   });
-  const marks =
-    pieces.length > 1 ? marksForPieces(familyNum, pieces) : [`${familyNum}a`];
+  // Chỉ đánh 1a, 1b… khi nối ≥ 2 đoạn; thanh đơn giữ số hiệu cũ (ở lịch/PDF).
+  const marks = pieces.length > 1 ? marksForPieces(familyNum, pieces) : [];
   return { pieces, marks, cuts };
+}
+
+/** Số hiệu đoạn cắt tối ưu: 1a, 1b, 2a… */
+export function isCutSegmentMark(mark: string): boolean {
+  return /^\d+[a-z]+$/i.test(String(mark || "").trim());
 }

@@ -4,6 +4,7 @@ import { memo, useEffect, useMemo, useRef, useState, type MouseEvent, type React
 import { economy2TopZones, effectiveZones, type ScheduleRow } from "@/lib/calc";
 import {
   cutPiecesWithMarks,
+  isCutSegmentMark,
   isOptimizeCutOn,
   spliceWorldPoints,
   type CutPlanLabel,
@@ -219,11 +220,13 @@ export const SlabPreview = memo(function SlabPreview({
         tops,
         fam,
       );
-      if (pieces.length <= 1 && !cuts.length) continue;
+      // Chỉ đánh dấu mối nối / 1a… khi nối ≥ 2 đoạn
+      if (pieces.length <= 1) continue;
       splices.push(...spliceWorldPoints(bar, cuts));
       const L = rebarBarStraightLenMm(bar);
       const pool = schedule.filter(
         (r) =>
+          isCutSegmentMark(r.mark) &&
           r.direction === bar.dir &&
           r.dia === dia &&
           r.spacing === spacing &&

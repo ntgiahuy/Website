@@ -362,7 +362,10 @@ export function economy2TopZones(project: SlabProject): RebarZone[] {
   return applyPresetZones({ ...project, layoutPreset: "economy2" }).filter((z) => z.layer === "top");
 }
 
-/** Tách dòng thống kê thành các đoạn ≤ 11,7 m; số hiệu 1a, 1b… (L lớn → bé). */
+/**
+ * Tách dòng thống kê khi thanh > 11,7 m phải nối ≥ 2 đoạn → số hiệu 1a, 1b…
+ * Thanh không nối: giữ nguyên số hiệu như cũ.
+ */
 function expandRowForOptimizeCut(
   row: ScheduleRow,
   project: SlabProject,
@@ -386,17 +389,8 @@ function expandRowForOptimizeCut(
     cutsMm: cuts,
   });
 
-  // Thanh ≤ 11,7 m: vẫn cấp số hiệu Na khi đang bật cắt tối ưu
-  if (pieces.length <= 1) {
-    const fam = familyCounter.n++;
-    return [
-      {
-        ...row,
-        mark: `${fam}a`,
-        note: row.note,
-      },
-    ];
-  }
+  // Không nối (≤ 11,7 m hoặc 1 đoạn): giữ số hiệu cũ
+  if (pieces.length <= 1) return [row];
 
   const fam = familyCounter.n++;
   const marks = marksForPieces(fam, pieces);

@@ -13,6 +13,7 @@ import {
 } from "../calc";
 import {
   cutPiecesWithMarks,
+  isCutSegmentMark,
   isOptimizeCutOn,
   spliceWorldPoints,
 } from "../cut-optimize";
@@ -643,7 +644,8 @@ function scheduleRowsByStt(
   _hookMm = 50,
 ): Array<ScheduleRow & { stt: number }> {
   const sttMap = rebarSttByMark(schedule);
-  const groups = new Map<number, ScheduleRow & { stt: number }>();
+  /** Không gộp khác lớp / khác phương — bảng TK phải có cả lớp dưới và lớp trên. */
+  const groups = new Map<string, ScheduleRow & { stt: number }>();
   for (const row of schedule) {
     const fromReg = registry.get(
       rebarSpecKey(row.dia, row.spacing, row.barLength, row.leftHook, row.rightHook),
@@ -658,17 +660,18 @@ function scheduleRowsByStt(
         leftHook: Math.max(0, Math.round(Number(row.leftHook) || 0)),
         rightHook: Math.max(0, Math.round(Number(row.rightHook) || 0)),
       };
-    const prev = groups.get(info.stt);
+    const gKey = `${info.stt}|${row.layer}|${row.direction}|${row.mark}`;
+    const prev = groups.get(gKey);
     if (!prev) {
-      groups.set(info.stt, { ...row, stt: info.stt });
+      groups.set(gKey, { ...row, stt: info.stt });
       continue;
     }
-    // Chỉ gộp khi cùng Ø+a+dài+móc (STT đã khóa móc) — cộng số thanh 1 CK
+    // Chỉ gộp khi trùng STT + lớp + phương + mark — cộng số thanh 1 CK
     const qtyEach = prev.qtyEach + row.qtyEach;
     const qtyMembers = Math.max(prev.qtyMembers, row.qtyMembers);
     const qtyTotal = qtyEach * qtyMembers;
     const totalM = (prev.barLength * qtyTotal) / 1000;
-    groups.set(info.stt, {
+    groups.set(gKey, {
       ...prev,
       qtyEach,
       qtyMembers,
@@ -705,8 +708,9 @@ function scheduleRowsByStt(
     qtyByKey.set(key, cur);
   }
 
+  const usedStts = new Set([...groups.values()].map((r) => r.stt));
   for (const info of registry.values()) {
-    if (groups.has(info.stt)) continue;
+    if (usedStts.has(info.stt)) continue;
     const key = rebarSpecKey(
       info.dia,
       info.spacing,
@@ -718,7 +722,8 @@ function scheduleRowsByStt(
     const qty = Math.max(1, hit?.qty ?? 1);
     const totalM = (info.lengthMm * qty) / 1000;
     const hooked = info.leftHook > 0 || info.rightHook > 0;
-    groups.set(info.stt, {
+    const mbKey = `${info.stt}|bottom|${hit?.dir ?? "X"}|MB-${info.stt}`;
+    groups.set(mbKey, {
       mark: `MB-${info.stt}`,
       layer: "bottom",
       direction: hit?.dir ?? "X",
@@ -738,7 +743,14 @@ function scheduleRowsByStt(
     });
   }
 
-  return [...groups.values()].sort((a, b) => a.stt - b.stt);
+  const layerOrder = (L: string) =>
+    L === "bottom" ? 0 : L === "structural" ? 1 : L === "top" ? 2 : 3;
+  return [...groups.values()].sort(
+    (a, b) =>
+      a.stt - b.stt ||
+      layerOrder(a.layer) - layerOrder(b.layer) ||
+      a.direction.localeCompare(b.direction),
+  );
 }
 
 /** Ø+a cho một thanh: zone cùng phương phủ tâm thanh (ưu tiên đúng lớp nếu có). */
@@ -1046,7 +1058,7 @@ function drawPlan(
         topZonesEco,
         cutFam,
       );
-      if (pieces.length > 1 || cuts.length > 0) {
+      if (pieces.length > 1) {
         // Ô vàng tại mối nối (toY = top-origin; ty() → PDF bottom-origin)
         for (const p of spliceWorldPoints(bar, cuts)) {
           const sx = toX(p.x) - 2.2;
@@ -1064,6 +1076,7 @@ function drawPlan(
         const L = rebarBarStraightLenMm(bar);
         const pool = ctx.model.schedule.filter(
           (r) =>
+            isCutSegmentMark(r.mark) &&
             r.direction === bar.dir &&
             r.dia === dia &&
             r.spacing === spacing &&
@@ -1360,11 +1373,6 @@ function drawBeam(
   }
 }
 
-/** Số hiệu cắt tối ưu: 1a, 1b, 2a… */
-function isCutMark(mark: string): boolean {
-  return /^\d+[a-z]+$/i.test(mark.trim());
-}
-
 function compareCutMarks(a: string, b: string): number {
   const ma = /^(\d+)([a-z]*)$/i.exec(a.trim());
   const mb = /^(\d+)([a-z]*)$/i.exec(b.trim());
@@ -1394,20 +1402,34 @@ function buildPdfScheduleRows(ctx: Ctx): Array<ScheduleRow & { stt: number | str
     project,
     project.info.cover || 50,
   );
-  // Cắt tối ưu: cột STT = số hiệu đoạn 1a, 1b… (khớp mặt bằng)
-  if (isOptimizeCutOn(project) && rows.some((r) => isCutMark(r.mark))) {
+  // Chỉ dòng nối ≥ 2 đoạn: STT = 1a, 1b…; còn lại giữ STT số như cũ
+  if (isOptimizeCutOn(project) && rows.some((r) => isCutSegmentMark(r.mark))) {
+    const layerOrder = (L: string) =>
+      L === "bottom" ? 0 : L === "structural" ? 1 : L === "top" ? 2 : 3;
     return rows
       .map((row) => ({
         ...row,
-        stt: isCutMark(row.mark) ? row.mark : row.stt,
+        stt: isCutSegmentMark(row.mark) ? row.mark : row.stt,
       }))
       .sort((a, b) => {
         const am = String(a.stt);
         const bm = String(b.stt);
-        if (isCutMark(am) && isCutMark(bm)) return compareCutMarks(am, bm);
-        if (isCutMark(am)) return -1;
-        if (isCutMark(bm)) return 1;
-        return Number(a.stt) - Number(b.stt);
+        const ac = isCutSegmentMark(am);
+        const bc = isCutSegmentMark(bm);
+        if (ac && bc) return compareCutMarks(am, bm);
+        if (ac !== bc) {
+          // Trộn theo STT số: 1a đứng cạnh họ 1; số thuần theo số
+          const na = ac ? Number(/^(\d+)/.exec(am)?.[1] ?? 0) : Number(a.stt);
+          const nb = bc ? Number(/^(\d+)/.exec(bm)?.[1] ?? 0) : Number(b.stt);
+          if (na !== nb) return na - nb;
+          if (ac) return 1; // số thuần trước hậu tố a/b cùng họ
+          if (bc) return -1;
+        }
+        return (
+          Number(a.stt) - Number(b.stt) ||
+          layerOrder(a.layer) - layerOrder(b.layer) ||
+          a.direction.localeCompare(b.direction)
+        );
       });
   }
   return rows;
