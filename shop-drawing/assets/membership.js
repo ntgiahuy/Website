@@ -26,9 +26,9 @@
     var attr = scriptEl && scriptEl.getAttribute("data-activate-url");
     if (attr) return attr;
     try {
-      if (scriptEl && scriptEl.src) return new URL("../thanh-vien/", scriptEl.src).href;
+      if (scriptEl && scriptEl.src) return new URL("../dang-nhap/", scriptEl.src).href;
     } catch (e) {}
-    return "./thanh-vien/";
+    return "./dang-nhap/";
   })();
 
   function browserKey() {
