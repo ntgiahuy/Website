@@ -1,7 +1,12 @@
 "use client";
 
 import { memo, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { effectiveZones } from "@/lib/calc";
+import { economy2TopZones, effectiveZones } from "@/lib/calc";
+import {
+  isOptimizeCutOn,
+  planCutsForBar,
+  spliceWorldPoints,
+} from "@/lib/cut-optimize";
 import {
   axisInteriorSegmentsX,
   axisInteriorSegmentsY,
@@ -29,7 +34,7 @@ import {
   faceChainAlongY,
   hookDrawMm,
 } from "@/lib/grid";
-import type { PlanSelection, SlabProject } from "@/lib/types";
+import type { PlanSelection, RebarLayer, SlabProject } from "@/lib/types";
 import { buildBeamFrameScene, projectSceneToSvg } from "@/lib/view3d";
 
 type Anchor = { leftPct: number; topPct: number };
@@ -163,14 +168,15 @@ export const SlabPreview = memo(function SlabPreview({
   /** Bảng chỉnh sửa kích thước hiển thị tại vị trí chọn. */
   editPanel?: ReactNode;
 }) {
+  /** Chỉ zone của tick/preset đang chọn — minh họa không trộn zone thủ công khi đang preset. */
   const zones = useMemo(() => effectiveZones(project), [project]);
   const axesX = useMemo(() => sortAxes(project.axesX ?? []), [project.axesX]);
   const axesY = useMemo(() => sortAxes(project.axesY ?? []), [project.axesY]);
-  /** Một lần / project — tránh gọi stripRebar 2–3 lần trong JSX (đơ khi sàn lớn). */
-  const rebarBars = useMemo(
-    () => (axesX.length >= 2 && axesY.length >= 2 ? stripRebarBarSegments(project, axesX, axesY) : []),
-    [project, axesX, axesY],
-  );
+  /** Một lần / tick — bỏ strip nặng khi preset không có vùng thép. */
+  const rebarBars = useMemo(() => {
+    if (!zones.length || axesX.length < 2 || axesY.length < 2) return [];
+    return stripRebarBarSegments(project, axesX, axesY);
+  }, [project, axesX, axesY, zones]);
   const drawBars = useMemo(
     () => typicalLayeredRebarBars(project, rebarBars, zones),
     [project, rebarBars, zones],
@@ -179,6 +185,22 @@ export const SlabPreview = memo(function SlabPreview({
     () => stripRebarPressMarks(project, axesX, axesY, zones, rebarBars),
     [project, axesX, axesY, zones, rebarBars],
   );
+  /** Điểm nối cắt tối ưu trên thanh điển hình (minh họa). */
+  const spliceMarks = useMemo(() => {
+    if (!isOptimizeCutOn(project) || !drawBars.length) return [] as Array<{ x: number; y: number }>;
+    const tops = economy2TopZones(project);
+    const out: Array<{ x: number; y: number }> = [];
+    for (const bar of drawBars) {
+      const layer = (bar.layer ?? "bottom") as RebarLayer;
+      const z =
+        zones.find((zz) => zz.direction === bar.dir && zz.layer === layer) ??
+        zones.find((zz) => zz.direction === bar.dir);
+      const dia = z?.dia ?? 10;
+      const cuts = planCutsForBar(project, bar, layer, dia, tops);
+      out.push(...spliceWorldPoints(bar, cuts));
+    }
+    return out;
+  }, [project, drawBars, zones]);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
 
@@ -976,6 +998,21 @@ export const SlabPreview = memo(function SlabPreview({
                       </g>
                     );
                   })}
+                  {spliceMarks.map((p, i) => (
+                    <rect
+                      key={`splice-${i}`}
+                      x={X(p.x) - 3}
+                      y={Y(p.y) - 3}
+                      width={6}
+                      height={6}
+                      fill="#fbbf24"
+                      stroke="#92400e"
+                      strokeWidth={0.8}
+                      pointerEvents="none"
+                    >
+                      <title>Mối nối cắt tối ưu</title>
+                    </rect>
+                  ))}
                   {pressMarks.map((m, i) => (
                     <g key={`press-${i}`} pointerEvents="none">
                       {/* Ký hiệu nhấn tại thân dầm: tick ⊥ thanh + ghi độ nhấn */}

@@ -32,6 +32,9 @@ export function defaultInfo(): SlabInfo {
     drawingScale: 100,
     floorElevationM: 8.05,
     showDistRange: true,
+    optimizeCut: true,
+    optimizeCutMode: "avoidZones",
+    lapMul: 40,
   };
 }
 

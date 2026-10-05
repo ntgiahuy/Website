@@ -15,6 +15,15 @@ export function rebarLayerMark(layer: RebarLayer): string {
 export type LayoutPreset = "manual" | "simple2" | "economy2";
 export type BarShapeKind = "straight" | "hooked" | "mesh";
 
+/**
+ * Cắt thép sàn tối ưu (thép cây max 11,7 m):
+ * - avoidZones: nối trong/ngoài vùng thép mũ economy2
+ * - byStock: cắt theo 11,7 m nối liên tiếp
+ */
+export type OptimizeCutMode = "avoidZones" | "byStock";
+/** Hệ số chiều dài nối chồng (×Ø). */
+export type LapMul = 30 | 35 | 40;
+
 export interface SlabInfo {
   name: string;
   thickness: number;
@@ -49,6 +58,15 @@ export interface SlabInfo {
    * `false` = ẩn; mặc định hiện (`undefined`/`true`).
    */
   showDistRange?: boolean;
+  /**
+   * Cắt thép sàn tối ưu khi thanh > 11,7 m (nối 30D/35D/40D).
+   * Mặc định bật (`undefined`/`true`).
+   */
+  optimizeCut?: boolean;
+  /** Cách cắt: tránh vùng mũ economy2 | theo 11,7 m. */
+  optimizeCutMode?: OptimizeCutMode;
+  /** Chiều dài nối chồng: 30D | 35D | 40D. Mặc định 40. */
+  lapMul?: LapMul;
 }
 
 /** Trục lưới mặt bằng (mm). X: 1,2,3… — Y: A,B,C… */
