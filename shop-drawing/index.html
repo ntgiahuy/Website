@@ -279,6 +279,25 @@
       font-size: 0.86rem; color: var(--muted);
     }
     .pay-note strong { color: var(--ink); }
+    .pay-box {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem 1.25rem;
+      margin-top: 0.95rem; padding: 0.95rem 1rem;
+      border-radius: 12px; border: 1px solid var(--line);
+      background: rgba(0,0,0,0.25);
+    }
+    .pay-box .pay-col { min-width: 0; }
+    .pay-box .pay-row {
+      display: grid; grid-template-columns: 8.2rem minmax(0, 1fr); gap: 0.35rem;
+      align-items: baseline; margin: 0.32rem 0; font-size: 0.88rem; line-height: 1.4;
+    }
+    .pay-box .pay-row span { color: var(--muted); font-weight: 500; }
+    .pay-box .pay-row strong { color: var(--ink); font-weight: 700; word-break: break-word; }
+    @media (max-width: 760px) {
+      .pay-box { grid-template-columns: 1fr; gap: 0.55rem; }
+      .pay-box .pay-col + .pay-col {
+        padding-top: 0.55rem; border-top: 1px solid var(--line);
+      }
+    }
     .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; word-break: break-all; }
     .otp-step[hidden] { display: none !important; }
     @media (max-width: 900px) {
@@ -444,7 +463,18 @@
                 </div>
               </div>
             </div>
-            <div class="pay-note" id="pay-note">Đang tải thông tin thanh toán…</div>
+            <div class="pay-box" id="pay-box">
+              <div class="pay-col">
+                <div class="pay-row"><span>Bạn đang chọn gói</span><strong id="pay-plan-label">—</strong></div>
+                <div class="pay-row"><span>Số tiền</span><strong id="pay-amount">—</strong></div>
+                <div class="pay-row"><span>Nội dung CK</span><strong class="mono" id="pay-ck">GH username</strong></div>
+              </div>
+              <div class="pay-col">
+                <div class="pay-row"><span>Chuyển khoản</span><strong id="pay-bank">—</strong></div>
+                <div class="pay-row"><span>Tên tài khoản</span><strong id="pay-holder">—</strong></div>
+                <div class="pay-row"><span>Số tài khoản</span><strong class="mono" id="pay-account">—</strong></div>
+              </div>
+            </div>
             <div class="cta-auth" style="margin-top:0.9rem">
               <a class="btn btn-primary" href="./dang-ky/">Đăng ký ngay</a>
               <a class="btn btn-ghost" href="./dang-nhap/">Đăng nhập</a>
@@ -492,7 +522,18 @@
                 </div>
               </div>
             </div>
-            <div class="pay-note" id="pay-note-pay">Đang tải thông tin thanh toán…</div>
+            <div class="pay-box" id="pay-box-pay">
+              <div class="pay-col">
+                <div class="pay-row"><span>Bạn đang chọn gói</span><strong id="pay-plan-label-pay">—</strong></div>
+                <div class="pay-row"><span>Số tiền</span><strong id="pay-amount-pay">—</strong></div>
+                <div class="pay-row"><span>Nội dung CK</span><strong class="mono" id="pay-ck-pay">GH username</strong></div>
+              </div>
+              <div class="pay-col">
+                <div class="pay-row"><span>Chuyển khoản</span><strong id="pay-bank-pay">—</strong></div>
+                <div class="pay-row"><span>Tên tài khoản</span><strong id="pay-holder-pay">—</strong></div>
+                <div class="pay-row"><span>Số tài khoản</span><strong class="mono" id="pay-account-pay">—</strong></div>
+              </div>
+            </div>
           </section>
         </div>
       </div>
@@ -533,10 +574,20 @@
         btnStartTrial: document.getElementById("btn-start-trial"),
         homePlans: document.getElementById("home-plans"),
         plans: document.getElementById("plans"),
-        payNote: document.getElementById("pay-note"),
-        payNotePay: document.getElementById("pay-note-pay"),
         transferContent: document.getElementById("transfer-content"),
         transferContentPay: document.getElementById("transfer-content-pay"),
+        payPlanLabel: document.getElementById("pay-plan-label"),
+        payAmount: document.getElementById("pay-amount"),
+        payCk: document.getElementById("pay-ck"),
+        payBank: document.getElementById("pay-bank"),
+        payHolder: document.getElementById("pay-holder"),
+        payAccount: document.getElementById("pay-account"),
+        payPlanLabelPay: document.getElementById("pay-plan-label-pay"),
+        payAmountPay: document.getElementById("pay-amount-pay"),
+        payCkPay: document.getElementById("pay-ck-pay"),
+        payBankPay: document.getElementById("pay-bank-pay"),
+        payHolderPay: document.getElementById("pay-holder-pay"),
+        payAccountPay: document.getElementById("pay-account-pay"),
         paywallTitle: document.getElementById("paywall-title"),
         paywallLead: document.getElementById("paywall-lead"),
         accountBtn: document.getElementById("account-btn"),
@@ -635,27 +686,24 @@
         var userHint =
           (els.accName && els.accName.textContent !== "—" ? els.accName.textContent : "username");
         var ck = "GH " + userHint;
-        var html =
-          "<strong>Chuyển khoản:</strong> " +
-          (c.bank || "") +
-          " · STK <span class='mono'>" +
-          (c.account || "") +
-          "</span> · " +
-          (c.holder || "") +
-          "<br/><strong>Nội dung CK:</strong> <span class='mono'>" +
-          ck +
-          "</span> · " +
-          money(price) +
-          (c.note ? "<br/>" + c.note : "") +
-          "<br/><em>Sau khi CK, admin cấp quyền theo username của bạn.</em>";
-        if (els.payNote) els.payNote.innerHTML = html;
-        if (els.payNotePay) els.payNotePay.innerHTML = html;
-        if (els.transferContent) {
-          els.transferContent.textContent = ck + " · " + money(price);
+        var planLabel = (plan && plan.label) || "—";
+        var amount = money(price);
+        var bank = c.bank || "Ngân hàng BIDV";
+        var holder = c.holder || "NGUYEN THANH NHAT";
+        var account = c.account || "0362118138";
+
+        function fill(planEl, amountEl, ckEl, bankEl, holderEl, accountEl) {
+          if (planEl) planEl.textContent = planLabel;
+          if (amountEl) amountEl.textContent = amount;
+          if (ckEl) ckEl.textContent = ck;
+          if (bankEl) bankEl.textContent = bank;
+          if (holderEl) holderEl.textContent = holder;
+          if (accountEl) accountEl.textContent = account;
         }
-        if (els.transferContentPay) {
-          els.transferContentPay.textContent = ck + " · " + money(price);
-        }
+        fill(els.payPlanLabel, els.payAmount, els.payCk, els.payBank, els.payHolder, els.payAccount);
+        fill(els.payPlanLabelPay, els.payAmountPay, els.payCkPay, els.payBankPay, els.payHolderPay, els.payAccountPay);
+        if (els.transferContent) els.transferContent.textContent = ck + " · " + amount;
+        if (els.transferContentPay) els.transferContentPay.textContent = ck + " · " + amount;
       }
 
       function scrollToHuongDan(fromPaywall) {
