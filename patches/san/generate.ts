@@ -1036,7 +1036,6 @@ function drawPlan(
   const sttRegistry = unifiedSttRegistry(project, ctx.model.schedule, allDrawBars, rebarZones);
   const optCut = isOptimizeCutOn(project);
   const topZonesEco = optCut ? economy2TopZones(project) : [];
-  const usedCutMarks = new Set<string>();
   let cutFam = 1;
   for (const bar of drawBars) {
     const layer = (bar.layer ?? "bottom") as import("../types").RebarLayer;
@@ -1082,18 +1081,20 @@ function drawPlan(
             r.spacing === spacing &&
             (r.layer === layer || (layer === "bottom" && r.layer === "structural")),
         );
+        // Nhiều thanh giống nhau dùng chung 1a/1b — chỉ tránh trùng trong 1 thanh
+        const usedOnBar = new Set<string>();
         for (let i = 0; i < pieces.length; i++) {
           const p = pieces[i]!;
           const midT = L > 0 ? (p.t0 + p.t1) / 2 / L : 0.5;
           const matched = pool.find(
             (r) =>
-              !usedCutMarks.has(r.mark) &&
+              !usedOnBar.has(r.mark) &&
               Math.abs(r.barLength - p.barLength) <= 2 &&
               Math.round(r.leftHook) === Math.round(p.leftHook) &&
               Math.round(r.rightHook) === Math.round(p.rightHook),
           );
           const mark = matched?.mark ?? marks[i]!;
-          if (matched) usedCutMarks.add(matched.mark);
+          if (matched) usedOnBar.add(matched.mark);
           const mx =
             bar.dir === "X"
               ? Math.min(bar.x0, bar.x1) + Math.abs(bar.x1 - bar.x0) * midT
@@ -1126,6 +1127,22 @@ function drawPlan(
     }
 
     const info = sttInfoForPlanBar(project, ctx.model.schedule, sttRegistry, rebarZones, bar);
+    // Cắt tối ưu: số hiệu mặt bằng = mark thống kê (cùng Ø/L/hình → cùng số)
+    let planMark: string | number = info.stt;
+    if (optCut) {
+      const developed = rebarBarStraightLenMm(bar) + hooks.left + hooks.right;
+      const hit = ctx.model.schedule.find(
+        (r) =>
+          r.dia === dia &&
+          r.spacing === spacing &&
+          r.direction === bar.dir &&
+          (r.layer === layer || (layer === "bottom" && r.layer === "structural")) &&
+          Math.abs(r.barLength - developed) <= 2 &&
+          Math.round(r.leftHook) === Math.round(hooks.left) &&
+          Math.round(r.rightHook) === Math.round(hooks.right),
+      );
+      if (hit) planMark = hit.mark;
+    }
     const label = `Ø${info.dia}a${info.spacing}`;
     const labelW = ctx.font.widthOfTextAtSize(label, 6.2);
     const gap = 2.5;
@@ -1136,13 +1153,13 @@ function drawPlan(
       const barY = toY(bar.y);
       const cy = barY + REBAR_MARK_R + CALL_GAP;
       const cx = midX - rowLen / 2 + REBAR_MARK_R;
-      drawRebarCallout(ctx, cx, cy, info.stt, info.dia, info.spacing, "X");
+      drawRebarCallout(ctx, cx, cy, planMark, info.dia, info.spacing, "X");
     } else {
       const midY = toY((bar.y0 + bar.y1) / 2);
       const barX = toX(bar.x);
       const cx = barX + REBAR_MARK_R + CALL_GAP;
       const cy = midY - rowLen / 2 + REBAR_MARK_R;
-      drawRebarCallout(ctx, cx, cy, info.stt, info.dia, info.spacing, "Y");
+      drawRebarCallout(ctx, cx, cy, planMark, info.dia, info.spacing, "Y");
     }
   }
 
@@ -1373,18 +1390,6 @@ function drawBeam(
   }
 }
 
-function compareCutMarks(a: string, b: string): number {
-  const ma = /^(\d+)([a-z]*)$/i.exec(a.trim());
-  const mb = /^(\d+)([a-z]*)$/i.exec(b.trim());
-  if (ma && mb) {
-    const na = Number(ma[1]);
-    const nb = Number(mb[1]);
-    if (na !== nb) return na - nb;
-    return (ma[2] || "").localeCompare(mb[2] || "", "en");
-  }
-  return a.localeCompare(b, "en");
-}
-
 /** Toàn bộ dòng thống kê PDF (gồm STT thanh ngắn trên mặt bằng). */
 function buildPdfScheduleRows(ctx: Ctx): Array<ScheduleRow & { stt: number | string }> {
   const { project, model } = ctx;
@@ -1402,31 +1407,39 @@ function buildPdfScheduleRows(ctx: Ctx): Array<ScheduleRow & { stt: number | str
     project,
     project.info.cover || 50,
   );
-  // Chỉ dòng nối ≥ 2 đoạn: STT = 1a, 1b…; còn lại giữ STT số như cũ
-  if (isOptimizeCutOn(project) && rows.some((r) => isCutSegmentMark(r.mark))) {
+  // Cắt tối ưu: STT = mark thống nhất (cùng Ø/L/hình → cùng số; nối mới thêm a/b/c)
+  if (isOptimizeCutOn(project)) {
     const layerOrder = (L: string) =>
       L === "bottom" ? 0 : L === "structural" ? 1 : L === "top" ? 2 : 3;
     return rows
       .map((row) => ({
         ...row,
-        stt: isCutSegmentMark(row.mark) ? row.mark : row.stt,
+        stt: row.mark as unknown as number,
       }))
       .sort((a, b) => {
         const am = String(a.stt);
         const bm = String(b.stt);
-        const ac = isCutSegmentMark(am);
-        const bc = isCutSegmentMark(bm);
-        if (ac && bc) return compareCutMarks(am, bm);
-        if (ac !== bc) {
-          // Trộn theo STT số: 1a đứng cạnh họ 1; số thuần theo số
-          const na = ac ? Number(/^(\d+)/.exec(am)?.[1] ?? 0) : Number(a.stt);
-          const nb = bc ? Number(/^(\d+)/.exec(bm)?.[1] ?? 0) : Number(b.stt);
+        const pa = /^(\d+)([a-z]?)$/i.exec(am);
+        const pb = /^(\d+)([a-z]?)$/i.exec(bm);
+        if (pa && pb) {
+          const na = Number(pa[1]);
+          const nb = Number(pb[1]);
           if (na !== nb) return na - nb;
-          if (ac) return 1; // số thuần trước hậu tố a/b cùng họ
-          if (bc) return -1;
+          const la = (pa[2] || "").toLowerCase();
+          const lb = (pb[2] || "").toLowerCase();
+          if (la !== lb) {
+            if (!la) return -1;
+            if (!lb) return 1;
+            return la.localeCompare(lb);
+          }
+          return (
+            layerOrder(a.layer) - layerOrder(b.layer) ||
+            a.direction.localeCompare(b.direction) ||
+            b.barLength - a.barLength
+          );
         }
         return (
-          Number(a.stt) - Number(b.stt) ||
+          am.localeCompare(bm, "vi") ||
           layerOrder(a.layer) - layerOrder(b.layer) ||
           a.direction.localeCompare(b.direction)
         );

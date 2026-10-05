@@ -200,7 +200,6 @@ export const SlabPreview = memo(function SlabPreview({
     const tops = economy2TopZones(project);
     const splices: Array<{ x: number; y: number }> = [];
     const labels: CutPlanLabel[] = [];
-    const usedMarks = new Set<string>();
     let fam = 1;
     for (const bar of drawBars) {
       const layer = (bar.layer ?? "bottom") as RebarLayer;
@@ -232,6 +231,8 @@ export const SlabPreview = memo(function SlabPreview({
           r.spacing === spacing &&
           (r.layer === layer || (layer === "bottom" && r.layer === "structural")),
       );
+      // Đánh dấu tạm trong 1 thanh — nhiều thanh giống nhau dùng chung 1a/1b
+      const usedOnBar = new Set<string>();
       for (let i = 0; i < pieces.length; i++) {
         const p = pieces[i]!;
         const midT = L > 0 ? (p.t0 + p.t1) / 2 / L : 0.5;
@@ -241,13 +242,13 @@ export const SlabPreview = memo(function SlabPreview({
         const y1 = bar.dir === "Y" ? Math.max(bar.y0, bar.y1) : bar.y;
         const matched = pool.find(
           (r) =>
-            !usedMarks.has(r.mark) &&
+            !usedOnBar.has(r.mark) &&
             Math.abs(r.barLength - p.barLength) <= 2 &&
             Math.round(r.leftHook) === Math.round(p.leftHook) &&
             Math.round(r.rightHook) === Math.round(p.rightHook),
         );
         const mark = matched?.mark ?? marks[i]!;
-        if (matched) usedMarks.add(matched.mark);
+        if (matched) usedOnBar.add(matched.mark);
         labels.push({
           mark,
           x: bar.dir === "X" ? x0 + (x1 - x0) * midT : bar.x,

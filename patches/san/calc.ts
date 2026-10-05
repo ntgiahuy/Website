@@ -26,7 +26,6 @@ import {
   isOptimizeCutOn,
   lapLengthMm,
   lapMulOf,
-  marksForPieces,
   optimizeCutModeOf,
   planCutsForBar,
   stockPiecesForStraight,
@@ -362,16 +361,32 @@ export function economy2TopZones(project: SlabProject): RebarZone[] {
   return applyPresetZones({ ...project, layoutPreset: "economy2" }).filter((z) => z.layer === "top");
 }
 
+/** Khóa thanh: Ø + chiều dài phát triển + móc + hình dạng. */
+function barPieceSpecKey(r: {
+  dia: number;
+  barLength: number;
+  leftHook: number;
+  rightHook: number;
+  shape: string;
+}): string {
+  return [
+    Math.round(r.dia),
+    Math.round(r.barLength),
+    Math.round(r.leftHook),
+    Math.round(r.rightHook),
+    r.shape,
+  ].join("|");
+}
+
 /**
- * Tách dòng thống kê khi thanh > 11,7 m phải nối ≥ 2 đoạn → số hiệu 1a, 1b…
- * Thanh không nối: giữ nguyên số hiệu như cũ.
+ * Tách thanh > 11,7 m thành ≥ 2 đoạn (tạm mark CUT:…).
+ * Thanh không nối: mark rỗng — gán số hiệu thống nhất sau.
  */
 function expandRowForOptimizeCut(
   row: ScheduleRow,
   project: SlabProject,
   typicalBar: RebarBarSeg | null,
   topZones: RebarZone[],
-  familyCounter: { n: number },
 ): ScheduleRow[] {
   if (!isOptimizeCutOn(project)) return [row];
   const straight = Math.max(0, row.barLength - row.leftHook - row.rightHook);
@@ -389,19 +404,38 @@ function expandRowForOptimizeCut(
     cutsMm: cuts,
   });
 
-  // Không nối (≤ 11,7 m hoặc 1 đoạn): giữ số hiệu cũ
-  if (pieces.length <= 1) return [row];
+  if (pieces.length <= 1) {
+    return [{ ...row, mark: "" }];
+  }
 
-  const fam = familyCounter.n++;
-  const marks = marksForPieces(fam, pieces);
+  // Chữ ký họ nối (tập đoạn) — họ giống nhau → cùng số hiệu 1a/1b…
+  const ranked = pieces
+    .map((p, i) => ({
+      i,
+      len: p.barLength,
+      spec: barPieceSpecKey({
+        dia: row.dia,
+        barLength: p.barLength,
+        leftHook: p.leftHook,
+        rightHook: p.rightHook,
+        shape: p.shape,
+      }),
+    }))
+    .sort((a, b) => b.len - a.len || a.i - b.i);
+  const letter = new Array<string>(pieces.length);
+  ranked.forEach((r, rank) => {
+    letter[r.i] = String.fromCharCode(97 + rank);
+  });
+  const cutSig = ranked.map((r) => r.spec).join(";");
   const tag = `nối ${mul}D · cắt tối ưu`;
+
   return pieces.map((p, i) => {
     const qtyEach = row.qtyEach;
     const qtyTotal = qtyEach * row.qtyMembers;
     const totalM = (p.barLength * qtyTotal) / 1000;
     return {
       ...row,
-      mark: marks[i]!,
+      mark: `CUT:${cutSig}:${letter[i]}`,
       barLength: p.barLength,
       leftHook: p.leftHook,
       rightHook: p.rightHook,
@@ -410,8 +444,56 @@ function expandRowForOptimizeCut(
       qtyTotal,
       totalM,
       weight: totalM * weightPerMeter(row.dia),
-      note: `${row.note} · ${tag} · ${marks[i]}`,
+      note: `${row.note} · ${tag}`,
     };
+  });
+}
+
+/**
+ * Gán số hiệu thống nhất:
+ * - Cùng Ø + L + móc + hình dạng → cùng số hiệu
+ * - Họ nối ≥ 2 đoạn (>11,7 m) → thêm a,b,c (1a, 1b…); họ giống nhau dùng chung
+ * - Thanh không nối → chỉ số (1, 2, 3…); nếu trùng kích thước đoạn nối thì dùng chung mark đó
+ */
+function assignUnifiedScheduleMarks(rows: ScheduleRow[]): ScheduleRow[] {
+  let next = 1;
+  const cutFamilyNum = new Map<string, number>();
+  const cutMarkByProvisional = new Map<string, string>();
+  const markBySpec = new Map<string, string>();
+
+  for (const r of rows) {
+    const m = /^CUT:(.+):([a-z])$/i.exec(r.mark);
+    if (!m) continue;
+    const sig = m[1]!;
+    if (!cutFamilyNum.has(sig)) cutFamilyNum.set(sig, next++);
+  }
+  for (const r of rows) {
+    const m = /^CUT:(.+):([a-z])$/i.exec(r.mark);
+    if (!m) continue;
+    const mark = `${cutFamilyNum.get(m[1]!) ?? 1}${m[2]!.toLowerCase()}`;
+    cutMarkByProvisional.set(r.mark, mark);
+    const spec = barPieceSpecKey(r);
+    if (!markBySpec.has(spec)) markBySpec.set(spec, mark);
+  }
+  for (const r of rows) {
+    if (/^CUT:/i.test(r.mark)) continue;
+    const spec = barPieceSpecKey(r);
+    if (markBySpec.has(spec)) continue;
+    const mark = String(next++);
+    markBySpec.set(spec, mark);
+  }
+
+  return rows.map((r) => {
+    const cutMark = cutMarkByProvisional.get(r.mark);
+    if (cutMark) {
+      return {
+        ...r,
+        mark: cutMark,
+        note: r.note.includes(cutMark) ? r.note : `${r.note} · ${cutMark}`,
+      };
+    }
+    const mark = markBySpec.get(barPieceSpecKey(r)) ?? "1";
+    return { ...r, mark };
   });
 }
 
@@ -552,12 +634,9 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
       : [];
   const schedule: ScheduleRow[] = [];
   const qtyMembers = Math.max(1, project.info.quantity);
-  const familyCounter = { n: 1 };
 
   const pushRows = (row: ScheduleRow, typical: RebarBarSeg | null) => {
-    schedule.push(
-      ...expandRowForOptimizeCut(row, project, typical, topZonesEco, familyCounter),
-    );
+    schedule.push(...expandRowForOptimizeCut(row, project, typical, topZonesEco));
   };
 
   for (const z of zones) {
@@ -663,8 +742,11 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
       });
     }
   }
-  const merged = mergeScheduleRows(schedule);
-  /** 1a, 1b, 2a… — số rồi chữ; cùng mark thì L lớn trước. */
+  const withMarks = isOptimizeCutOn(project)
+    ? assignUnifiedScheduleMarks(schedule)
+    : schedule;
+  const merged = mergeScheduleRows(withMarks);
+  /** 1, 2, 1a, 1b… — số rồi chữ; cùng mark thì L lớn trước. */
   merged.sort((a, b) => {
     const pa = /^(\d+)([a-z]?)$/i.exec(a.mark);
     const pb = /^(\d+)([a-z]?)$/i.exec(b.mark);
