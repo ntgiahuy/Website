@@ -1,6 +1,9 @@
 /**
  * Cắt thép sàn tối ưu — thép cây thương mại dài nhất 11,7 m.
  * Nối chồng 30D / 35D / 40D.
+ *
+ * Cắt tránh vùng: ưu tiên đoạn 11,7 m; mối nối trong vùng cho phép;
+ * số hiệu đoạn theo chiều dài lớn → bé: 1a, 1b, 1c…
  */
 import type { LapMul, OptimizeCutMode, RebarLayer, RebarZone, SlabProject } from "./types";
 import type { RebarBarSeg } from "./grid";
@@ -29,11 +32,16 @@ export function lapLengthMm(dia: number, mul: LapMul = 40): number {
 export type StockPiece = {
   /** Chiều dài phát triển (thẳng + móc đầu/cuối nếu có). */
   barLength: number;
+  /** Chiều dài đoạn thẳng (mm). */
+  straightMm: number;
   leftHook: number;
   rightHook: number;
   shape: "hooked" | "straight";
-  /** Vị trí mối nối trên thanh gốc (mm từ đầu), nếu là điểm cắt. */
-  spliceAtMm?: number;
+  /** Thứ tự dọc thanh gốc (0 = đầu). */
+  geomIndex: number;
+  /** Đầu–cuối trên thanh gốc (mm). */
+  t0: number;
+  t1: number;
 };
 
 type Interval = { lo: number; hi: number };
@@ -109,7 +117,7 @@ export function allowedSpliceIntervals(
   return inside.length ? inside : [{ lo: 0, hi: L }];
 }
 
-/** Cắt theo 11,7 m — trả về chiều dài đoạn thẳng từng cây (mm). */
+/** Cắt theo 11,7 m — chiều dài đoạn thẳng từng cây (mm), thứ tự dọc thanh. */
 export function splitStraightByStock(
   straightMm: number,
   stockMm = STOCK_BAR_MM,
@@ -117,7 +125,7 @@ export function splitStraightByStock(
 ): number[] {
   const L = Math.max(0, Math.round(straightMm));
   if (L <= stockMm) return L > 0 ? [L] : [];
-  const advance = Math.max(100, stockMm - Math.max(0, lapMulSafe(lapMm)));
+  const advance = Math.max(100, stockMm - Math.max(0, Math.round(lapMm) || 0));
   const pieces: number[] = [];
   let covered = 0;
   while (covered < L - 0.5) {
@@ -132,14 +140,11 @@ export function splitStraightByStock(
   return pieces;
 }
 
-function lapMulSafe(lapMm: number) {
-  return Math.max(0, Math.round(lapMm) || 0);
-}
-
 /**
- * Điểm cắt (mm từ đầu thanh) — mỗi đoạn ≤ stock; ưu tiên nằm trong vùng cho phép.
+ * Cắt tránh vùng — ưu tiên đoạn đúng 11,7 m; mối nối trong vùng cho phép.
+ * Trả về điểm cắt (mm từ đầu) theo thứ tự dọc thanh.
  */
-export function splicePositionsMm(
+export function splicePositionsPreferStock(
   straightMm: number,
   stockMm: number,
   allowed: Interval[],
@@ -149,42 +154,70 @@ export function splicePositionsMm(
   const windows = mergeIntervals(allowed.filter((a) => a.hi > a.lo));
   const cuts: number[] = [];
   let start = 0;
-  while (start + stockMm < L - 1) {
+  const minPiece = Math.min(stockMm * 0.5, 3000);
+
+  while (L - start > stockMm + 1) {
     const ideal = start + stockMm;
-    const minAt = start + Math.min(stockMm * 0.45, stockMm - 200);
-    const maxAt = Math.min(L - 200, start + stockMm);
-    let best: number | null = null;
-    let bestDist = Infinity;
+    let cut: number | null = null;
+
+    // 1) Ưu tiên đúng 11,7 m nếu điểm nối nằm trong vùng cho phép
     for (const w of windows) {
-      const lo = Math.max(w.lo, minAt);
-      const hi = Math.min(w.hi, maxAt);
-      if (hi < lo) continue;
-      const cand = Math.min(hi, Math.max(lo, ideal));
-      const d = Math.abs(cand - ideal);
-      if (d < bestDist) {
-        bestDist = d;
-        best = cand;
+      if (ideal >= w.lo - 0.5 && ideal <= w.hi + 0.5 && ideal < L - 150) {
+        cut = ideal;
+        break;
       }
     }
-    const at = best ?? ideal;
-    cuts.push(Math.round(at));
-    start = Math.round(at);
+
+    // 2) Đoạn dài nhất ≤ 11,7 m kết thúc trong vùng cho phép (lớn → gần 11,7 m)
+    if (cut == null) {
+      let bestLen = -1;
+      for (const w of windows) {
+        const lo = Math.max(w.lo, start + minPiece);
+        const hi = Math.min(w.hi, start + stockMm, L - 150);
+        if (hi < lo) continue;
+        const cand = hi; // dài nhất có thể trong cửa sổ
+        const len = cand - start;
+        if (len > bestLen) {
+          bestLen = len;
+          cut = cand;
+        }
+      }
+    }
+
+    // 3) Fallback: cắt tại 11,7 m
+    if (cut == null) cut = Math.min(ideal, L - 150);
+
+    cuts.push(Math.round(cut));
+    start = Math.round(cut);
   }
   return cuts;
 }
 
-/** Đổi danh sách điểm cắt → chiều dài đoạn thẳng. */
-export function segmentsFromCuts(straightMm: number, cuts: number[]): number[] {
+/** @deprecated alias — dùng splicePositionsPreferStock */
+export function splicePositionsMm(
+  straightMm: number,
+  stockMm: number,
+  allowed: Interval[],
+): number[] {
+  return splicePositionsPreferStock(straightMm, stockMm, allowed);
+}
+
+/** Đổi danh sách điểm cắt → các đoạn {t0,t1,straight}. */
+export function segmentsFromCuts(
+  straightMm: number,
+  cuts: number[],
+): Array<{ t0: number; t1: number; straightMm: number }> {
   const L = Math.max(0, Math.round(straightMm));
   const pts = [0, ...cuts.map((c) => Math.round(c)).filter((c) => c > 0 && c < L), L];
   pts.sort((a, b) => a - b);
   const uniq = pts.filter((v, i) => i === 0 || v > pts[i - 1]!);
-  const out: number[] = [];
+  const out: Array<{ t0: number; t1: number; straightMm: number }> = [];
   for (let i = 0; i < uniq.length - 1; i++) {
-    const d = uniq[i + 1]! - uniq[i]!;
-    if (d > 1) out.push(d);
+    const t0 = uniq[i]!;
+    const t1 = uniq[i + 1]!;
+    if (t1 - t0 > 1) out.push({ t0, t1, straightMm: t1 - t0 });
   }
-  return out.length ? out : L > 0 ? [L] : [];
+  return out.length ? out : L > 0 ? [{ t0: 0, t1: L, straightMm: L }] : [];
 }
 
 export function stockPiecesForStraight(
@@ -196,7 +229,6 @@ export function stockPiecesForStraight(
     mode: OptimizeCutMode;
     stockMm?: number;
     lapMm: number;
-    /** Điểm cắt sẵn (avoidZones); bỏ trống → byStock. */
     cutsMm?: number[];
   },
 ): StockPiece[] {
@@ -210,32 +242,63 @@ export function stockPiecesForStraight(
     return [
       {
         barLength: Math.round(straight + lh + rh),
+        straightMm: straight,
         leftHook: lh,
         rightHook: rh,
         shape: hooked ? "hooked" : "straight",
+        geomIndex: 0,
+        t0: 0,
+        t1: straight,
       },
     ];
   }
 
-  const segs =
-    opts.mode === "avoidZones" && opts.cutsMm?.length
-      ? segmentsFromCuts(straight, opts.cutsMm)
-      : splitStraightByStock(straight, stockMm, opts.lapMm);
+  let segs: Array<{ t0: number; t1: number; straightMm: number }>;
+  if (opts.mode === "avoidZones" && opts.cutsMm && opts.cutsMm.length) {
+    segs = segmentsFromCuts(straight, opts.cutsMm);
+  } else {
+    const lens = splitStraightByStock(straight, stockMm, opts.lapMm);
+    segs = [];
+    let t = 0;
+    for (const s of lens) {
+      segs.push({ t0: t, t1: t + s, straightMm: s });
+      t += s;
+    }
+  }
 
-  return segs.map((s, i) => {
+  return segs.map((seg, i) => {
     const left = i === 0 ? lh : 0;
     const right = i === segs.length - 1 ? rh : 0;
     const hooked = left > 0 || right > 0;
     return {
-      barLength: Math.round(s + left + right),
+      barLength: Math.round(seg.straightMm + left + right),
+      straightMm: seg.straightMm,
       leftHook: left,
       rightHook: right,
       shape: (hooked ? "hooked" : "straight") as "hooked" | "straight",
+      geomIndex: i,
+      t0: seg.t0,
+      t1: seg.t1,
     };
   });
 }
 
-/** Điểm nối trên mặt bằng (tọa độ mm) để vẽ minh họa. */
+/**
+ * Gán số hiệu 1a, 1b, 1c… theo chiều dài lớn → bé trong một họ thanh.
+ * `familyNum` = 1, 2, 3…
+ */
+export function marksForPieces(familyNum: number, pieces: StockPiece[]): string[] {
+  const ranked = pieces
+    .map((p, i) => ({ i, len: p.barLength }))
+    .sort((a, b) => b.len - a.len || a.i - b.i);
+  const letter = new Array<string>(pieces.length);
+  ranked.forEach((r, rank) => {
+    letter[r.i] = String.fromCharCode(97 + rank); // a, b, c…
+  });
+  return pieces.map((_, i) => `${familyNum}${letter[i]}`);
+}
+
+/** Điểm nối trên mặt bằng (tọa độ mm). */
 export function spliceWorldPoints(
   bar: RebarBarSeg,
   cutsMm: number[],
@@ -244,18 +307,43 @@ export function spliceWorldPoints(
   const out: Array<{ x: number; y: number }> = [];
   for (const c of cutsMm) {
     if (c <= 0 || c >= L) continue;
-    const t = c / L;
-    if (bar.dir === "X") {
-      const x0 = Math.min(bar.x0, bar.x1);
-      const x1 = Math.max(bar.x0, bar.x1);
-      out.push({ x: x0 + (x1 - x0) * t, y: bar.y });
-    } else {
-      const y0 = Math.min(bar.y0, bar.y1);
-      const y1 = Math.max(bar.y0, bar.y1);
-      out.push({ x: bar.x, y: y0 + (y1 - y0) * t });
-    }
+    out.push(pointOnBar(bar, c / L));
   }
   return out;
+}
+
+function pointOnBar(bar: RebarBarSeg, t01: number): { x: number; y: number } {
+  const t = Math.min(1, Math.max(0, t01));
+  if (bar.dir === "X") {
+    const x0 = Math.min(bar.x0, bar.x1);
+    const x1 = Math.max(bar.x0, bar.x1);
+    return { x: x0 + (x1 - x0) * t, y: bar.y };
+  }
+  const y0 = Math.min(bar.y0, bar.y1);
+  const y1 = Math.max(bar.y0, bar.y1);
+  return { x: bar.x, y: y0 + (y1 - y0) * t };
+}
+
+/** Nhãn đoạn trên mặt bằng: midpoint + số hiệu. */
+export type CutPlanLabel = {
+  mark: string;
+  x: number;
+  y: number;
+  dir: "X" | "Y";
+};
+
+export function segmentLabelsForBar(
+  bar: RebarBarSeg,
+  pieces: StockPiece[],
+  marks: string[],
+): CutPlanLabel[] {
+  const L = rebarBarStraightLenMm(bar);
+  if (L < 2) return [];
+  return pieces.map((p, i) => {
+    const midT = (p.t0 + p.t1) / 2 / L;
+    const pt = pointOnBar(bar, midT);
+    return { mark: marks[i] ?? String(i + 1), x: pt.x, y: pt.y, dir: bar.dir };
+  });
 }
 
 /** Tính điểm cắt cho 1 thanh theo chế độ hiện tại. */
@@ -282,5 +370,29 @@ export function planCutsForBar(
     return cuts;
   }
   const allowed = allowedSpliceIntervals(bar, layer, topZones);
-  return splicePositionsMm(straight, STOCK_BAR_MM, allowed);
+  return splicePositionsPreferStock(straight, STOCK_BAR_MM, allowed);
+}
+
+/** Tách thanh thành pieces + marks (1a,1b…) — dùng chung preview/PDF/thống kê. */
+export function cutPiecesWithMarks(
+  project: SlabProject,
+  bar: RebarBarSeg,
+  layer: RebarLayer,
+  dia: number,
+  leftHook: number,
+  rightHook: number,
+  topZones: RebarZone[],
+  familyNum: number,
+): { pieces: StockPiece[]; marks: string[]; cuts: number[] } {
+  const straight = rebarBarStraightLenMm(bar);
+  const cuts = planCutsForBar(project, bar, layer, dia, topZones);
+  const pieces = stockPiecesForStraight(straight, leftHook, rightHook, {
+    on: isOptimizeCutOn(project),
+    mode: optimizeCutModeOf(project),
+    lapMm: lapLengthMm(dia, lapMulOf(project)),
+    cutsMm: cuts,
+  });
+  const marks =
+    pieces.length > 1 ? marksForPieces(familyNum, pieces) : [`${familyNum}a`];
+  return { pieces, marks, cuts };
 }

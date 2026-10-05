@@ -1,11 +1,12 @@
 "use client";
 
 import { memo, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { economy2TopZones, effectiveZones } from "@/lib/calc";
+import { economy2TopZones, effectiveZones, type ScheduleRow } from "@/lib/calc";
 import {
+  cutPiecesWithMarks,
   isOptimizeCutOn,
-  planCutsForBar,
   spliceWorldPoints,
+  type CutPlanLabel,
 } from "@/lib/cut-optimize";
 import {
   axisInteriorSegmentsX,
@@ -152,6 +153,7 @@ export const SlabPreview = memo(function SlabPreview({
   interactive = false,
   insertBeamMode = false,
   editPanel = null,
+  schedule = [],
 }: {
   project: SlabProject;
   show3d?: boolean;
@@ -167,6 +169,8 @@ export const SlabPreview = memo(function SlabPreview({
   insertBeamMode?: boolean;
   /** Bảng chỉnh sửa kích thước hiển thị tại vị trí chọn. */
   editPanel?: ReactNode;
+  /** Thống kê (số hiệu 1a, 1b…) — đồng bộ nhãn mặt bằng. */
+  schedule?: ScheduleRow[];
 }) {
   /** Chỉ zone của tick/preset đang chọn — minh họa không trộn zone thủ công khi đang preset. */
   const zones = useMemo(() => effectiveZones(project), [project]);
@@ -185,22 +189,73 @@ export const SlabPreview = memo(function SlabPreview({
     () => stripRebarPressMarks(project, axesX, axesY, zones, rebarBars),
     [project, axesX, axesY, zones, rebarBars],
   );
-  /** Điểm nối cắt tối ưu trên thanh điển hình (minh họa). */
-  const spliceMarks = useMemo(() => {
-    if (!isOptimizeCutOn(project) || !drawBars.length) return [] as Array<{ x: number; y: number }>;
+  /** Mối nối (ô vàng) + số hiệu 1a, 1b… tại giữa từng đoạn (khớp bảng thống kê). */
+  const cutOverlay = useMemo(() => {
+    const empty = {
+      splices: [] as Array<{ x: number; y: number }>,
+      labels: [] as CutPlanLabel[],
+    };
+    if (!isOptimizeCutOn(project) || !drawBars.length) return empty;
     const tops = economy2TopZones(project);
-    const out: Array<{ x: number; y: number }> = [];
+    const splices: Array<{ x: number; y: number }> = [];
+    const labels: CutPlanLabel[] = [];
+    const usedMarks = new Set<string>();
+    let fam = 1;
     for (const bar of drawBars) {
       const layer = (bar.layer ?? "bottom") as RebarLayer;
       const z =
         zones.find((zz) => zz.direction === bar.dir && zz.layer === layer) ??
         zones.find((zz) => zz.direction === bar.dir);
       const dia = z?.dia ?? 10;
-      const cuts = planCutsForBar(project, bar, layer, dia, tops);
-      out.push(...spliceWorldPoints(bar, cuts));
+      const spacing = z?.spacing ?? 150;
+      const hooks = hooksForRebarBar(project, bar, zones);
+      const { pieces, marks, cuts } = cutPiecesWithMarks(
+        project,
+        bar,
+        layer,
+        dia,
+        hooks.left,
+        hooks.right,
+        tops,
+        fam,
+      );
+      if (pieces.length <= 1 && !cuts.length) continue;
+      splices.push(...spliceWorldPoints(bar, cuts));
+      const L = rebarBarStraightLenMm(bar);
+      const pool = schedule.filter(
+        (r) =>
+          r.direction === bar.dir &&
+          r.dia === dia &&
+          r.spacing === spacing &&
+          (r.layer === layer || (layer === "bottom" && r.layer === "structural")),
+      );
+      for (let i = 0; i < pieces.length; i++) {
+        const p = pieces[i]!;
+        const midT = L > 0 ? (p.t0 + p.t1) / 2 / L : 0.5;
+        const x0 = bar.dir === "X" ? Math.min(bar.x0, bar.x1) : bar.x;
+        const x1 = bar.dir === "X" ? Math.max(bar.x0, bar.x1) : bar.x;
+        const y0 = bar.dir === "Y" ? Math.min(bar.y0, bar.y1) : bar.y;
+        const y1 = bar.dir === "Y" ? Math.max(bar.y0, bar.y1) : bar.y;
+        const matched = pool.find(
+          (r) =>
+            !usedMarks.has(r.mark) &&
+            Math.abs(r.barLength - p.barLength) <= 2 &&
+            Math.round(r.leftHook) === Math.round(p.leftHook) &&
+            Math.round(r.rightHook) === Math.round(p.rightHook),
+        );
+        const mark = matched?.mark ?? marks[i]!;
+        if (matched) usedMarks.add(matched.mark);
+        labels.push({
+          mark,
+          x: bar.dir === "X" ? x0 + (x1 - x0) * midT : bar.x,
+          y: bar.dir === "Y" ? y0 + (y1 - y0) * midT : bar.y,
+          dir: bar.dir,
+        });
+      }
+      fam += 1;
     }
-    return out;
-  }, [project, drawBars, zones]);
+    return { splices, labels };
+  }, [project, drawBars, zones, schedule]);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
 
@@ -998,7 +1053,7 @@ export const SlabPreview = memo(function SlabPreview({
                       </g>
                     );
                   })}
-                  {spliceMarks.map((p, i) => (
+                  {cutOverlay.splices.map((p, i) => (
                     <rect
                       key={`splice-${i}`}
                       x={X(p.x) - 3}
@@ -1012,6 +1067,29 @@ export const SlabPreview = memo(function SlabPreview({
                     >
                       <title>Mối nối cắt tối ưu</title>
                     </rect>
+                  ))}
+                  {cutOverlay.labels.map((lb, i) => (
+                    <g key={`cut-mark-${lb.mark}-${i}`} pointerEvents="none">
+                      <circle
+                        cx={X(lb.x)}
+                        cy={Y(lb.y)}
+                        r={7}
+                        fill="#0f172a"
+                        stroke="#fbbf24"
+                        strokeWidth={1.2}
+                      />
+                      <text
+                        x={X(lb.x)}
+                        y={Y(lb.y)}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill="#fbbf24"
+                        fontSize={7.5}
+                        fontWeight={700}
+                      >
+                        {lb.mark}
+                      </text>
+                    </g>
                   ))}
                   {pressMarks.map((m, i) => (
                     <g key={`press-${i}`} pointerEvents="none">

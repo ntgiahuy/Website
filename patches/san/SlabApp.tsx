@@ -2421,7 +2421,7 @@ export function SlabApp() {
                             }}
                           >
                             <option value="avoidZones">
-                              Cắt tránh vùng (dưới nối trong mũ / trên nối ngoài mũ)
+                              Cắt tránh vùng: ưu tiên 11,7 m, dài→ngắn trong vùng nối
                             </option>
                             <option value="byStock">Cắt theo 11,7 m (nối liên tiếp)</option>
                           </select>
@@ -2875,6 +2875,7 @@ export function SlabApp() {
               selection={planSelection}
               beamMultiSelect={beamMultiSelect}
               onSelect={stablePlanSelect}
+              schedule={model.schedule}
             />
           </div>
         </div>

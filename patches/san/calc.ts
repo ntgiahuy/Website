@@ -26,6 +26,7 @@ import {
   isOptimizeCutOn,
   lapLengthMm,
   lapMulOf,
+  marksForPieces,
   optimizeCutModeOf,
   planCutsForBar,
   stockPiecesForStraight,
@@ -361,17 +362,16 @@ export function economy2TopZones(project: SlabProject): RebarZone[] {
   return applyPresetZones({ ...project, layoutPreset: "economy2" }).filter((z) => z.layer === "top");
 }
 
-/** Tách dòng thống kê thành các đoạn ≤ 11,7 m khi bật cắt tối ưu. */
+/** Tách dòng thống kê thành các đoạn ≤ 11,7 m; số hiệu 1a, 1b… (L lớn → bé). */
 function expandRowForOptimizeCut(
   row: ScheduleRow,
   project: SlabProject,
   typicalBar: RebarBarSeg | null,
   topZones: RebarZone[],
+  familyCounter: { n: number },
 ): ScheduleRow[] {
   if (!isOptimizeCutOn(project)) return [row];
   const straight = Math.max(0, row.barLength - row.leftHook - row.rightHook);
-  if (straight <= STOCK_BAR_MM) return [row];
-
   const mul = lapMulOf(project);
   const lap = lapLengthMm(row.dia, mul);
   const mode = optimizeCutModeOf(project);
@@ -385,8 +385,21 @@ function expandRowForOptimizeCut(
     lapMm: lap,
     cutsMm: cuts,
   });
-  if (pieces.length <= 1) return [row];
 
+  // Thanh ≤ 11,7 m: vẫn cấp số hiệu Na khi đang bật cắt tối ưu
+  if (pieces.length <= 1) {
+    const fam = familyCounter.n++;
+    return [
+      {
+        ...row,
+        mark: `${fam}a`,
+        note: row.note,
+      },
+    ];
+  }
+
+  const fam = familyCounter.n++;
+  const marks = marksForPieces(fam, pieces);
   const tag = `nối ${mul}D · cắt tối ưu`;
   return pieces.map((p, i) => {
     const qtyEach = row.qtyEach;
@@ -394,6 +407,7 @@ function expandRowForOptimizeCut(
     const totalM = (p.barLength * qtyTotal) / 1000;
     return {
       ...row,
+      mark: marks[i]!,
       barLength: p.barLength,
       leftHook: p.leftHook,
       rightHook: p.rightHook,
@@ -402,7 +416,7 @@ function expandRowForOptimizeCut(
       qtyTotal,
       totalM,
       weight: totalM * weightPerMeter(row.dia),
-      note: `${row.note} · ${tag} · đoạn ${i + 1}/${pieces.length}`,
+      note: `${row.note} · ${tag} · ${marks[i]}`,
     };
   });
 }
@@ -544,9 +558,12 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
       : [];
   const schedule: ScheduleRow[] = [];
   const qtyMembers = Math.max(1, project.info.quantity);
+  const familyCounter = { n: 1 };
 
   const pushRows = (row: ScheduleRow, typical: RebarBarSeg | null) => {
-    schedule.push(...expandRowForOptimizeCut(row, project, typical, topZonesEco));
+    schedule.push(
+      ...expandRowForOptimizeCut(row, project, typical, topZonesEco, familyCounter),
+    );
   };
 
   for (const z of zones) {
@@ -653,7 +670,21 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
     }
   }
   const merged = mergeScheduleRows(schedule);
-  merged.sort((a, b) => a.mark.localeCompare(b.mark, "vi") || a.barLength - b.barLength);
+  /** 1a, 1b, 2a… — số rồi chữ; cùng mark thì L lớn trước. */
+  merged.sort((a, b) => {
+    const pa = /^(\d+)([a-z]?)$/i.exec(a.mark);
+    const pb = /^(\d+)([a-z]?)$/i.exec(b.mark);
+    if (pa && pb) {
+      const na = Number(pa[1]);
+      const nb = Number(pb[1]);
+      if (na !== nb) return na - nb;
+      const la = (pa[2] || "a").toLowerCase();
+      const lb = (pb[2] || "a").toLowerCase();
+      if (la !== lb) return la.localeCompare(lb);
+      return b.barLength - a.barLength;
+    }
+    return a.mark.localeCompare(b.mark, "vi") || b.barLength - a.barLength;
+  });
 
   const byDiaMap = new Map<number, DiaSummary>();
   for (const r of merged) {
