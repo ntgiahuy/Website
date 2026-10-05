@@ -58,6 +58,7 @@
       background: rgba(255,255,255,0.03); color: var(--muted); white-space: nowrap;
       max-width: 22vw; overflow: hidden; text-overflow: ellipsis;
     }
+    .chip[hidden] { display: none !important; }
     .chip.live { color: var(--amber); border-color: rgba(232,163,23,0.4); }
     .chip.ok { color: var(--ok); border-color: rgba(62,207,142,0.35); }
     .chip.danger { color: var(--danger); border-color: rgba(255,107,107,0.35); }
@@ -235,22 +236,25 @@
     .feature strong { display: block; color: var(--ink); margin-bottom: 0.25rem; font-size: 0.98rem; }
     .feature p { margin: 0; font-size: 0.88rem; line-height: 1.45; }
     .plans {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 0.7rem; margin-top: 0.2rem;
+      display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 0.45rem; margin-top: 0.2rem;
     }
     .plan {
-      border: 1px solid var(--line); border-radius: 14px; padding: 1rem 0.9rem 1.05rem;
+      border: 1px solid var(--line); border-radius: 12px; padding: 0.65rem 0.45rem 0.7rem;
       background: rgba(255,255,255,0.02); text-align: left;
-      color: inherit; font: inherit; display: grid; gap: 0.2rem;
-      transition: border-color 0.15s ease, background 0.15s ease;
+      color: inherit; font: inherit; display: grid; gap: 0.1rem;
+      transition: border-color 0.15s ease, background 0.15s ease; min-width: 0;
     }
     .plan.featured, .plan.selected {
       border-color: rgba(232,163,23,0.55); background: rgba(232,163,23,0.07);
     }
-    .plan .name { font-weight: 700; display: block; margin-bottom: 0.15rem; }
-    .plan .price { font-family: "IBM Plex Mono", monospace; color: var(--amber); font-size: 1.25rem; }
-    .plan .hint { color: var(--muted); font-size: 0.86rem; margin: 0 0 0.75rem; }
-    .plan .btn { width: 100%; justify-content: center; margin-top: 0.15rem; }
+    .plan .name { font-weight: 700; display: block; margin-bottom: 0.1rem; font-size: 0.82rem; }
+    .plan .price { font-family: "IBM Plex Mono", monospace; color: var(--amber); font-size: 0.92rem; }
+    .plan .hint { color: var(--muted); font-size: 0.72rem; margin: 0 0 0.5rem; }
+    .plan .btn {
+      width: 100%; justify-content: center; margin-top: 0.1rem;
+      font-size: 0.74rem; padding: 0.4rem 0.3rem; white-space: nowrap;
+    }
     .steps { display: grid; gap: 0.85rem; counter-reset: step; margin-top: 0.35rem; }
     .step { display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: start; }
     .step::before {
@@ -260,6 +264,9 @@
     }
     .step strong { color: var(--ink); }
     .step p { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.92rem; }
+    @media (max-width: 980px) {
+      .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
     @media (max-width: 560px) {
       .feature-grid { grid-template-columns: 1fr; }
       .plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -281,28 +288,26 @@
       min-width: 0; padding: 0.9rem 0.95rem;
       border-radius: 12px; border: 1px solid var(--line);
       background: rgba(0,0,0,0.25);
+      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
     }
+    .pay-table.is-active {
+      background: rgba(232,163,23,0.18);
+      border-color: rgba(232,163,23,0.6);
+      box-shadow: inset 0 0 0 1px rgba(232,163,23,0.15);
+    }
+    .pay-table.is-active .pay-row span,
+    .pay-table.is-active .pay-row strong { color: #f6d27a; }
+    .pay-table.is-flash { animation: payFlash 0.7s ease; }
     .pay-table .pay-row {
       display: grid; grid-template-columns: 8.6rem minmax(0, 1fr); gap: 0.35rem;
-      align-items: center; margin: 0.22rem 0; padding: 0.32rem 0.45rem;
-      border-radius: 8px; font-size: 0.88rem; line-height: 1.4;
-      transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+      align-items: center; margin: 0.22rem 0; padding: 0.15rem 0;
+      font-size: 0.88rem; line-height: 1.4;
     }
     .pay-table .pay-row span { color: var(--muted); font-weight: 500; }
     .pay-table .pay-row strong { color: var(--ink); font-weight: 700; word-break: break-word; }
-    .pay-table .pay-row.is-active {
-      background: rgba(232,163,23,0.22);
-      border: 1px solid rgba(232,163,23,0.55);
-      box-shadow: inset 0 0 0 1px rgba(232,163,23,0.12);
-    }
-    .pay-table .pay-row.is-active span,
-    .pay-table .pay-row.is-active strong { color: #f6d27a; }
-    .pay-table .pay-row.is-flash {
-      animation: payFlash 0.7s ease;
-    }
     @keyframes payFlash {
-      0% { background: rgba(232,163,23,0.55); }
-      100% { background: rgba(232,163,23,0.22); }
+      0% { background: rgba(232,163,23,0.5); }
+      100% { background: rgba(232,163,23,0.18); }
     }
     .huong-cta {
       display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem;
@@ -316,9 +321,9 @@
     .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; word-break: break-all; }
     .otp-step[hidden] { display: none !important; }
     @media (max-width: 900px) {
-      .chip { display: none; }
       .brand strong { font-size: 1rem; }
       .tab { font-size: 0.82rem; padding: 0.42rem 0.65rem; }
+      .chip { max-width: 34vw; font-size: 0.65rem; }
     }
     @media (max-width: 760px) {
       body { overflow: auto; }
@@ -357,7 +362,7 @@
       </div>
 
       <div class="topbar-right">
-        <span class="chip" id="status-chip">Đang kiểm tra…</span>
+        <span class="chip" id="status-chip" hidden>Đang kiểm tra…</span>
         <div class="account">
           <button type="button" class="account-btn" id="account-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Tài khoản">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
@@ -480,7 +485,7 @@
             </div>
             <div class="pay-boxes">
               <div class="pay-table" id="pay-table-plan">
-                <div class="pay-row is-active" id="pay-plan-row">
+                <div class="pay-row" id="pay-plan-row">
                   <span>Bạn đang chọn gói:</span><strong id="pay-plan-label">—</strong>
                 </div>
                 <div class="pay-row"><span>Số tiền:</span><strong id="pay-amount">—</strong></div>
@@ -540,8 +545,8 @@
               </div>
             </div>
             <div class="pay-boxes">
-              <div class="pay-table">
-                <div class="pay-row is-active" id="pay-plan-row-pay">
+              <div class="pay-table" id="pay-table-plan-pay">
+                <div class="pay-row" id="pay-plan-row-pay">
                   <span>Bạn đang chọn gói:</span><strong id="pay-plan-label-pay">—</strong>
                 </div>
                 <div class="pay-row"><span>Số tiền:</span><strong id="pay-amount-pay">—</strong></div>
@@ -595,6 +600,8 @@
         plans: document.getElementById("plans"),
         transferContent: document.getElementById("transfer-content"),
         transferContentPay: document.getElementById("transfer-content-pay"),
+        payPlanTable: document.getElementById("pay-table-plan"),
+        payPlanTablePay: document.getElementById("pay-table-plan-pay"),
         payPlanRow: document.getElementById("pay-plan-row"),
         payPlanLabel: document.getElementById("pay-plan-label"),
         payAmount: document.getElementById("pay-amount"),
@@ -701,13 +708,13 @@
       }
 
       function highlightPlanRow(flash) {
-        [els.payPlanRow, els.payPlanRowPay].forEach(function (row) {
-          if (!row) return;
-          row.classList.add("is-active");
+        [els.payPlanTable, els.payPlanTablePay].forEach(function (table) {
+          if (!table) return;
+          table.classList.add("is-active");
           if (flash) {
-            row.classList.remove("is-flash");
-            void row.offsetWidth;
-            row.classList.add("is-flash");
+            table.classList.remove("is-flash");
+            void table.offsetWidth;
+            table.classList.add("is-flash");
           }
         });
       }
@@ -887,6 +894,13 @@
         var uname = access.username || (access.member && access.member.username) || "";
         // Tag shop trên header: ẩn với khách; hiện khi đã đăng nhập (hoặc đang dùng thử)
         setShopNavVisible(isLoggedIn(access) || (access && access.mode === "trial"));
+        // Chip trạng thái: chỉ hiện khi dùng thử hoặc đã đăng nhập
+        var showChip = isLoggedIn(access) || (access && access.mode === "trial");
+        els.chip.hidden = !showChip;
+        if (!showChip) {
+          setAccountMenu(access);
+          return;
+        }
         if (access.mode === "member") {
           els.chip.classList.add("ok");
           els.chip.textContent = "TV · " + uname + " · " + GiaHuyMembership.formatExpiry(access.member);
