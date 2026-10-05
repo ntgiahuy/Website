@@ -1429,10 +1429,18 @@ function buildPdfScheduleRows(ctx: Ctx): Array<ScheduleRow & { stt: number | str
 }
 
 function scheduleLayerLabel(layer: ScheduleRow["layer"]): string {
-  if (layer === "top") return "Thép lớp trên";
-  if (layer === "structural") return "Thép cấu tạo";
-  return "Thép lớp dưới";
+  if (layer === "top") return "Lớp trên";
+  if (layer === "structural") return "Lớp cấu tạo";
+  return "Lớp dưới";
 }
+
+/** Tỉ lệ bản vẽ 1:N → hệ số pt PDF / mm thế giới. */
+function scalePtPerMm(drawingScale: number): number {
+  return 72 / (25.4 * Math.max(1, drawingScale));
+}
+
+/** Tỉ lệ mặt cắt thép sàn (phóng to hơn mặt bằng). */
+const SECTION_DRAWING_SCALE = 75;
 
 
 /** Đoạn mặt cắt dọc theo đường cắt (mm thế giới). */
@@ -1903,10 +1911,10 @@ function sectionCutPieceCallouts(
 }
 
 /**
- * Mặt cắt thép sàn đúng tỉ lệ mặt bằng: từ trục đầu → trục cuối,
+ * Mặt cắt thép sàn: từ trục đầu → trục cuối,
  * đủ dầm / ô thủng / sàn thấp trên đường cắt.
  * `cutDir` X → MẶT CẮT A-A; Y → MẶT CẮT B-B.
- * `planS` = cùng hệ số tỉ lệ với bản vẽ mặt bằng.
+ * `sectionS` = tỉ lệ mặt cắt (mặc định 1/75).
  */
 function drawRebarSectionCut(
   ctx: Ctx,
@@ -1914,7 +1922,7 @@ function drawRebarSectionCut(
   y: number,
   maxW: number,
   cutDir: "X" | "Y",
-  planS: number,
+  sectionS: number,
 ): number {
   const { project, model } = ctx;
   const sections = ensureSectionCuts(project);
@@ -1941,8 +1949,8 @@ function drawRebarSectionCut(
   const padL = 28;
   const padR = 48;
   const drawW = maxW - padL - padR;
-  // Một tỉ lệ s cho cả nhịp + B dầm + dày sàn + H dầm (đúng tỉ lệ 3 kích thước)
-  const s = Math.min(planS, drawW / spanMm);
+  // Tỉ lệ mặt cắt 1/75 (clamp nếu nhịp dài hơn bề rộng cột)
+  const s = Math.min(sectionS, drawW / spanMm);
   const usedW = spanMm * s;
   const xBase = x + padL + (drawW - usedW) / 2;
   const toAlong = (mm: number) => xBase + (mm - along0) * s;
@@ -2354,7 +2362,7 @@ function drawRebarSectionCut(
   textSimple(ctx, title, x + maxW / 2, titleY, 8.5, true, "center");
   textSimple(
     ctx,
-    `TL 1/${project.info.drawingScale || 100} · Lớp BV ${project.info.cover}`,
+    `TL 1/${SECTION_DRAWING_SCALE} · Lớp BV ${project.info.cover}`,
     x + maxW / 2,
     titleY + 12,
     6.2,
@@ -2366,27 +2374,27 @@ function drawRebarSectionCut(
   return titleY + 36;
 }
 
-/** A-A trên, B-B dưới — cùng tỉ lệ mặt bằng (đặt dưới mặt bằng lớp dưới). */
+/** A-A trên, B-B dưới — tỉ lệ mặt cắt 1/75 (đặt dưới mặt bằng lớp dưới). */
 function drawSectionCutsAboveSchedule(
   ctx: Ctx,
   x: number,
   y: number,
   maxW: number,
-  planS: number,
+  sectionS: number,
 ): number {
   const gap = 10;
-  const bottomA = drawRebarSectionCut(ctx, x, y, maxW, "X", planS);
-  const bottomB = drawRebarSectionCut(ctx, x, bottomA + gap, maxW, "Y", planS);
+  const bottomA = drawRebarSectionCut(ctx, x, y, maxW, "X", sectionS);
+  const bottomB = drawRebarSectionCut(ctx, x, bottomA + gap, maxW, "Y", sectionS);
   return bottomB;
 }
 
 function drawScheduleTable(ctx: Ctx, x: number, y: number) {
   const { project } = ctx;
   const rows = buildPdfScheduleRows(ctx);
-  // Tên CK | Lớp (dưới/trên) | STT | …
+  // Tên CK | Lớp (bằng cột Ø) | STT | …
   const cols = [
     { w: 36 },
-    { w: 54 },
+    { w: 26 },
     { w: 36 },
     { w: 158 },
     { w: 26 },
@@ -2541,7 +2549,7 @@ function scheduleSummaryBlockSize(ctx: Ctx): {
   blockH: number;
 } {
   const rows = buildPdfScheduleRows(ctx);
-  const schedW = 36 + 54 + 36 + 158 + 26 + 50 + 26 + 34 + 38 + 46 + 48;
+  const schedW = 36 + 26 + 36 + 158 + 26 + 50 + 26 + 34 + 38 + 46 + 48;
   const schedH = 18 + 34 + Math.max(rows.length, 1) * 18;
   const dias = new Set(rows.map((r) => r.dia));
   const sumW = 138 + Math.max(dias.size, 1) * 78;
@@ -2664,17 +2672,18 @@ export async function generateSlabPdf(
     return one * 2 + gap;
   };
 
-  // planH: mặt bằng + mặt cắt; chừa tableBlock ở đáy trang (A1 rộng hơn)
+  // Mặt cắt phóng to TL 1/75; mặt bằng fit còn lại
+  const sectionS = scalePtPerMm(SECTION_DRAWING_SCALE);
   let planH = Math.max(
-    280,
-    Math.min(620, bottomLimit - topY - estSecHFor(0.08) - gap - tableBlock.blockH - 28),
+    220,
+    Math.min(560, bottomLimit - topY - estSecHFor(sectionS) - gap - tableBlock.blockH - 28),
   );
   let planS = planScale(project, colW, planH);
-  for (let i = 0; i < 4; i++) {
-    const secH = estSecHFor(planS);
+  for (let i = 0; i < 5; i++) {
+    const secH = estSecHFor(sectionS);
     const estPlanBlock = planH + 95;
     if (topY + estPlanBlock + gap + secH + 8 <= bottomLimit - tableBlock.blockH) break;
-    planH = Math.max(220, planH - 36);
+    planH = Math.max(180, planH - 40);
     planS = planScale(project, colW, planH);
   }
 
@@ -2682,8 +2691,8 @@ export async function generateSlabPdf(
   const afterTop = drawPlan(ctx, rightX, topY, colW, planH, zones, "top");
   const afterPlans = Math.max(afterBottom, afterTop);
 
-  // A-A / B-B nằm dưới mặt bằng lớp dưới (cột trái)
-  drawSectionCutsAboveSchedule(ctx, leftX, afterPlans + gap, colW, planS);
+  // A-A / B-B nằm dưới mặt bằng lớp dưới (cột trái) — TL 1/75
+  drawSectionCutsAboveSchedule(ctx, leftX, afterPlans + gap, colW, sectionS);
 
   // Bảng TK + Tổng hợp: cùng hàng, neo góc dưới phải (trong khung trang)
   const tablesX = PAGE_W - pagePad - tableBlock.blockW;
