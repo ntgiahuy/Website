@@ -7,7 +7,8 @@ import type {
   SlabInfo,
   SlabProject,
 } from "./types";
-import { applyAxesToProject, defaultAxesX, defaultAxesY } from "./grid";
+import { rebarLayerMark } from "./types";
+import { applyAxesToProject, defaultAxesX, defaultAxesY, ensureSectionCuts } from "./grid";
 import { uid } from "./utils";
 
 export function defaultInfo(): SlabInfo {
@@ -37,9 +38,9 @@ export function defaultInfo(): SlabInfo {
 export function defaultSimple2(): Simple2Layer {
   return {
     bottomSpec: "10a150",
-    bottomHook: 50,
+    bottomHook: 100,
     topSpec: "10a150",
-    topHook: 50,
+    topHook: 100,
     textHeight: 150,
   };
 }
@@ -47,14 +48,13 @@ export function defaultSimple2(): Simple2Layer {
 export function defaultEconomy2(): Economy2Layer {
   return {
     bottomSpec: "10a200",
-    bottomHook: 60,
+    bottomHook: 100,
     topSpec: "10a150",
-    topHook: 60,
+    topHook: 100,
     structuralSpec: "6a150",
-    structuralHook: 50,
+    structuralHook: 80,
     distToCenter: 4,
     textHeight: 150,
-    hatAlongShort: true,
   };
 }
 
@@ -97,18 +97,18 @@ function sampleBeams(): PlanBeam[] {
 }
 
 function sampleZones(): RebarZone[] {
-  const cover = 50;
+  const cover = defaultInfo().cover;
   const pad = 110;
   return [
     {
       id: uid("zone"),
-      mark: "MC 1-1",
+      mark: rebarLayerMark("bottom"),
       layer: "bottom",
       direction: "X",
       dia: 10,
       spacing: 150,
-      leftHook: 50,
-      rightHook: 50,
+      leftHook: 100,
+      rightHook: 100,
       x1: pad,
       y1: pad,
       x2: 6000 - pad,
@@ -120,13 +120,13 @@ function sampleZones(): RebarZone[] {
     },
     {
       id: uid("zone"),
-      mark: "MT 1-1",
+      mark: rebarLayerMark("top"),
       layer: "top",
       direction: "X",
       dia: 10,
       spacing: 150,
-      leftHook: 50,
-      rightHook: 50,
+      leftHook: 100,
+      rightHook: 100,
       x1: pad,
       y1: pad,
       x2: 3000,
@@ -140,15 +140,27 @@ function sampleZones(): RebarZone[] {
 }
 
 function sampleSections(): SectionCut[] {
+  // Sẽ được chuẩn hóa lại trong createSampleS1 (trục + offset).
   return [
     {
       id: uid("sec"),
       name: "1",
       textHeight: 150,
       direction: "X",
+      at: 3000,
+      from: 0,
+      to: 4500,
+      offsetMm: 0,
+    },
+    {
+      id: uid("sec"),
+      name: "1",
+      textHeight: 150,
+      direction: "Y",
       at: 2250,
       from: 0,
       to: 6000,
+      offsetMm: 0,
     },
   ];
 }
@@ -170,7 +182,7 @@ export function createSampleS1(): SlabProject {
       size: b.size,
       offset: b.offset,
     }));
-  return applyAxesToProject({
+  const base = applyAxesToProject({
     info: defaultInfo(),
     planWidth: 6000,
     planHeight: 4500,
@@ -184,9 +196,10 @@ export function createSampleS1(): SlabProject {
     simple2: defaultSimple2(),
     economy2: defaultEconomy2(),
     sections: sampleSections(),
-    layoutPreset: "simple2",
+    layoutPreset: "manual",
     show3d: false,
   });
+  return { ...base, sections: ensureSectionCuts(base) };
 }
 
 export function createEmptyProject(): SlabProject {

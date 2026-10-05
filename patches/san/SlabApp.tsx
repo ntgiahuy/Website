@@ -164,8 +164,6 @@ function AxisMmInput({
 export function SlabApp() {
   const [project, setProject] = useState<SlabProject>(() => createSampleS1());
   const [tab, setTab] = useState<TabId>("plan");
-  /** Tick trong tab Bố trí sàn — mặc định Vẽ thép sàn. */
-  const [layoutPanel, setLayoutPanel] = useState<LayoutPanelId>("manual");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   /** Phóng to / thu nhỏ bản vẽ preview (%). */
@@ -1070,7 +1068,7 @@ export function SlabApp() {
   }
 
   function setPreset(layoutPreset: LayoutPreset) {
-    persist({ ...project, layoutPreset });
+    persist({ ...projectRef.current, layoutPreset });
   }
 
   const deferredProject = useDeferredValue(project);
@@ -1113,9 +1111,17 @@ export function SlabApp() {
         fetch(withBasePath("/fonts/BeVietnamPro-Bold.ttf")),
       ];
       const [regular, bold] = await Promise.all(fontRes.map((r) => r.then((x) => x.arrayBuffer())));
-      const bytes = await generateSlabPdf(project, { regular, bold });
-      downloadPdf(bytes, `KetCauSan_${project.info.name.replace(/\s+/g, "_")}.pdf`);
-      setStatus("Đã xuất PDF A1.");
+      // Xuất đúng tick đang chọn (layoutPreset), không dùng state UI lệch.
+      const exportProject = projectRef.current;
+      const bytes = await generateSlabPdf(exportProject, { regular, bold });
+      const modeLabel =
+        exportProject.layoutPreset === "economy2"
+          ? "Thép 2 lớn tiết kiệm"
+          : exportProject.layoutPreset === "simple2"
+            ? "Thép 2 lớp đơn giản"
+            : "Vẽ thép sàn";
+      downloadPdf(bytes, `KetCauSan_${exportProject.info.name.replace(/\s+/g, "_")}.pdf`);
+      setStatus(`Đã xuất PDF A1 (${modeLabel}).`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Xuất PDF thất bại.");
     } finally {
@@ -1275,17 +1281,25 @@ export function SlabApp() {
     setStatus("Đã áp dụng bố trí 2 lớp đơn giản.");
   }
 
+  /** Tick Bố trí sàn = layoutPreset (PDF / preview / schedule cùng nguồn). */
   function selectLayoutPanel(mode: LayoutPanelId) {
-    setLayoutPanel(mode);
+    const cur = projectRef.current;
     if (mode === "manual") {
-      setPreset("manual");
+      const seeded =
+        cur.layoutPreset === "manual" && (cur.zones?.length ?? 0) > 0
+          ? cur.zones
+          : effectiveZones(cur).map((z) => ({ ...z, id: z.id || uid("zone") }));
+      persist({ ...cur, layoutPreset: "manual", zones: seeded });
+      setStatus("Đã chọn Vẽ thép sàn — xuất PDF theo vùng thép thủ công.");
       return;
     }
     if (mode === "economy2") {
-      if (project.layoutPreset !== "economy2") setPreset("economy2");
+      persist({ ...cur, layoutPreset: "economy2" });
+      setStatus("Đã chọn Thép 2 lớn tiết kiệm — xuất PDF theo preset tiết kiệm.");
       return;
     }
-    applySimple2();
+    persist({ ...cur, layoutPreset: "simple2" });
+    setStatus("Đã chọn Thép 2 lớp đơn giản — xuất PDF theo preset đơn giản.");
   }
 
   function assignAllBeams() {
@@ -2258,7 +2272,7 @@ export function SlabApp() {
                       className="flex cursor-pointer items-center gap-2 text-xs text-zinc-200"
                     >
                       <Checkbox
-                        checked={layoutPanel === mode}
+                        checked={project.layoutPreset === mode}
                         onCheckedChange={() => selectLayoutPanel(mode)}
                       />
                       {label}
@@ -2267,7 +2281,7 @@ export function SlabApp() {
                 </div>
               </div>
 
-              {layoutPanel === "manual" && (
+              {project.layoutPreset === "manual" && (
                 <>
                   <Panel title="Vẽ thép sàn" className="min-w-0 flex-1">
                     <div className="flex flex-col gap-2.5">
@@ -2419,7 +2433,6 @@ export function SlabApp() {
                             onClick={() => {
                               setSelectedZoneId(z.id);
                               setZoneForm({ ...z, mark: rebarLayerMark(z.layer) });
-                              setLayoutPanel("manual");
                               setPreset("manual");
                             }}
                           >
@@ -2537,7 +2550,7 @@ export function SlabApp() {
                 </>
               )}
 
-              {layoutPanel === "economy2" && (
+              {project.layoutPreset === "economy2" && (
                 <Panel title="Thép 2 lớn tiết kiệm" className="max-w-3xl">
                   <div className="flex flex-col gap-2.5">
                     <Field label="Thép lớp dưới">
@@ -2590,7 +2603,7 @@ export function SlabApp() {
                 </Panel>
               )}
 
-              {layoutPanel === "simple2" && (
+              {project.layoutPreset === "simple2" && (
                 <Panel title="Thép 2 lớp đơn giản" className="min-w-0 flex-1">
                   <div className="flex flex-col gap-2.5">
                     <Field label="Thép lớp dưới">
