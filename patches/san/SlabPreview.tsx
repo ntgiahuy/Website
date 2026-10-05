@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { effectiveZones } from "@/lib/calc";
 import {
   axisInteriorSegmentsX,
@@ -8,16 +8,26 @@ import {
   baySlabExtent,
   beamSegSideFaces,
   beamSegments,
+  beamFaceDashStyle,
+  clippedBeamFaceParts,
   getBeamSegShift,
   isBeamSegOmitted,
   planBeamBleed,
+  planBeamDisplayName,
   rectDiagonalHatchSegments,
   rectOpeningDiagonals,
   sortAxes,
   stripRebarBarSegments,
   stripRebarPressMarks,
   buildMergedDistRanges,
-  SLAB_REBAR_HOOK_MM,
+  distRangeJunctionsOnBars,
+  hooksForRebarBar,
+  rebarBarStraightLenMm,
+  rebarHookSegments,
+  typicalLayeredRebarBars,
+  faceChainAlongX,
+  faceChainAlongY,
+  hookDrawMm,
 } from "@/lib/grid";
 import type { PlanSelection, SlabProject } from "@/lib/types";
 import { buildBeamFrameScene, projectSceneToSvg } from "@/lib/view3d";
@@ -26,16 +36,108 @@ type Anchor = { leftPct: number; topPct: number };
 
 /** Bán kính vòng số hiệu trục (px SVG). */
 const AXIS_BUBBLE_R = 6;
-/** Khoảng hở giữa da dầm ngoài và mép vòng (kề sàn, không chạm). */
-const AXIS_BUBBLE_GAP = 12;
-/** Tâm vòng số hiệu cách da dầm ngoài. */
-const AXIS_BUBBLE_OFFSET = AXIS_BUBBLE_R + AXIS_BUBBLE_GAP;
+/** Da dầm → đường dim dầm/sàn (gần hình vẽ nhất). */
+const DIM_FROM_EDGE = 16;
+/** Khoảng cách giữa các chuỗi dim. */
+const DIM_CHAIN_GAP = 14;
+/** Mép đường dim ngoài cùng → mép vòng số hiệu. */
+const DIM_TO_BUBBLE = 10;
 
 function clamp(n: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, n));
 }
 
-export function SlabPreview({
+const DIM_STROKE = "#60a5fa";
+const DIM_TEXT = "#93c5fd";
+const DIM_TICK = 3.5;
+
+/** Chuỗi dim ngang (SVG): tick + đường + số. */
+function SvgDimHChain({
+  marksMm,
+  y,
+  X,
+  fontSize = 8,
+}: {
+  marksMm: number[];
+  y: number;
+  X: (mm: number) => number;
+  fontSize?: number;
+}) {
+  const nodes: ReactNode[] = [];
+  for (let i = 0; i < marksMm.length - 1; i++) {
+    const a = marksMm[i]!;
+    const b = marksMm[i + 1]!;
+    const mm = Math.round(Math.abs(b - a));
+    if (mm < 1) continue;
+    const x1 = X(Math.min(a, b));
+    const x2 = X(Math.max(a, b));
+    const mid = (x1 + x2) / 2;
+    nodes.push(
+      <g key={`dh-${i}-${mm}`}>
+        <line x1={x1} y1={y} x2={x2} y2={y} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <line x1={x1} y1={y - DIM_TICK} x2={x1} y2={y + DIM_TICK} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <line x1={x2} y1={y - DIM_TICK} x2={x2} y2={y + DIM_TICK} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <text
+          x={mid}
+          y={y - 4}
+          fill={DIM_TEXT}
+          fontSize={fontSize}
+          fontWeight="600"
+          textAnchor="middle"
+        >
+          {mm}
+        </text>
+      </g>,
+    );
+  }
+  return <g pointerEvents="none">{nodes}</g>;
+}
+
+/** Chuỗi dim đứng (SVG): số xoay dọc bên trái. */
+function SvgDimVChain({
+  marksMm,
+  x,
+  Y,
+  fontSize = 8,
+}: {
+  marksMm: number[];
+  x: number;
+  Y: (mm: number) => number;
+  fontSize?: number;
+}) {
+  const nodes: ReactNode[] = [];
+  for (let i = 0; i < marksMm.length - 1; i++) {
+    const a = marksMm[i]!;
+    const b = marksMm[i + 1]!;
+    const mm = Math.round(Math.abs(b - a));
+    if (mm < 1) continue;
+    const y1 = Y(Math.max(a, b));
+    const y2 = Y(Math.min(a, b));
+    const mid = (y1 + y2) / 2;
+    nodes.push(
+      <g key={`dv-${i}-${mm}`}>
+        <line x1={x} y1={y1} x2={x} y2={y2} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <line x1={x - DIM_TICK} y1={y1} x2={x + DIM_TICK} y2={y1} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <line x1={x - DIM_TICK} y1={y2} x2={x + DIM_TICK} y2={y2} stroke={DIM_STROKE} strokeWidth="0.9" />
+        <text
+          x={x - 5}
+          y={mid}
+          fill={DIM_TEXT}
+          fontSize={fontSize}
+          fontWeight="600"
+          textAnchor="middle"
+          dominantBaseline="middle"
+          transform={`rotate(-90 ${x - 5} ${mid})`}
+        >
+          {mm}
+        </text>
+      </g>,
+    );
+  }
+  return <g pointerEvents="none">{nodes}</g>;
+}
+
+export const SlabPreview = memo(function SlabPreview({
   project,
   show3d,
   zoomPct = 100,
@@ -64,31 +166,77 @@ export function SlabPreview({
   const zones = useMemo(() => effectiveZones(project), [project]);
   const axesX = useMemo(() => sortAxes(project.axesX ?? []), [project.axesX]);
   const axesY = useMemo(() => sortAxes(project.axesY ?? []), [project.axesY]);
+  /** Một lần / project — tránh gọi stripRebar 2–3 lần trong JSX (đơ khi sàn lớn). */
+  const rebarBars = useMemo(
+    () => (axesX.length >= 2 && axesY.length >= 2 ? stripRebarBarSegments(project, axesX, axesY) : []),
+    [project, axesX, axesY],
+  );
+  const drawBars = useMemo(
+    () => typicalLayeredRebarBars(project, rebarBars, zones),
+    [project, rebarBars, zones],
+  );
+  const pressMarks = useMemo(
+    () => stripRebarPressMarks(project, axesX, axesY, zones, rebarBars),
+    [project, axesX, axesY, zones, rebarBars],
+  );
   const wrapRef = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
 
   const W = 640;
   const H = 420;
   const bleed = useMemo(() => planBeamBleed(project, axesX, axesY), [project, axesX, axesY]);
-  const bleedMm = Math.max(
-    0,
-    -bleed.xMin,
-    -bleed.yMin,
-    bleed.xMax - project.planWidth,
-    bleed.yMax - project.planHeight,
-  );
-  // Chừa chỗ: dầm nhô ngoài plan + vòng số hiệu + khe hở
-  const pad = Math.max(48, AXIS_BUBBLE_OFFSET + AXIS_BUBBLE_R + 12 + bleedMm * 0.04);
-  const sx = (W - pad * 2) / Math.max(project.planWidth, 1);
-  const sy = (H - pad * 2) / Math.max(project.planHeight, 1);
+  // Ngoài → vào: số hiệu trục → dim tim trục → dim dầm/sàn → hình vẽ
+  const DIM_CHAINS = 2; // face + axis
+  const dimBand =
+    DIM_FROM_EDGE + DIM_CHAIN_GAP * DIM_CHAINS + DIM_TO_BUBBLE + AXIS_BUBBLE_R * 2 + 8;
+  /** Pad lệch: dim/bubble chỉ trái+dưới — trên chừa hẹp cho tên sàn để phóng to hình. */
+  const TITLE_BAND = 24;
+  const padT = TITLE_BAND;
+  const padR = 14;
+  const padL = Math.max(48, dimBand + 10);
+  const padB = Math.max(48, dimBand + 10);
+  /** Khung vẽ theo da dầm ngoài (kể cả dầm lệch ngoài biên), không cố định 0…plan. */
+  const extentW = Math.max(bleed.xMax - bleed.xMin, 1);
+  const extentH = Math.max(bleed.yMax - bleed.yMin, 1);
+  const availW = W - padL - padR;
+  const availH = H - padT - padB;
+  const sx = availW / extentW;
+  const sy = availH / extentH;
   const s = Math.min(sx, sy);
-  const ox = pad + (W - pad * 2 - project.planWidth * s) / 2;
-  const oy = pad + (H - pad * 2 - project.planHeight * s) / 2;
+  const ox = padL + (availW - extentW * s) / 2 - bleed.xMin * s;
+  // Neo sát dưới tên sàn (không căn giữa theo chiều đứng — tránh khoảng trống lớn)
+  const oy = padT + 4 - (project.planHeight - bleed.yMax) * s;
   const X = (mm: number) => ox + mm * s;
   const Y = (mm: number) => oy + (project.planHeight - mm) * s;
-  /** Da dầm ngoài cùng — neo vòng số hiệu / đường dẫn (không dính thân dầm). */
+  /** Da dầm ngoài cùng — neo vòng số hiệu / đường dẫn / khung xanh. */
   const outerLeft = bleed.xMin;
+  const outerRight = bleed.xMax;
   const outerBottom = bleed.yMin;
+  const outerTop = bleed.yMax;
+
+  /** Vị trí dim + bubble: ngoài → số hiệu → dim trục → dim dầm/sàn → hình. */
+  const faceXMarks = faceChainAlongX(project, axesX, axesY);
+  const faceYMarks = faceChainAlongY(project, axesX, axesY);
+  const axisXMarks = axesX.map((a) => a.pos);
+  const axisYMarks = axesY.map((a) => a.pos);
+  const edgeBottomY = Y(outerBottom);
+  const edgeLeftX = X(outerLeft);
+  let yDimCursor = edgeBottomY + DIM_FROM_EDGE;
+  const yFaceDim = faceXMarks.length >= 2 ? yDimCursor : null;
+  if (yFaceDim != null) yDimCursor += DIM_CHAIN_GAP;
+  const yAxisDim = axisXMarks.length >= 2 ? yDimCursor : null;
+  if (yAxisDim != null) yDimCursor += DIM_TO_BUBBLE + AXIS_BUBBLE_R;
+  else if (yFaceDim != null) yDimCursor = yFaceDim + DIM_TO_BUBBLE + AXIS_BUBBLE_R;
+  else yDimCursor = edgeBottomY + AXIS_BUBBLE_R + 12;
+  const bubbleBottomCY = yDimCursor;
+  let xDimCursor = edgeLeftX - DIM_FROM_EDGE;
+  const xFaceDim = faceYMarks.length >= 2 ? xDimCursor : null;
+  if (xFaceDim != null) xDimCursor -= DIM_CHAIN_GAP;
+  const xAxisDim = axisYMarks.length >= 2 ? xDimCursor : null;
+  if (xAxisDim != null) xDimCursor -= DIM_TO_BUBBLE + AXIS_BUBBLE_R;
+  else if (xFaceDim != null) xDimCursor = xFaceDim - DIM_TO_BUBBLE - AXIS_BUBBLE_R;
+  else xDimCursor = edgeLeftX - AXIS_BUBBLE_R - 12;
+  const bubbleLeftCX = xDimCursor;
 
   function anchorFromSvg(svgX: number, svgY: number): Anchor {
     return {
@@ -116,8 +264,8 @@ export function SlabPreview({
     const axes = sel.dir === "X" ? axesX : axesY;
     const ax = axes.find((a) => a.id === sel.axisId);
     if (!ax) return { leftPct: 50, topPct: 40 };
-    if (sel.dir === "X") return anchorFromSvg(X(ax.pos), Y(outerBottom) + AXIS_BUBBLE_OFFSET + 20);
-    return anchorFromSvg(X(outerLeft) - AXIS_BUBBLE_OFFSET, Y(ax.pos));
+    if (sel.dir === "X") return anchorFromSvg(X(ax.pos), bubbleBottomCY);
+    return anchorFromSvg(bubbleLeftCX, Y(ax.pos));
   }
 
   function pick(sel: PlanSelection | null, e?: MouseEvent) {
@@ -147,89 +295,136 @@ export function SlabPreview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection?.kind, selection && "beamId" in selection ? selection.beamId : null, selection && "segIndex" in selection ? selection.segIndex : null, selection && "axisId" in selection ? selection.axisId : null, selection && "ix" in selection ? selection.ix : null, selection && "iy" in selection ? selection.iy : null]);
 
+  // Hooks phải gọi trước mọi early return (show3d) — tránh React #300.
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    let raf = 0;
+    const sync = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const w = Math.round(el.clientWidth);
+        const h = Math.round(el.clientHeight);
+        // Tránh vòng lặp scrollbar ↔ ResizeObserver (nháy liên tục).
+        setViewport((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+      });
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [show3d]);
+
   if (show3d) {
     const scene = buildBeamFrameScene(project);
     const view = projectSceneToSvg(scene, { width: 920, height: 540, pad: 40 });
+    const zoom3d = Math.min(300, Math.max(50, zoomPct));
+    const scale3d = zoom3d / 100;
+    const canvasW3d = Math.max(1, Math.round(viewport.w * scale3d));
+    const canvasH3d = Math.max(1, Math.round(viewport.h * scale3d));
+    const atDefaultZoom3d = Math.abs(scale3d - 1) < 0.001;
+    const scrollW3d = atDefaultZoom3d ? undefined : Math.max(viewport.w, canvasW3d);
+    const scrollH3d = atDefaultZoom3d ? undefined : Math.max(viewport.h, canvasH3d);
     return (
-      <div className="flex h-full min-h-0 items-center justify-center bg-zinc-900 p-3">
-        <svg
-          viewBox={`0 0 ${view.width} ${view.height}`}
-          className="h-full w-full max-h-full rounded border border-zinc-700 bg-white"
-          role="img"
-          aria-label={view.title}
-        >
-          <defs>
-            <pattern id="lowHatch3d" patternUnits="userSpaceOnUse" width="6" height="6">
-              <circle cx="1.2" cy="1.2" r="0.7" fill="#9ca3af" />
-            </pattern>
-          </defs>
-          {view.polygons.map((poly, i) => (
-            <polygon
-              key={`f-${i}`}
-              points={poly.points}
-              fill={poly.kind === "hatch" ? "url(#lowHatch3d)" : "#ffffff"}
-              stroke="none"
-            />
-          ))}
-          {view.edges.map((e, i) => (
-            <line
-              key={`e-${i}`}
-              x1={e.x1}
-              y1={e.y1}
-              x2={e.x2}
-              y2={e.y2}
-              stroke={e.style === "solid" ? "#0a0a0a" : "#9ca3af"}
-              strokeWidth={e.style === "solid" ? 1.45 : 0.55}
-              strokeDasharray={e.style === "dashed" ? "3.5 2.2" : undefined}
-              strokeLinecap="round"
-            />
-          ))}
-          {view.lines.map((ln, i) => (
-            <line
-              key={`x-${i}`}
-              x1={ln.x1}
-              y1={ln.y1}
-              x2={ln.x2}
-              y2={ln.y2}
-              stroke="#6b7280"
-              strokeWidth={1}
-              strokeDasharray="6 4"
-            />
-          ))}
-          {view.marks.map((m, i) => (
-            <g key={`m-${i}`} transform={`translate(${m.x}, ${m.y})`}>
-              <polygon points="-7,0 7,0 0,-10" fill="#111" />
-              <line x1={0} y1={0} x2={0} y2={14} stroke="#111" strokeWidth={1} />
-              <text x={10} y={-2} fill="#111" fontSize="11" fontWeight="700" fontFamily="sans-serif">
-                {m.elevText}
-              </text>
-              <text x={10} y={12} fill="#374151" fontSize="10" fontFamily="sans-serif">
-                {m.hsText}
-              </text>
-            </g>
-          ))}
-          <text
-            x={view.width / 2}
-            y={view.height - 22}
-            textAnchor="middle"
-            fill="#111"
-            fontSize="13"
-            fontWeight="700"
-            fontFamily="sans-serif"
+      <div className="flex h-full min-h-0 flex-col bg-zinc-950">
+        <div ref={wrapRef} className="relative min-h-0 flex-1 overflow-auto">
+          <div
+            className="box-border flex items-center justify-center bg-zinc-900 p-2 sm:p-3"
+            style={{
+              width: scrollW3d ?? "100%",
+              height: scrollH3d ?? "100%",
+              minWidth: "100%",
+              minHeight: "100%",
+            }}
           >
-            {view.title}
-          </text>
-          <text
-            x={view.width / 2}
-            y={view.height - 8}
-            textAnchor="middle"
-            fill="#4b5563"
-            fontSize="11"
-            fontFamily="sans-serif"
-          >
-            {view.subtitle}
-          </text>
-        </svg>
+            <svg
+              viewBox={`0 0 ${view.width} ${view.height}`}
+              width={atDefaultZoom3d || !viewport.w ? "100%" : canvasW3d}
+              height={atDefaultZoom3d || !viewport.h ? "100%" : canvasH3d}
+              className="block shrink-0 rounded border border-zinc-700 bg-white"
+              preserveAspectRatio="xMidYMid meet"
+              role="img"
+              aria-label={view.title}
+            >
+              <defs>
+                <pattern id="lowHatch3d" patternUnits="userSpaceOnUse" width="6" height="6">
+                  <circle cx="1.2" cy="1.2" r="0.7" fill="#9ca3af" />
+                </pattern>
+              </defs>
+              {view.polygons.map((poly, i) => (
+                <polygon
+                  key={`f-${i}`}
+                  points={poly.points}
+                  fill={poly.kind === "hatch" ? "url(#lowHatch3d)" : "#ffffff"}
+                  stroke="none"
+                />
+              ))}
+              {view.edges.map((e, i) => (
+                <line
+                  key={`e-${i}`}
+                  x1={e.x1}
+                  y1={e.y1}
+                  x2={e.x2}
+                  y2={e.y2}
+                  stroke={e.style === "solid" ? "#0a0a0a" : "#9ca3af"}
+                  strokeWidth={e.style === "solid" ? 1.45 : 0.55}
+                  strokeDasharray={e.style === "dashed" ? "3.5 2.2" : undefined}
+                  strokeLinecap="round"
+                />
+              ))}
+              {view.lines.map((ln, i) => (
+                <line
+                  key={`x-${i}`}
+                  x1={ln.x1}
+                  y1={ln.y1}
+                  x2={ln.x2}
+                  y2={ln.y2}
+                  stroke="#0a0a0a"
+                  strokeWidth={1.35}
+                  strokeLinecap="round"
+                />
+              ))}
+              {view.marks.map((m, i) => (
+                <g key={`m-${i}`} transform={`translate(${m.x}, ${m.y})`}>
+                  <polygon points="-7,0 7,0 0,-10" fill="#111" />
+                  <line x1={0} y1={0} x2={0} y2={14} stroke="#111" strokeWidth={1} />
+                  <text x={10} y={-2} fill="#111" fontSize="11" fontWeight="700" fontFamily="sans-serif">
+                    {m.elevText}
+                  </text>
+                  <text x={10} y={12} fill="#374151" fontSize="10" fontFamily="sans-serif">
+                    {m.hsText}
+                  </text>
+                </g>
+              ))}
+              <text
+                x={view.width / 2}
+                y={view.height - 22}
+                textAnchor="middle"
+                fill="#111"
+                fontSize="13"
+                fontWeight="700"
+                fontFamily="sans-serif"
+              >
+                {view.title}
+              </text>
+              <text
+                x={view.width / 2}
+                y={view.height - 8}
+                textAnchor="middle"
+                fill="#4b5563"
+                fontSize="11"
+                fontFamily="sans-serif"
+              >
+                {view.subtitle}
+              </text>
+            </svg>
+          </div>
+        </div>
       </div>
     );
   }
@@ -369,6 +564,12 @@ export function SlabPreview({
   });
 
   const beamNodes: ReactNode[] = [];
+  /** Nét da dầm: biên ngoài = xanh khung (theo da thật, kể cả lệch/xéo); da trong đứt xám. */
+  const BEAM_SW = 0.85;
+  const BEAM_OUTER_SW = 1.5;
+  const BEAM_DASH = "4 2.5";
+  const BEAM_STROKE = "#c4c4c8";
+  const BEAM_OUTER_STROKE = "#79b8ff";
   for (const beam of project.beams ?? []) {
     const segs = beamSegments(project, beam);
 
@@ -384,7 +585,7 @@ export function SlabPreview({
       const lo = seg.lo;
       const hi = seg.hi;
 
-      // Đa giác đoạn dầm (có thể xéo khi s0 ≠ s1)
+      // Hit-area trong suốt (chọn đoạn) — không tô thân dầm
       const pts =
         beam.direction === "Y"
           ? [
@@ -405,13 +606,45 @@ export function SlabPreview({
       const labelY =
         beam.direction === "Y" ? Y((lo + hi) / 2) : Y(Math.max(hi0, hi1)) - 6;
 
+      const faceLines: ReactNode[] = [];
+      const pushFace = (face0: number, face1: number, key: string) => {
+        const style = beamFaceDashStyle(beam.direction, face0, face1, bleed);
+        // Da biên ngoài: không cắt chỗ giao — giữ nét liền suốt đầu/cuối dầm
+        const parts =
+          style === "solid"
+            ? [{ faceA: face0, faceB: face1, alongA: lo, alongB: hi }]
+            : clippedBeamFaceParts(project, beam.direction, face0, face1, lo, hi);
+        parts.forEach((p, i) => {
+          const x1 = beam.direction === "Y" ? X(p.faceA) : X(p.alongA);
+          const y1 = beam.direction === "Y" ? Y(p.alongA) : Y(p.faceA);
+          const x2 = beam.direction === "Y" ? X(p.faceB) : X(p.alongB);
+          const y2 = beam.direction === "Y" ? Y(p.alongB) : Y(p.faceB);
+          const isOuter = style === "solid";
+          faceLines.push(
+            <line
+              key={`${key}-${i}`}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              stroke={active ? "#34d399" : isOuter ? BEAM_OUTER_STROKE : BEAM_STROKE}
+              strokeWidth={active ? 1.4 : isOuter ? BEAM_OUTER_SW : BEAM_SW}
+              strokeDasharray={isOuter ? undefined : BEAM_DASH}
+              strokeLinecap="square"
+              pointerEvents="none"
+            />,
+          );
+        });
+      };
+      pushFace(lo0, lo1, "lo");
+      pushFace(hi0, hi1, "hi");
+
       beamNodes.push(
         <g key={`${beam.id}-s${seg.index}`}>
           <polygon
             points={points}
-            fill="#27272a"
-            stroke="#a1a1aa"
-            strokeWidth={1}
+            fill={active ? "rgba(52,211,153,0.2)" : "transparent"}
+            stroke="none"
             className={interactive && !insertBeamMode ? "cursor-pointer" : undefined}
             pointerEvents={interactive && !insertBeamMode ? "all" : "none"}
             onClick={(e) => {
@@ -420,45 +653,37 @@ export function SlabPreview({
               pick({ kind: "beam", beamId: beam.id, segIndex: seg.index }, e);
             }}
           />
+          {faceLines}
           {active && (
-            <>
-              <polygon
-                points={points}
-                fill="rgba(52,211,153,0.45)"
-                stroke="#34d399"
-                strokeWidth={2}
+            beam.direction === "Y" ? (
+              <text
+                x={labelX}
+                y={labelY}
+                fill="#6ee7b7"
+                fontSize="10"
+                fontWeight="700"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                transform={`rotate(-90 ${labelX} ${labelY})`}
                 pointerEvents="none"
-              />
-              {beam.direction === "Y" ? (
-                <text
-                  x={labelX}
-                  y={labelY}
-                  fill="#6ee7b7"
-                  fontSize="10"
-                  fontWeight="700"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  transform={`rotate(-90 ${labelX} ${labelY})`}
-                  pointerEvents="none"
-                >
-                  {beam.name} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
-                  {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
-                </text>
-              ) : (
-                <text
-                  x={labelX}
-                  y={labelY}
-                  textAnchor="middle"
-                  fill="#6ee7b7"
-                  fontSize="10"
-                  fontWeight="700"
-                  pointerEvents="none"
-                >
-                  {beam.name} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
-                  {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
-                </text>
-              )}
-            </>
+              >
+                {planBeamDisplayName(project, beam.name)} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
+                {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
+              </text>
+            ) : (
+              <text
+                x={labelX}
+                y={labelY}
+                textAnchor="middle"
+                fill="#6ee7b7"
+                fontSize="10"
+                fontWeight="700"
+                pointerEvents="none"
+              >
+                {planBeamDisplayName(project, beam.name)} · {seg.a0.name}-{seg.a1.name} · L={Math.round(seg.span)}
+                {(s0 !== 0 || s1 !== 0) ? ` · Δ=${s0 === s1 ? s0 : `${s0}/${s1}`}` : ""}
+              </text>
+            )
           )}
         </g>,
       );
@@ -477,36 +702,24 @@ export function SlabPreview({
           ? (() => {
               const beam = project.beams.find((b) => b.id === selection.beamId);
               if (!beam) return `Đoạn dầm: ${selection.beamId}`;
+              const label = planBeamDisplayName(project, beam.name);
               const seg = beamSegments(project, beam)[selection.segIndex];
               return seg
-                ? `Đoạn dầm: ${beam.name} · ${seg.a0.name}–${seg.a1.name}`
-                : `Đoạn dầm: ${beam.name}`;
+                ? `Đoạn dầm: ${label} · ${seg.a0.name}–${seg.a1.name}`
+                : `Đoạn dầm: ${label}`;
             })()
           : `Trục ${selection.dir}: ${
               (selection.dir === "X" ? axesX : axesY).find((a) => a.id === selection.axisId)?.name ?? "?"
             }`;
 
   const zoom = Math.min(300, Math.max(50, zoomPct));
-  const [viewport, setViewport] = useState({ w: 0, h: 0 });
-
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-    const sync = () => {
-      setViewport({ w: el.clientWidth, h: el.clientHeight });
-    };
-    sync();
-    const ro = new ResizeObserver(sync);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [show3d]);
-
   const scale = zoom / 100;
   const canvasW = Math.max(1, Math.round(viewport.w * scale));
   const canvasH = Math.max(1, Math.round(viewport.h * scale));
-  // Vùng cuộn ≥ viewport khi phóng to; khi thu nhỏ vẫn đủ chỗ căn giữa
-  const scrollW = Math.max(viewport.w, canvasW);
-  const scrollH = Math.max(viewport.h, canvasH);
+  // Vùng cuộn ≥ viewport khi phóng to; khi 100% dùng % để tránh nháy scrollbar
+  const atDefaultZoom = Math.abs(scale - 1) < 0.001;
+  const scrollW = atDefaultZoom ? undefined : Math.max(viewport.w, canvasW);
+  const scrollH = atDefaultZoom ? undefined : Math.max(viewport.h, canvasH);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-zinc-950">
@@ -514,30 +727,30 @@ export function SlabPreview({
         <div
           className="box-border flex items-center justify-center p-1 sm:p-2"
           style={{
-            width: scrollW || "100%",
-            height: scrollH || "100%",
+            width: scrollW ?? "100%",
+            height: scrollH ?? "100%",
             minWidth: "100%",
             minHeight: "100%",
           }}
         >
           <svg
             viewBox={`0 0 ${W} ${H}`}
-            width={viewport.w ? canvasW : "100%"}
-            height={viewport.h ? canvasH : "100%"}
+            width={atDefaultZoom || !viewport.w ? "100%" : canvasW}
+            height={atDefaultZoom || !viewport.h ? "100%" : canvasH}
             className="block shrink-0"
             preserveAspectRatio="xMidYMid meet"
             onClick={() => {
               if (interactive && onSelect) pick(null);
             }}
           >
+            {/* Nền vùng da dầm — không stroke: đường xanh khung = đúng da dầm ngoài (beamNodes) */}
             <rect
-              x={X(0)}
-              y={Y(project.planHeight)}
-              width={project.planWidth * s}
-              height={project.planHeight * s}
+              x={X(outerLeft)}
+              y={Y(outerTop)}
+              width={(outerRight - outerLeft) * s}
+              height={(outerTop - outerBottom) * s}
               fill="#111113"
-              stroke="#79b8ff"
-              strokeWidth="1.5"
+              stroke="none"
               pointerEvents="none"
             />
             {bayNodes}
@@ -546,8 +759,8 @@ export function SlabPreview({
             {axesX.map((ax) => {
               const active = selection?.kind === "axis" && selection.dir === "X" && selection.axisId === ax.id;
               const cx = X(ax.pos);
-              const edgeY = Y(outerBottom);
-              const cy = edgeY + AXIS_BUBBLE_OFFSET;
+              const edgeY = edgeBottomY;
+              const cy = bubbleBottomCY;
               const stroke = active ? "#79b8ff" : "#52525b";
               const sw = active ? 1.2 : 0.6;
               const interior = axisInteriorSegmentsX(project, axesX, axesY, ax.pos);
@@ -567,7 +780,7 @@ export function SlabPreview({
                       pointerEvents="none"
                     />
                   ))}
-                  {/* Đường dẫn nét mảnh gạch đứt: mép vòng → da sàn ngoài */}
+                  {/* Đường dẫn: mép vòng (ngoài) → da sàn — băng qua chuỗi dim */}
                   <line
                     x1={cx}
                     y1={cy - AXIS_BUBBLE_R}
@@ -611,8 +824,8 @@ export function SlabPreview({
             })}
             {axesY.map((ay) => {
               const active = selection?.kind === "axis" && selection.dir === "Y" && selection.axisId === ay.id;
-              const edgeX = X(outerLeft);
-              const cx = edgeX - AXIS_BUBBLE_OFFSET;
+              const edgeX = edgeLeftX;
+              const cx = bubbleLeftCX;
               const cy = Y(ay.pos);
               const stroke = active ? "#fbbf24" : "#52525b";
               const sw = active ? 1.2 : 0.6;
@@ -633,7 +846,7 @@ export function SlabPreview({
                       pointerEvents="none"
                     />
                   ))}
-                  {/* Đường dẫn nét mảnh gạch đứt: mép vòng → da sàn ngoài */}
+                  {/* Đường dẫn: mép vòng (ngoài) → da sàn — băng qua chuỗi dim */}
                   <line
                     x1={cx + AXIS_BUBBLE_R}
                     y1={cy}
@@ -675,19 +888,40 @@ export function SlabPreview({
                 </g>
               );
             })}
+            {/* Dim: sát hình = dầm/sàn; ngoài hơn = tim trục; số hiệu ngoài cùng */}
+            <g pointerEvents="none">
+              {yFaceDim != null && (
+                <SvgDimHChain key="dim-face-x" marksMm={faceXMarks} y={yFaceDim} X={X} fontSize={7} />
+              )}
+              {yAxisDim != null && (
+                <SvgDimHChain key="dim-axis-x" marksMm={axisXMarks} y={yAxisDim} X={X} fontSize={7.5} />
+              )}
+              {xFaceDim != null && (
+                <SvgDimVChain key="dim-face-y" marksMm={faceYMarks} x={xFaceDim} Y={Y} fontSize={7} />
+              )}
+              {xAxisDim != null && (
+                <SvgDimVChain key="dim-axis-y" marksMm={axisYMarks} x={xAxisDim} Y={Y} fontSize={7.5} />
+              )}
+            </g>
             {beamNodes}
             {(() => {
-              const bars = stripRebarBarSegments(project, axesX, axesY);
-              const hook = SLAB_REBAR_HOOK_MM;
+              const bars = rebarBars;
               const stroke = "#ef4444";
-              const pressMarks = stripRebarPressMarks(project, axesX, axesY);
               const tick = 70;
               return (
                 <>
-                  {bars.map((bar, i) => {
+                  {drawBars.map((bar, i) => {
+                    const { left: leftHook, right: rightHook } = hooksForRebarBar(project, bar, zones);
+                    const hooks = rebarHookSegments(
+                      bar,
+                      hookDrawMm(leftHook, s),
+                      hookDrawMm(rightHook, s),
+                      project.planWidth,
+                      project.planHeight,
+                    );
                     if (bar.dir === "X") {
                       return (
-                        <g key={`rebar-x-${i}`} pointerEvents="none">
+                        <g key={`rebar-x-${bar.layer ?? "b"}-${i}`} pointerEvents="none">
                           <line
                             x1={X(bar.x0)}
                             y1={Y(bar.y)}
@@ -695,31 +929,27 @@ export function SlabPreview({
                             y2={Y(bar.y)}
                             stroke={stroke}
                             strokeWidth="1.6"
+                            strokeLinecap="butt"
                             opacity="0.95"
                           />
-                          <line
-                            x1={X(bar.x0)}
-                            y1={Y(bar.y)}
-                            x2={X(bar.x0)}
-                            y2={Y(bar.y - hook)}
-                            stroke={stroke}
-                            strokeWidth="1.6"
-                            opacity="0.95"
-                          />
-                          <line
-                            x1={X(bar.x1)}
-                            y1={Y(bar.y)}
-                            x2={X(bar.x1)}
-                            y2={Y(bar.y - hook)}
-                            stroke={stroke}
-                            strokeWidth="1.6"
-                            opacity="0.95"
-                          />
+                          {hooks.map((h, hi) => (
+                            <line
+                              key={`hx-${i}-${hi}`}
+                              x1={X(h.x1)}
+                              y1={Y(h.y1)}
+                              x2={X(h.x2)}
+                              y2={Y(h.y2)}
+                              stroke={stroke}
+                              strokeWidth="1.6"
+                              strokeLinecap="butt"
+                              opacity="0.95"
+                            />
+                          ))}
                         </g>
                       );
                     }
                     return (
-                      <g key={`rebar-y-${i}`} pointerEvents="none">
+                      <g key={`rebar-y-${bar.layer ?? "b"}-${i}`} pointerEvents="none">
                         <line
                           x1={X(bar.x)}
                           y1={Y(bar.y0)}
@@ -727,26 +957,22 @@ export function SlabPreview({
                           y2={Y(bar.y1)}
                           stroke={stroke}
                           strokeWidth="1.6"
+                          strokeLinecap="butt"
                           opacity="0.95"
                         />
-                        <line
-                          x1={X(bar.x)}
-                          y1={Y(bar.y0)}
-                          x2={X(bar.x + hook)}
-                          y2={Y(bar.y0)}
-                          stroke={stroke}
-                          strokeWidth="1.6"
-                          opacity="0.95"
-                        />
-                        <line
-                          x1={X(bar.x)}
-                          y1={Y(bar.y1)}
-                          x2={X(bar.x + hook)}
-                          y2={Y(bar.y1)}
-                          stroke={stroke}
-                          strokeWidth="1.6"
-                          opacity="0.95"
-                        />
+                        {hooks.map((h, hi) => (
+                          <line
+                            key={`hy-${i}-${hi}`}
+                            x1={X(h.x1)}
+                            y1={Y(h.y1)}
+                            x2={X(h.x2)}
+                            y2={Y(h.y2)}
+                            stroke={stroke}
+                            strokeWidth="1.6"
+                            strokeLinecap="butt"
+                            opacity="0.95"
+                          />
+                        ))}
                       </g>
                     );
                   })}
@@ -837,10 +1063,25 @@ export function SlabPreview({
                           return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
                         });
                         const z = hits.find((h) => h.layer === "bottom") ?? hits[0];
-                        if (z) return `${z.mark}|${z.dia}|${z.spacing}|${z.direction}`;
-                        return `${bar.dir}|10|150`;
+                        const hooks = hooksForRebarBar(project, bar, zones);
+                        const len = Math.round(
+                          rebarBarStraightLenMm(bar) + hooks.left + hooks.right,
+                        );
+                        // Mỗi số hiệu (Ø+a+L+móc) một khoảng rải riêng trên minh họa
+                        if (z) {
+                          return `${z.mark}|${z.dia}|${z.spacing}|${z.direction}|L${len}|H${hooks.left}/${hooks.right}`;
+                        }
+                        return `${bar.dir}|10|150|L${len}|H${hooks.left}/${hooks.right}`;
                       };
-                      const merged = buildMergedDistRanges(project, axesX, axesY, bars, markKeyOf);
+                      const merged = buildMergedDistRanges(
+                        project,
+                        axesX,
+                        axesY,
+                        bars,
+                        markKeyOf,
+                        undefined,
+                        zones,
+                      );
                       const ah = 7; // ×0.5
                       const aw = 3.5;
                       const capHalf = 5.5;
@@ -890,8 +1131,12 @@ export function SlabPreview({
                         const ux = dx / plen;
                         const uy = dy / plen;
                         const inset = Math.min(ah, plen * 0.35);
-                        const jr = 3.2;
+                        /** Minh họa: nhỏ gấp 2 so với r=3.2 cũ. */
+                        const jr = 3.2 / 2;
                         const jd = jr * 0.72;
+                        const jStroke = 1.5 / 2;
+                        // Chấm đúng giao khoảng rải ∩ cây điển hình (đã lệch lớp)
+                        const junctions = distRangeJunctionsOnBars(seg, drawBars);
                         return (
                           <g key={`dist-${si}`} pointerEvents="none">
                             <line
@@ -904,16 +1149,15 @@ export function SlabPreview({
                             />
                             {endCap(sxA, syA, sxB, syB, `a-${si}`)}
                             {endCap(sxB, syB, sxA, syA, `b-${si}`)}
-                            {seg.junctions.map((j, ji) => (
+                            {junctions.map((j, ji) => (
                               <g key={`j-${si}-${ji}`}>
-                                {/* Chấm hình 2: vòng trắng + kim cương tại giao khoảng rải ∩ thép sàn */}
                                 <circle
                                   cx={X(j.x)}
                                   cy={Y(j.y)}
                                   r={jr}
                                   fill="none"
                                   stroke="#ffffff"
-                                  strokeWidth="1.5"
+                                  strokeWidth={jStroke}
                                 />
                                 <polygon
                                   points={`${X(j.x)},${Y(j.y) - jd} ${X(j.x) + jd},${Y(j.y)} ${X(j.x)},${Y(j.y) + jd} ${X(j.x) - jd},${Y(j.y)}`}
@@ -938,7 +1182,7 @@ export function SlabPreview({
                 </>
               );
             })()}
-            <text x={W / 2} y={18} textAnchor="middle" fill="#79b8ff" fontSize="13" fontWeight="700">
+            <text x={W / 2} y={15} textAnchor="middle" fill="#79b8ff" fontSize="13" fontWeight="700">
               {project.info.name} · {Math.round(project.planWidth)}×{Math.round(project.planHeight)} ×{" "}
               {project.info.thickness}mm
             </text>
@@ -959,4 +1203,4 @@ export function SlabPreview({
       <div className="shrink-0 border-t border-zinc-800 px-3 py-1.5 text-[11px] text-zinc-500">{statusText}</div>
     </div>
   );
-}
+});

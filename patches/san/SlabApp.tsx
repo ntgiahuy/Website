@@ -1281,25 +1281,25 @@ export function SlabApp() {
     setStatus("Đã áp dụng bố trí 2 lớp đơn giản.");
   }
 
-  /** Tick Bố trí sàn = layoutPreset (PDF / preview / schedule cùng nguồn). */
+  /**
+   * Tick Bố trí sàn = layoutPreset (PDF + hình minh họa cùng nguồn).
+   * Không seed zone từ preset vào danh sách thủ công — tránh thêm Lớp dưới X/Y lặp.
+   */
   function selectLayoutPanel(mode: LayoutPanelId) {
     const cur = projectRef.current;
+    if (mode === cur.layoutPreset) return;
     if (mode === "manual") {
-      const seeded =
-        cur.layoutPreset === "manual" && (cur.zones?.length ?? 0) > 0
-          ? cur.zones
-          : effectiveZones(cur).map((z) => ({ ...z, id: z.id || uid("zone") }));
-      persist({ ...cur, layoutPreset: "manual", zones: seeded });
-      setStatus("Đã chọn Vẽ thép sàn — xuất PDF theo vùng thép thủ công.");
+      persist({ ...cur, layoutPreset: "manual" });
+      setStatus("Đã chọn Vẽ thép sàn — minh họa / PDF theo danh sách vùng thép.");
       return;
     }
     if (mode === "economy2") {
       persist({ ...cur, layoutPreset: "economy2" });
-      setStatus("Đã chọn Thép 2 lớn tiết kiệm — xuất PDF theo preset tiết kiệm.");
+      setStatus("Đã chọn Thép 2 lớn tiết kiệm — minh họa / PDF theo preset tiết kiệm.");
       return;
     }
     persist({ ...cur, layoutPreset: "simple2" });
-    setStatus("Đã chọn Thép 2 lớp đơn giản — xuất PDF theo preset đơn giản.");
+    setStatus("Đã chọn Thép 2 lớp đơn giản — minh họa / PDF theo preset đơn giản.");
   }
 
   function assignAllBeams() {
@@ -2423,7 +2423,7 @@ export function SlabApp() {
                   </Panel>
                   <Panel title="Danh sách vùng thép" className="min-w-0 w-full">
                     <ul className="max-h-48 space-y-1 overflow-auto text-xs">
-                      {(project.layoutPreset === "manual" ? project.zones : zones).map((z) => (
+                      {project.zones.map((z) => (
                         <li key={z.id}>
                           <button
                             type="button"
@@ -2433,7 +2433,6 @@ export function SlabApp() {
                             onClick={() => {
                               setSelectedZoneId(z.id);
                               setZoneForm({ ...z, mark: rebarLayerMark(z.layer) });
-                              setPreset("manual");
                             }}
                           >
                             {`${z.layer === "top" ? "Lớp trên" : "Lớp dưới"} phương ${z.direction}: Ø${z.dia}a${z.spacing}`}
