@@ -50,6 +50,7 @@
       display: flex; align-items: center; gap: 0.4rem;
       flex: 1; min-width: 0;
     }
+    .nav-slot[hidden] { display: none !important; }
     .topbar-right { display: flex; align-items: center; gap: 0.45rem; flex: none; margin-left: auto; }
     .chip {
       font-family: "IBM Plex Mono", monospace; font-size: 0.7rem; font-weight: 600;
@@ -299,7 +300,7 @@
         <strong>GIA HUY</strong>
       </a>
 
-      <div class="nav-slot">
+      <div class="nav-slot" id="nav-slot" hidden>
         <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Mở menu shop" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
@@ -504,6 +505,7 @@
 
       var els = {
         tabs: document.getElementById("tabs"),
+        navSlot: document.getElementById("nav-slot") || document.querySelector(".nav-slot"),
         mobileMenu: document.getElementById("mobile-shop-menu"),
         menuToggle: document.getElementById("menu-toggle"),
         workspace: document.getElementById("workspace"),
@@ -775,9 +777,19 @@
         els.accPlanBox.className = "plan-box" + (isPro ? "" : " free");
       }
 
+      function setShopNavVisible(show) {
+        if (els.navSlot) els.navSlot.hidden = !show;
+        if (!show) {
+          if (els.mobileMenu) els.mobileMenu.hidden = true;
+          if (els.menuToggle) els.menuToggle.setAttribute("aria-expanded", "false");
+        }
+      }
+
       function setChip(access) {
         els.chip.className = "chip";
         var uname = access.username || (access.member && access.member.username) || "";
+        // Tag shop trên header: ẩn với khách; hiện khi đã đăng nhập (hoặc đang dùng thử)
+        setShopNavVisible(isLoggedIn(access) || (access && access.mode === "trial"));
         if (access.mode === "member") {
           els.chip.classList.add("ok");
           els.chip.textContent = "TV · " + uname + " · " + GiaHuyMembership.formatExpiry(access.member);
