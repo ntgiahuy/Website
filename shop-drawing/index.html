@@ -185,34 +185,70 @@
     .workspace iframe { width: 100%; height: 100%; border: 0; background: #111; display: none; }
     .workspace iframe.active { display: block; }
     .gate, .paywall {
-      position: absolute; inset: 0; display: grid; place-items: center; padding: 1.25rem;
-      background: radial-gradient(600px 320px at 50% 20%, rgba(206,44,144,0.1), transparent 60%), rgba(7, 11, 16, 0.92);
-      backdrop-filter: blur(6px); z-index: 5; overflow: auto;
+      position: absolute; inset: 0; display: block; padding: 1.1rem 1rem 2.2rem;
+      background: radial-gradient(700px 360px at 50% 0%, rgba(206,44,144,0.1), transparent 55%), #070b10;
+      z-index: 5; overflow: auto; -webkit-overflow-scrolling: touch;
     }
     .gate[hidden], .paywall[hidden] { display: none !important; }
+    .landing { width: min(100%, 920px); margin: 0 auto; display: grid; gap: 1.35rem; }
     .card {
-      width: min(100%, 560px); border: 1px solid var(--line); border-radius: 18px;
-      padding: 1.5rem 1.35rem 1.35rem; background: rgba(18, 26, 34, 0.95); animation: rise 0.45s ease;
+      width: 100%; border: 1px solid var(--line); border-radius: 18px;
+      padding: 1.45rem 1.25rem 1.25rem; background: rgba(18, 26, 34, 0.96); animation: rise 0.45s ease;
     }
-    .card.wide { width: min(100%, 920px); }
+    .card.wide { width: 100%; }
     @keyframes rise { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
     .card h1 { margin: 0 0 0.45rem; font-size: clamp(1.45rem, 3.5vw, 2rem); letter-spacing: -0.03em; line-height: 1.15; }
+    .card h2 { margin: 0 0 0.4rem; font-size: clamp(1.2rem, 2.8vw, 1.55rem); letter-spacing: -0.02em; }
     .card p { margin: 0; color: var(--muted); }
+    .card .lead { margin: 0 0 1rem; max-width: 48ch; }
     .card .cta-row { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 1.15rem; }
+    .card .cta-stack { display: grid; gap: 0.55rem; margin-top: 1.15rem; }
+    .card .cta-stack > .btn-primary {
+      width: 100%; justify-content: center; padding: 0.85rem 1rem;
+    }
+    .card .cta-auth {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem;
+    }
+    .card .cta-auth .btn { justify-content: center; width: 100%; }
+    .feature-grid {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.7rem;
+    }
+    .feature {
+      border: 1px solid var(--line); border-radius: 14px; padding: 0.95rem 0.9rem;
+      background: rgba(255,255,255,0.025);
+    }
+    .feature strong { display: block; color: var(--ink); margin-bottom: 0.25rem; font-size: 0.98rem; }
+    .feature p { margin: 0; font-size: 0.88rem; line-height: 1.45; }
     .plans {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 0.55rem; margin-top: 1.1rem;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.7rem; margin-top: 0.2rem;
     }
     .plan {
-      border: 1px solid var(--line); border-radius: 12px; padding: 0.85rem 0.75rem;
-      background: rgba(255,255,255,0.02); cursor: pointer; text-align: left;
-      color: inherit; font: inherit; transition: border-color 0.15s ease, background 0.15s ease;
+      border: 1px solid var(--line); border-radius: 14px; padding: 1rem 0.9rem 1.05rem;
+      background: rgba(255,255,255,0.02); text-align: left;
+      color: inherit; font: inherit; display: grid; gap: 0.2rem;
+      transition: border-color 0.15s ease, background 0.15s ease;
     }
-    .plan:hover, .plan.selected {
+    .plan.featured, .plan.selected {
       border-color: rgba(232,163,23,0.55); background: rgba(232,163,23,0.07);
     }
-    .plan .name { font-weight: 700; display: block; margin-bottom: 0.2rem; }
-    .plan .price { font-family: "IBM Plex Mono", monospace; color: var(--amber); font-size: 1.3rem; }
+    .plan .name { font-weight: 700; display: block; margin-bottom: 0.15rem; }
+    .plan .price { font-family: "IBM Plex Mono", monospace; color: var(--amber); font-size: 1.25rem; }
+    .plan .hint { color: var(--muted); font-size: 0.86rem; margin: 0 0 0.75rem; }
+    .plan .btn { width: 100%; justify-content: center; margin-top: 0.15rem; }
+    .steps { display: grid; gap: 0.85rem; counter-reset: step; margin-top: 0.35rem; }
+    .step { display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: start; }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      width: 1.7rem; height: 1.7rem; border-radius: 999px; display: grid; place-items: center;
+      background: rgba(232,163,23,0.15); color: var(--amber); font-weight: 700; font-size: 0.85rem;
+    }
+    .step strong { color: var(--ink); }
+    .step p { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.92rem; }
+    @media (max-width: 560px) {
+      .feature-grid { grid-template-columns: 1fr; }
+      .plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
     .login-box { margin-top: 1rem; display: grid; gap: 0.55rem; }
     .login-box label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.25rem; }
     .login-box input {
@@ -328,29 +364,121 @@
       </div>
 
       <div class="gate" id="gate">
-        <div class="card">
-          <h1 id="gate-title">Dùng thử — một lần</h1>
-          <p id="gate-lead">Mở các tiện ích shop thép trên cùng một trang. Hết giờ dùng thử thì đăng nhập email thành viên để tiếp tục.</p>
-          <div class="cta-row">
-            <button type="button" class="btn btn-primary" id="btn-start-trial">Bắt đầu dùng thử</button>
-            <a class="btn btn-ghost" href="./dang-nhap/">Đăng nhập</a>
-            <a class="btn btn-ghost" href="./dang-ky/">Đăng ký</a>
+        <div class="landing">
+          <div class="card" id="trial-card">
+            <h1 id="gate-title">Dùng thử — một lần</h1>
+            <p id="gate-lead">Mở các tiện ích shop thép trên cùng một trang. Hết giờ dùng thử thì đăng nhập thành viên (username + mật khẩu) để tiếp tục. Xuất PDF cần thành viên còn hạn.</p>
+            <div class="cta-stack">
+              <button type="button" class="btn btn-primary" id="btn-start-trial">Bắt đầu dùng thử</button>
+              <div class="cta-auth">
+                <a class="btn btn-ghost" href="./dang-nhap/">Đăng nhập</a>
+                <a class="btn btn-ghost" href="./dang-ky/">Đăng ký</a>
+              </div>
+            </div>
+            <p class="msg bad" id="gate-msg" hidden></p>
           </div>
-          <p class="msg bad" id="gate-msg" hidden></p>
+
+          <section class="card" id="tien-ich">
+            <h2>Tiện ích shop thép</h2>
+            <p class="lead">Một gói thành viên mở khóa toàn bộ shop trên hub — xuất bản vẽ nhanh, đồng bộ quy trình móng → cột → dầm → sàn.</p>
+            <div class="feature-grid">
+              <article class="feature">
+                <strong>Shop thép móng</strong>
+                <p>Bố trí thép móng đơn, xuất PDF / DXF phục vụ thi công và nghiệm thu.</p>
+              </article>
+              <article class="feature">
+                <strong>Shop thép cột</strong>
+                <p>Chi tiết cột theo khổ A1, giúp thống nhất thép dọc, đai và nối.</p>
+              </article>
+              <article class="feature">
+                <strong>Shop thép dầm</strong>
+                <p>Bản vẽ dầm A2 rõ ràng cho xưởng gia công và đội thi công hiện trường.</p>
+              </article>
+              <article class="feature">
+                <strong>Shop thép sàn</strong>
+                <p>Bố trí thép sàn nhanh, giảm sai sót khi triển khai mặt bằng tầng.</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="card" id="goi">
+            <h2>Gói theo thời gian</h2>
+            <p class="lead">Một tài khoản username mở khóa toàn bộ tiện ích trên hub trong thời hạn còn hiệu lực.</p>
+            <div class="plans" id="home-plans"></div>
+          </section>
+
+          <section class="card" id="huong-dan">
+            <h2>Cách đăng ký</h2>
+            <div class="steps">
+              <div class="step">
+                <div>
+                  <strong>Tạo tài khoản</strong>
+                  <p>Đăng ký họ tên + username + email + SĐT + mật khẩu, xác nhận OTP email lần đầu.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <strong>Chọn gói và chuyển khoản</strong>
+                  <p id="pay-hint">Nội dung CK: <span class="mono" id="transfer-content">GH username</span></p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <strong>Admin cấp quyền theo username</strong>
+                  <p>Sau khi nhận tiền, admin gắn gói + ngày hết hạn cho username của bạn.</p>
+                </div>
+              </div>
+            </div>
+            <div class="pay-note" id="pay-note">Đang tải thông tin thanh toán…</div>
+            <div class="cta-auth" style="margin-top:0.9rem">
+              <a class="btn btn-primary" href="./dang-ky/">Đăng ký ngay</a>
+              <a class="btn btn-ghost" href="./dang-nhap/">Đăng nhập</a>
+            </div>
+          </section>
         </div>
       </div>
 
       <div class="paywall" id="paywall" hidden>
-        <div class="card wide">
-          <h1 id="paywall-title">Kích hoạt thành viên</h1>
-          <p id="paywall-lead">Chọn gói và chuyển khoản. Admin cấp quyền theo email đã đăng nhập.</p>
-          <div class="cta-row">
-            <a class="btn btn-primary" href="./dang-nhap/">Đăng nhập</a>
-            <a class="btn btn-ghost" href="./dang-ky/">Đăng ký</a>
-            <a class="btn btn-ghost" href="./thanh-vien/">Xem bảng giá</a>
+        <div class="landing">
+          <div class="card">
+            <h1 id="paywall-title">Kích hoạt thành viên</h1>
+            <p id="paywall-lead">Chọn gói bên dưới rồi chuyển khoản. Admin cấp quyền theo username đã đăng ký.</p>
+            <div class="cta-stack">
+              <div class="cta-auth">
+                <a class="btn btn-primary" href="./dang-nhap/">Đăng nhập</a>
+                <a class="btn btn-ghost" href="./dang-ky/">Đăng ký</a>
+              </div>
+            </div>
           </div>
-          <div class="plans" id="plans"></div>
-          <div class="pay-note" id="pay-note">Đang tải thông tin thanh toán…</div>
+          <section class="card">
+            <h2>Gói theo thời gian</h2>
+            <p class="lead">Chọn gói bất kỳ để xem hướng dẫn đăng ký và nội dung chuyển khoản.</p>
+            <div class="plans" id="plans"></div>
+          </section>
+          <section class="card" id="huong-dan-pay">
+            <h2>Cách đăng ký</h2>
+            <div class="steps">
+              <div class="step">
+                <div>
+                  <strong>Đăng nhập / đăng ký</strong>
+                  <p>Dùng username + mật khẩu. OTP chỉ cần khi đăng ký lần đầu (xác nhận email).</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <strong>Chuyển khoản đúng nội dung</strong>
+                  <p>Nội dung CK: <span class="mono" id="transfer-content-pay">GH username</span></p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <strong>Chờ admin cấp gói</strong>
+                  <p>Sau khi nhận tiền, admin gắn hạn dùng theo username của bạn.</p>
+                </div>
+              </div>
+            </div>
+            <div class="pay-note" id="pay-note-pay">Đang tải thông tin thanh toán…</div>
+          </section>
         </div>
       </div>
     </main>
@@ -386,8 +514,13 @@
         gateMsg: document.getElementById("gate-msg"),
         gateTitle: document.getElementById("gate-title"),
         gateLead: document.getElementById("gate-lead"),
+        btnStartTrial: document.getElementById("btn-start-trial"),
+        homePlans: document.getElementById("home-plans"),
         plans: document.getElementById("plans"),
         payNote: document.getElementById("pay-note"),
+        payNotePay: document.getElementById("pay-note-pay"),
+        transferContent: document.getElementById("transfer-content"),
+        transferContentPay: document.getElementById("transfer-content-pay"),
         paywallTitle: document.getElementById("paywall-title"),
         paywallLead: document.getElementById("paywall-lead"),
         accountBtn: document.getElementById("account-btn"),
@@ -482,22 +615,76 @@
       function loadPayConfig() {
         var c = window.__PAY__ || {};
         var plan = selectedPlan || PLANS[0];
-        var price = PLAN_PRICES[plan.id] || 0;
+        var price = PLAN_PRICES[(plan && plan.id) || ""] || 0;
         var userHint =
           (els.accName && els.accName.textContent !== "—" ? els.accName.textContent : "username");
-        els.payNote.innerHTML =
+        var ck = "GH " + userHint;
+        var html =
           "<strong>Chuyển khoản:</strong> " +
           (c.bank || "") +
           " · STK <span class='mono'>" +
           (c.account || "") +
           "</span> · " +
           (c.holder || "") +
-          "<br/><strong>Nội dung CK:</strong> <span class='mono'>GH " +
-          userHint +
+          "<br/><strong>Nội dung CK:</strong> <span class='mono'>" +
+          ck +
           "</span> · " +
           money(price) +
           (c.note ? "<br/>" + c.note : "") +
           "<br/><em>Sau khi CK, admin cấp quyền theo username của bạn.</em>";
+        if (els.payNote) els.payNote.innerHTML = html;
+        if (els.payNotePay) els.payNotePay.innerHTML = html;
+        if (els.transferContent) {
+          els.transferContent.textContent = ck + " · " + money(price);
+        }
+        if (els.transferContentPay) {
+          els.transferContentPay.textContent = ck + " · " + money(price);
+        }
+      }
+
+      function scrollToHuongDan(fromPaywall) {
+        var target = document.getElementById(fromPaywall ? "huong-dan-pay" : "huong-dan");
+        if (!target) return;
+        try {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch (e) {
+          target.scrollIntoView(true);
+        }
+      }
+
+      function planDaysHint(plan) {
+        if (!plan) return "";
+        if (plan.id === "lifetime" || (plan.days && plan.days > 20000)) return "Không hết hạn";
+        return (plan.days || 0) + " ngày";
+      }
+
+      function renderPlanCards(container, opts) {
+        if (!container) return;
+        var fromPaywall = !!(opts && opts.fromPaywall);
+        container.innerHTML = "";
+        PLANS.forEach(function (plan, idx) {
+          var art = document.createElement("article");
+          var sel = (selectedPlan && selectedPlan.id === plan.id) || (!selectedPlan && idx === 0);
+          if (sel) selectedPlan = plan;
+          art.className = "plan" + (sel ? " featured selected" : "");
+          art.innerHTML =
+            "<span class='name'>" + plan.label + "</span>" +
+            "<span class='price'>" + money(PLAN_PRICES[plan.id] || 0) + "</span>" +
+            "<p class='hint'>" + planDaysHint(plan) + "</p>" +
+            "<button type='button' class='btn " + (sel ? "btn-primary" : "btn-ghost") + "'>Chọn gói này</button>";
+          art.querySelector("button").addEventListener("click", function () {
+            selectedPlan = plan;
+            renderPlans();
+            loadPayConfig();
+            scrollToHuongDan(fromPaywall);
+          });
+          container.appendChild(art);
+        });
+      }
+
+      function renderPlans() {
+        renderPlanCards(els.homePlans, { fromPaywall: false });
+        renderPlanCards(els.plans, { fromPaywall: true });
       }
 
       function ensureFrames() {
@@ -571,25 +758,6 @@
         });
       }
 
-      function renderPlans() {
-        els.plans.innerHTML = "";
-        PLANS.forEach(function (plan, idx) {
-          var btn = document.createElement("button");
-          btn.type = "button";
-          var sel = (selectedPlan && selectedPlan.id === plan.id) || (!selectedPlan && idx === 0);
-          if (sel) selectedPlan = plan;
-          btn.className = "plan" + (sel ? " selected" : "");
-          btn.innerHTML =
-            "<span class='name'>" + plan.label + "</span><span class='price'>" + money(PLAN_PRICES[plan.id] || 0) + "</span>";
-          btn.addEventListener("click", function () {
-            selectedPlan = plan;
-            renderPlans();
-            loadPayConfig();
-          });
-          els.plans.appendChild(btn);
-        });
-      }
-
       function setAccountMenu(access) {
         var loggedIn = isLoggedIn(access);
         els.accountGuest.hidden = loggedIn;
@@ -629,8 +797,11 @@
       function showGate(msg) {
         els.gate.hidden = false;
         els.paywall.hidden = true;
+        if (els.btnStartTrial) els.btnStartTrial.hidden = false;
         showMsg(els.gateMsg, false, msg || "");
         Object.keys(frames).forEach(function (k) { frames[k].classList.remove("active"); });
+        renderPlans();
+        loadPayConfig();
       }
 
       function showPaywall(kind) {
@@ -643,7 +814,7 @@
         if (kind === "trial_used") {
           els.paywallTitle.textContent = "Đã hết dùng thử";
           els.paywallLead.textContent =
-            "Đăng nhập bằng username + mật khẩu. Sau khi chuyển khoản, admin cấp gói theo username.";
+            "Đăng nhập bằng username + mật khẩu. Chọn gói bên dưới rồi chuyển khoản — admin cấp theo username.";
         } else {
           els.paywallTitle.textContent = "Kích hoạt thành viên";
           els.paywallLead.textContent =
