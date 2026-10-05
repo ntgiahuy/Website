@@ -1845,22 +1845,61 @@ function sectionSteelCallout(
       : (zone.layer === "bottom" || zone.layer === "structural") && zone.direction === dir,
   );
   if (!z) return null;
-  const rows = buildPdfScheduleRows(ctx);
+  const rows = buildPdfScheduleRows(ctx).filter(
+    (r) =>
+      r.direction === dir &&
+      (layer === "top" ? r.layer === "top" : r.layer === "bottom" || r.layer === "structural") &&
+      r.dia === z.dia &&
+      r.spacing === z.spacing,
+  );
+  // Ưu tiên số thuần; nếu chỉ có đoạn nối thì lấy đoạn dài nhất (1a trước 1b…)
+  const plain = rows.find((r) => !isCutSegmentMark(String(r.stt)));
   const row =
-    rows.find(
+    plain ??
+    [...rows].sort(
+      (a, b) =>
+        compareScheduleMarks(String(a.stt), String(b.stt)) || b.barLength - a.barLength,
+    )[0] ??
+    null;
+  if (!row) {
+    return { stt: 1, dia: z.dia, spacing: z.spacing };
+  }
+  return {
+    stt: row.stt,
+    dia: z.dia,
+    spacing: z.spacing,
+  };
+}
+
+/** Các đoạn nối (1a,1b…) cùng lớp + phương — dài → ngắn. */
+function sectionCutPieceCallouts(
+  ctx: Ctx,
+  layer: "bottom" | "top",
+  dir: "X" | "Y",
+): Array<{ stt: string; dia: number; spacing: number; barLength: number }> {
+  const zones = effectiveZones(ctx.project);
+  const z = zones.find((zone) =>
+    layer === "top"
+      ? zone.layer === "top" && zone.direction === dir
+      : (zone.layer === "bottom" || zone.layer === "structural") && zone.direction === dir,
+  );
+  if (!z) return [];
+  return buildPdfScheduleRows(ctx)
+    .filter(
       (r) =>
         r.direction === dir &&
         (layer === "top" ? r.layer === "top" : r.layer === "bottom" || r.layer === "structural") &&
         r.dia === z.dia &&
-        r.spacing === z.spacing,
-    ) ??
-    rows.find((r) => r.dia === z.dia && r.spacing === z.spacing && r.direction === dir) ??
-    rows.find((r) => r.dia === z.dia && r.spacing === z.spacing);
-  return {
-    stt: row?.stt ?? 1,
-    dia: z.dia,
-    spacing: z.spacing,
-  };
+        r.spacing === z.spacing &&
+        isCutSegmentMark(String(r.stt)),
+    )
+    .map((r) => ({
+      stt: String(r.stt),
+      dia: z.dia,
+      spacing: z.spacing,
+      barLength: r.barLength,
+    }))
+    .sort((a, b) => compareScheduleMarks(a.stt, b.stt) || b.barLength - a.barLength);
 }
 
 /**
@@ -2060,21 +2099,24 @@ function drawRebarSectionCut(
   }
 
   // Chấm thép ⊥ mặt cắt (trong đoạn sàn) + nét dọc xuyên dầm / neo + móc
+  // cutDir X → cắt tại X, nhìn theo Y: nét dọc = thép Y, chấm = thép X
+  // cutDir Y → cắt tại Y, nhìn theo X: nét dọc = thép X, chấm = thép Y
   const zones = effectiveZones(project);
   const coverMm = slabCoverMm(project);
-  const perpDir: "X" | "Y" = cutDir === "X" ? "Y" : "X";
+  const alongDir: "X" | "Y" = cutDir === "X" ? "Y" : "X";
+  const perpDir: "X" | "Y" = cutDir;
   const hasBot = zones.some(
     (z) => (z.layer === "bottom" || z.layer === "structural") && z.direction === perpDir,
   );
   const hasTop = zones.some((z) => z.layer === "top" && z.direction === perpDir);
   const hasBotLong = zones.some(
-    (z) => (z.layer === "bottom" || z.layer === "structural") && z.direction === cutDir,
+    (z) => (z.layer === "bottom" || z.layer === "structural") && z.direction === alongDir,
   );
-  const hasTopLong = zones.some((z) => z.layer === "top" && z.direction === cutDir);
+  const hasTopLong = zones.some((z) => z.layer === "top" && z.direction === alongDir);
   const botLongZone = zones.find(
-    (z) => (z.layer === "bottom" || z.layer === "structural") && z.direction === cutDir,
+    (z) => (z.layer === "bottom" || z.layer === "structural") && z.direction === alongDir,
   );
-  const topLongZone = zones.find((z) => z.layer === "top" && z.direction === cutDir);
+  const topLongZone = zones.find((z) => z.layer === "top" && z.direction === alongDir);
   const botHookL = Math.max(0, Math.round(Number(botLongZone?.leftHook) || 0));
   const botHookR = Math.max(0, Math.round(Number(botLongZone?.rightHook) || 0));
   const topHookL = Math.max(0, Math.round(Number(topLongZone?.leftHook) || 0));
@@ -2152,8 +2194,20 @@ function drawRebarSectionCut(
     const mid = (leaderSlab.x0 + leaderSlab.x1) / 2;
     const botInfo = hasBot ? sectionSteelCallout(ctx, "bottom", perpDir) : null;
     const topInfo = hasTop ? sectionSteelCallout(ctx, "top", perpDir) : null;
-    const longBot = hasBotLong ? sectionSteelCallout(ctx, "bottom", cutDir) : null;
-    const longTop = hasTopLong ? sectionSteelCallout(ctx, "top", cutDir) : null;
+    const longBotPieces = hasBotLong ? sectionCutPieceCallouts(ctx, "bottom", alongDir) : [];
+    const longTopPieces = hasTopLong ? sectionCutPieceCallouts(ctx, "top", alongDir) : [];
+    const longBot =
+      longBotPieces.length > 0
+        ? null
+        : hasBotLong
+          ? sectionSteelCallout(ctx, "bottom", alongDir)
+          : null;
+    const longTop =
+      longTopPieces.length > 0
+        ? null
+        : hasTopLong
+          ? sectionSteelCallout(ctx, "top", alongDir)
+          : null;
 
     // Lớp dưới (chấm đặc) — chỉ lên trên bên trái
     if (botInfo) {
@@ -2183,7 +2237,31 @@ function drawRebarSectionCut(
         topInfo.spacing,
       );
     }
-    // Thanh song song mặt cắt (nét ngang): chỉ khi khác Øa với thép ⊥ cùng lớp
+    // Thanh dọc mặt cắt: nếu nối ≥2 đoạn → gắn 1a, 1b… theo vị trí đoạn (không trộn lớp)
+    const labelCutPieces = (
+      pieces: Array<{ stt: string; dia: number; spacing: number; barLength: number }>,
+      yBar: number,
+      yLabel: number,
+      side: "left" | "right",
+    ) => {
+      if (pieces.length < 2) return;
+      const total = pieces.reduce((s, p) => s + Math.max(1, p.barLength), 0);
+      let acc = 0;
+      for (const p of pieces) {
+        const frac = (acc + p.barLength / 2) / total;
+        acc += p.barLength;
+        const tipX = leaderSlab.x0 + (leaderSlab.x1 - leaderSlab.x0) * Math.min(0.92, Math.max(0.08, frac));
+        const labelCx = side === "left" ? tipX - 28 : tipX + 34;
+        drawSectionRebarLeader(ctx, tipX, yBar, labelCx, yLabel, p.stt, p.dia, p.spacing);
+      }
+    };
+    if (longBotPieces.length >= 2) {
+      labelCutPieces(longBotPieces, leaderSlab.yBot, slabTopY - 30, "left");
+    }
+    if (longTopPieces.length >= 2) {
+      labelCutPieces(longTopPieces, leaderSlab.yTop, slabTopY - 44, "right");
+    }
+    // Thanh dọc không nối: 1 số hiệu khi khác Øa với thép ⊥ cùng lớp
     const sameSpec = (
       a: { dia: number; spacing: number } | null,
       b: { dia: number; spacing: number } | null,
@@ -2351,10 +2429,16 @@ function drawScheduleTable(ctx: Ctx, x: number, y: number) {
   ];
   headers.forEach((lb, i) => textSimple(ctx, lb, mid(i), ty0 + headerH / 2 + 2, 6, false, "center"));
 
+  const layerKeyOf = (layer: ScheduleRow["layer"]) =>
+    layer === "top" ? "top" : layer === "structural" ? "structural" : "bottom";
+
   rows.forEach((row, i) => {
     const ry = ty0 + headerH + i * rowH;
-    line(ctx, colX[1], ry + rowH, x + w, ry + rowH, 0.3);
-    textSimple(ctx, scheduleLayerLabel(row.layer), mid(1), ry + rowH / 2 + 2, 5.4, false, "center");
+    const next = rows[i + 1];
+    const layerBreak =
+      !next || layerKeyOf(next.layer) !== layerKeyOf(row.layer);
+    // Gộp cột LỚP theo nhóm lớp — kẻ ngang từ STT trở đi; hết nhóm thì kẻ cả cột LỚP
+    line(ctx, layerBreak ? colX[1] : colX[2], ry + rowH, x + w, ry + rowH, 0.3);
     const sttLabel = String(row.stt);
     const sttSize = sttLabel.length >= 3 ? 6.2 : 7;
     textSimple(ctx, sttLabel, mid(2), ry + rowH / 2 + 2, sttSize, true, "center");
@@ -2370,6 +2454,8 @@ function drawScheduleTable(ctx: Ctx, x: number, y: number) {
   if (rows.length === 0) {
     textSimple(ctx, "—", mid(2), ty0 + headerH + rowH / 2, 7, false, "center");
   }
+
+  // TÊN CK: 1 chữ đứng đậm suốt cột
   textVertical(
     ctx,
     project.info.name || "SÀN",
@@ -2378,6 +2464,24 @@ function drawScheduleTable(ctx: Ctx, x: number, y: number) {
     9,
     true,
   );
+
+  // LỚP: 1 chữ đứng đậm / nhóm (Thép lớp dưới | Thép lớp trên) — giống TÊN CK
+  let gi = 0;
+  while (gi < rows.length) {
+    const key = layerKeyOf(rows[gi]!.layer);
+    let gj = gi + 1;
+    while (gj < rows.length && layerKeyOf(rows[gj]!.layer) === key) gj++;
+    const y0 = ty0 + headerH + gi * rowH;
+    const y1 = ty0 + headerH + gj * rowH;
+    const label = scheduleLayerLabel(rows[gi]!.layer);
+    const span = Math.max(12, y1 - y0 - 4);
+    // Cỡ chữ vừa chiều cao nhóm (chữ xoay đứng)
+    let size = 8;
+    while (size > 5.2 && ctx.fontBold.widthOfTextAtSize(label, size) > span) size -= 0.3;
+    textVertical(ctx, label, mid(1), (y0 + y1) / 2, size, true);
+    gi = gj;
+  }
+
   return { w, h: 18 + h };
 }
 
