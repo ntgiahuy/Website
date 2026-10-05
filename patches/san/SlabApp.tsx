@@ -2303,7 +2303,7 @@ export function SlabApp() {
                         });
                       }}
                     />
-                    Cắt thép sàn tối ưu (thép cây ≤ 11,7 m)
+                    Cắt thép sàn tối ưu
                   </label>
                   {project.info.optimizeCut !== false && (
                     <div className="space-y-1.5 rounded border border-zinc-700/80 bg-zinc-900/60 p-2">
@@ -2320,10 +2320,8 @@ export function SlabApp() {
                             });
                           }}
                         >
-                          <option value="avoidZones">
-                            Cắt tránh vùng: ưu tiên 11,7 m, dài→ngắn trong vùng nối
-                          </option>
-                          <option value="byStock">Cắt theo 11,7 m (nối liên tiếp)</option>
+                          <option value="avoidZones">Cắt tránh vùng</option>
+                          <option value="byStock">Cắt tự do 11,7m</option>
                         </select>
                       </Field>
                       <Field label="Chiều dài nối" wide>
@@ -2348,10 +2346,6 @@ export function SlabApp() {
                           <option value={40}>Nối 40D</option>
                         </select>
                       </Field>
-                      <p className="text-[10px] leading-snug text-zinc-500">
-                        Thép dài hơn 11,7 m phải nối. Cắt tránh vùng: lớp dưới chỉ nối trong vùng thép
-                        mũ (Thép 2 lớp tiết kiệm); lớp trên chỉ nối ngoài vùng mũ.
-                      </p>
                     </div>
                   )}
                 </div>
