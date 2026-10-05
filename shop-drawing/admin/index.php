@@ -158,7 +158,7 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
           <div style="overflow:auto">
             <table>
               <thead>
-                <tr><th>User</th><th>Email</th><th>Gói</th><th>Hết hạn</th><th>Trạng thái</th><th>Ghi chú</th></tr>
+                <tr><th>User</th><th>Email</th><th>SĐT</th><th>Gói</th><th>Hết hạn</th><th>Trạng thái</th><th>Ghi chú</th></tr>
               </thead>
               <tbody id="rows"></tbody>
             </table>
@@ -347,6 +347,7 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
           tr.innerHTML =
             '<td class="mono">' + (m.username || "—") + "</td>" +
             '<td class="mono">' + (m.email || "") + "</td>" +
+            '<td class="mono">' + (m.phone || "—") + "</td>" +
             "<td>" + (m.plan || "—") + "</td>" +
             "<td>" + moneyDate(m.expires_at) + "</td>" +
             '<td><span class="tag ' + (m.active ? "ok" : "bad") + '">' + (m.active ? "Còn hạn" : "Hết hạn") + "</span></td>" +

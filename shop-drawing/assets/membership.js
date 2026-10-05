@@ -117,10 +117,29 @@
     return statusFromMember(me.member);
   }
 
-  async function registerRequest(username, email, password) {
+  async function registerRequest(username, email, password, phone) {
     return api("auth_register_request.php", {
       method: "POST",
-      body: { username: username, email: email, password: password },
+      body: {
+        username: username,
+        email: email,
+        password: password,
+        phone: phone || "",
+      },
+    });
+  }
+
+  async function passwordResetRequest(email) {
+    return api("auth_password_reset_request.php", {
+      method: "POST",
+      body: { email: email },
+    });
+  }
+
+  async function passwordResetConfirm(email, token, password) {
+    return api("auth_password_reset_confirm.php", {
+      method: "POST",
+      body: { email: email, token: token || "", password: password },
     });
   }
 
@@ -266,6 +285,8 @@
     getStatus: getStatus,
     registerRequest: registerRequest,
     registerVerify: registerVerify,
+    passwordResetRequest: passwordResetRequest,
+    passwordResetConfirm: passwordResetConfirm,
     login: login,
     requestOtp: requestOtp,
     verifyOtp: verifyOtp,

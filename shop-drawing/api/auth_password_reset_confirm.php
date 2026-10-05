@@ -7,11 +7,10 @@ try {
     json_out(['ok' => false, 'error' => 'POST only'], 405);
   }
   $body = read_json_body();
-  $result = register_request(
-    (string) ($body['username'] ?? ''),
+  $result = password_reset_confirm(
     (string) ($body['email'] ?? ''),
-    (string) ($body['password'] ?? ''),
-    (string) ($body['phone'] ?? '')
+    (string) ($body['token'] ?? ''),
+    (string) ($body['password'] ?? '')
   );
   json_out($result, !empty($result['ok']) ? 200 : 400);
 } catch (Throwable $e) {
@@ -19,6 +18,6 @@ try {
   header('Content-Type: application/json; charset=utf-8');
   echo json_encode([
     'ok' => false,
-    'error' => 'Đăng ký lỗi: ' . $e->getMessage(),
+    'error' => 'Đặt lại mật khẩu lỗi: ' . $e->getMessage(),
   ], JSON_UNESCAPED_UNICODE);
 }

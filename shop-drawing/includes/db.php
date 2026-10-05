@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS members (
   email TEXT PRIMARY KEY,
   username TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
   email_verified INTEGER NOT NULL DEFAULT 0,
   plan TEXT NOT NULL DEFAULT '',
   expires_at INTEGER NOT NULL,
@@ -115,8 +116,16 @@ CREATE TABLE IF NOT EXISTS pending_signups (
   email TEXT PRIMARY KEY,
   username TEXT NOT NULL,
   password_hash TEXT NOT NULL,
+  phone TEXT NOT NULL DEFAULT '',
   code_hash TEXT NOT NULL,
   token_hash TEXT NOT NULL DEFAULT '',
+  expires_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS password_resets (
+  email TEXT PRIMARY KEY,
+  token_hash TEXT NOT NULL,
   expires_at INTEGER NOT NULL,
   attempts INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
@@ -161,6 +170,16 @@ function db_ensure_member_auth_columns_sqlite(PDO $pdo): void {
   if (!in_array('email_verified', $names, true)) {
     $pdo->exec('ALTER TABLE members ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0');
   }
+  if (!in_array('phone', $names, true)) {
+    $pdo->exec("ALTER TABLE members ADD COLUMN phone TEXT NOT NULL DEFAULT ''");
+  }
+  $pcols = $pdo->query('PRAGMA table_info(pending_signups)')->fetchAll();
+  $pnames = array_map(static function ($c) {
+    return $c['name'];
+  }, $pcols);
+  if ($pnames && !in_array('phone', $pnames, true)) {
+    $pdo->exec("ALTER TABLE pending_signups ADD COLUMN phone TEXT NOT NULL DEFAULT ''");
+  }
 }
 
 function db_mysql_has_column(PDO $pdo, string $table, string $column): bool {
@@ -179,6 +198,7 @@ CREATE TABLE IF NOT EXISTS members (
   email VARCHAR(191) NOT NULL PRIMARY KEY,
   username VARCHAR(64) NULL DEFAULT NULL,
   password_hash VARCHAR(255) NOT NULL DEFAULT '',
+  phone VARCHAR(32) NOT NULL DEFAULT '',
   email_verified TINYINT NOT NULL DEFAULT 0,
   plan VARCHAR(64) NOT NULL DEFAULT '',
   expires_at INT NOT NULL,
@@ -199,8 +219,16 @@ CREATE TABLE IF NOT EXISTS pending_signups (
   email VARCHAR(191) NOT NULL PRIMARY KEY,
   username VARCHAR(64) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  phone VARCHAR(32) NOT NULL DEFAULT '',
   code_hash VARCHAR(255) NOT NULL,
   token_hash VARCHAR(64) NOT NULL DEFAULT '',
+  expires_at INT NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  created_at INT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS password_resets (
+  email VARCHAR(191) NOT NULL PRIMARY KEY,
+  token_hash VARCHAR(64) NOT NULL,
   expires_at INT NOT NULL,
   attempts INT NOT NULL DEFAULT 0,
   created_at INT NOT NULL
@@ -233,6 +261,16 @@ SQL);
   }
   if (!db_mysql_has_column($pdo, 'members', 'email_verified')) {
     $pdo->exec('ALTER TABLE members ADD COLUMN email_verified TINYINT NOT NULL DEFAULT 0');
+  }
+  if (!db_mysql_has_column($pdo, 'members', 'phone')) {
+    $pdo->exec("ALTER TABLE members ADD COLUMN phone VARCHAR(32) NOT NULL DEFAULT ''");
+  }
+  if (!db_mysql_has_column($pdo, 'pending_signups', 'phone')) {
+    try {
+      $pdo->exec("ALTER TABLE pending_signups ADD COLUMN phone VARCHAR(32) NOT NULL DEFAULT ''");
+    } catch (Throwable $e) {
+      // ignore
+    }
   }
 }
 

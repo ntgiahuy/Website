@@ -1,26 +1,16 @@
 <?php
 declare(strict_types=1);
 
-function send_otp_mail(string $email, string $code, string $link = ''): array {
+function send_mail_message(string $email, string $subject, string $body, string $logExtra = ''): array {
   $mailCfg = cfg('mail', []);
   $fromEmail = $mailCfg['from_email'] ?? 'noreply@localhost';
   $fromName = $mailCfg['from_name'] ?? 'GIAHUY';
-  $mins = (int) (cfg('otp_ttl_minutes') ?? 10);
-  $subject = 'Mã xác nhận đăng ký GIAHUY: ' . $code;
-  $body = "Xin chào,\n\n"
-    . "Mã OTP xác nhận email đăng ký GIAHUY Shop Drawing của bạn là: {$code}\n"
-    . "Mã có hiệu lực trong {$mins} phút.\n";
-  if ($link !== '') {
-    $body .= "\nHoặc bấm link xác nhận đăng ký (cùng hiệu lực):\n{$link}\n";
-  }
-  $body .= "\nNếu bạn không yêu cầu, hãy bỏ qua email này.\n\nGIAHUY";
-
   $mode = $mailCfg['mode'] ?? 'mail';
+
   if ($mode === 'log') {
-    // Chế độ thử: ghi OTP vào data/otp-log.txt (không gửi mail thật)
     $dir = dirname((string) cfg('db_path'));
     if (!is_dir($dir)) mkdir($dir, 0755, true);
-    $line = date('c') . "\t" . $email . "\t" . $code . ($link ? "\t" . $link : '') . "\n";
+    $line = date('c') . "\t" . $email . "\t" . $subject . ($logExtra !== '' ? "\t" . $logExtra : '') . "\n";
     file_put_contents($dir . '/otp-log.txt', $line, FILE_APPEND);
     return ['ok' => true, 'mode' => 'log'];
   }
@@ -40,6 +30,29 @@ function send_otp_mail(string $email, string $code, string $link = ''): array {
   return $ok
     ? ['ok' => true]
     : ['ok' => false, 'error' => 'Hosting từ chối hàm mail(). Hãy cấu hình SMTP trong config.php.'];
+}
+
+function send_otp_mail(string $email, string $code, string $link = ''): array {
+  $mins = (int) (cfg('otp_ttl_minutes') ?? 10);
+  $subject = 'Mã xác nhận đăng ký GIAHUY: ' . $code;
+  $body = "Xin chào,\n\n"
+    . "Mã OTP xác nhận email đăng ký GIAHUY Shop Drawing của bạn là: {$code}\n"
+    . "Mã có hiệu lực trong {$mins} phút.\n";
+  if ($link !== '') {
+    $body .= "\nHoặc bấm link xác nhận đăng ký (cùng hiệu lực):\n{$link}\n";
+  }
+  $body .= "\nNếu bạn không yêu cầu, hãy bỏ qua email này.\n\nGIAHUY";
+  return send_mail_message($email, $subject, $body, $code . ($link ? "\t" . $link : ''));
+}
+
+function send_password_reset_mail(string $email, string $link, int $ttlMinutes = 30): array {
+  $subject = 'Đặt lại mật khẩu GIAHUY';
+  $body = "Xin chào,\n\n"
+    . "Bạn (hoặc ai đó) đã yêu cầu đặt lại mật khẩu tài khoản GIAHUY Shop Drawing.\n"
+    . "Bấm link sau để đặt mật khẩu mới (hiệu lực {$ttlMinutes} phút):\n\n"
+    . "{$link}\n\n"
+    . "Nếu bạn không yêu cầu, hãy bỏ qua email này.\n\nGIAHUY";
+  return send_mail_message($email, $subject, $body, $link);
 }
 
 function smtp_send(string $fromEmail, string $fromName, string $to, string $subject, string $body, array $smtp): array {

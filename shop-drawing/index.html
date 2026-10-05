@@ -292,6 +292,7 @@
                 <div class="label">Thông tin thành viên</div>
                 <div class="row"><span>Thành viên</span><strong id="acc-name">—</strong></div>
                 <div class="row"><span>Mail</span><strong id="acc-email">—</strong></div>
+                <div class="row"><span>SĐT</span><strong id="acc-phone">—</strong></div>
                 <div class="plan free" id="acc-plan">Tài khoản miễn phí</div>
               </div>
               <a href="./thanh-vien/" role="menuitem">
@@ -385,6 +386,7 @@
         accountMember: document.getElementById("account-member"),
         accName: document.getElementById("acc-name"),
         accEmail: document.getElementById("acc-email"),
+        accPhone: document.getElementById("acc-phone"),
         accPlan: document.getElementById("acc-plan"),
       };
 
@@ -402,7 +404,7 @@
       function formatPaidPlan(member) {
         if (!member || !member.active) return "Tài khoản miễn phí";
         if (member.plan === "lifetime" || (member.daysLeft && member.daysLeft > 20000)) {
-          return "Tài khoản trả phí: · Vĩnh viễn";
+          return "Tài khoản trả phí · Vĩnh viễn";
         }
         var dateStr = "";
         try {
@@ -412,8 +414,8 @@
           }
         } catch (e) {}
         var d = member.daysLeft || 0;
-        if (dateStr) return "Tài khoản trả phí: · " + dateStr + " (còn " + d + " ngày)";
-        return "Tài khoản trả phí: · " + (GiaHuyMembership.formatExpiry(member) || "đang hoạt động");
+        if (dateStr) return "Tài khoản trả phí · " + dateStr + " (còn " + d + " ngày)";
+        return "Tài khoản trả phí · " + (GiaHuyMembership.formatExpiry(member) || "đang hoạt động");
       }
 
       async function loadConfig() {
@@ -578,6 +580,9 @@
         if (!loggedIn) return;
         els.accName.textContent = access.username || (access.member && access.member.username) || "—";
         els.accEmail.textContent = access.email || (access.member && access.member.email) || "—";
+        if (els.accPhone) {
+          els.accPhone.textContent = (access.member && access.member.phone) || "—";
+        }
         if (access.mode === "member" && access.member) {
           els.accPlan.className = "plan";
           els.accPlan.textContent = formatPaidPlan(access.member);

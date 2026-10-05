@@ -116,3 +116,13 @@ function valid_username(string $username): bool {
 function valid_password(string $password): bool {
   return strlen($password) >= 6 && strlen($password) <= 128;
 }
+
+function normalize_phone(?string $phone): string {
+  $p = preg_replace('/[^\d+]/', '', trim((string) $phone));
+  return (string) $p;
+}
+
+function valid_phone(string $phone): bool {
+  // VN: 09..., 03..., +849... hoặc 10–11 số
+  return (bool) preg_match('/^(\+?84|0)\d{8,10}$/', $phone);
+}

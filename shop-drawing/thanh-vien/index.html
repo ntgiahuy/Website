@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Thành viên GIAHUY — Email OTP</title>
-  <meta name="description" content="Đăng nhập bằng email OTP để mở khóa Shop Drawing theo thời hạn thành viên." />
+  <title>Thành viên GIA HUY</title>
+  <meta name="description" content="Đăng ký username + mật khẩu, đăng nhập và mở khóa Shop Drawing theo thời hạn thành viên." />
   <link rel="icon" href="../assets/icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -137,23 +137,24 @@
         <a href="../dang-nhap/">Đăng nhập</a>
         <a href="../dang-ky/">Đăng ký</a>
         <a href="#goi">Gói</a>
-        <span class="brand-status" id="brand-status" style="color:var(--muted);font-size:0.78rem;padding:0.42rem 0.5rem">Thành viên · Email OTP</span>
+        <span class="brand-status" id="brand-status" style="color:var(--muted);font-size:0.78rem;padding:0.42rem 0.5rem">Thành viên · username</span>
       </nav>
     </header>
 
     <section class="hero" style="border:0;padding-top:2.6rem">
       <h1>Thành viên username.<br />Mở khóa theo hạn.</h1>
-      <p>Đăng ký: username + email (OTP) + mật khẩu. Đăng nhập bằng username và mật khẩu. Admin cấp gói theo username.</p>
+      <p>Đăng ký: username + email + SĐT + mật khẩu (OTP xác nhận email lần đầu). Đăng nhập bằng username và mật khẩu. Admin cấp gói theo username.</p>
       <div class="cta-row">
         <a class="btn btn-primary" href="../dang-nhap/">Đăng nhập</a>
         <a class="btn btn-ghost" href="../dang-ky/">Đăng ký</a>
         <a class="btn btn-ghost" href="../">Về hub dùng thử</a>
       </div>
+      <div class="status" id="status" hidden style="position:relative;max-width:42ch"></div>
     </section>
 
     <section id="goi">
       <h2>Gói theo thời gian</h2>
-      <p class="lead">Một email thành viên mở khóa toàn bộ tiện ích trên hub trong thời hạn còn hiệu lực.</p>
+      <p class="lead">Một tài khoản username mở khóa toàn bộ tiện ích trên hub trong thời hạn còn hiệu lực.</p>
       <div class="plans" id="plans"></div>
     </section>
 
@@ -162,20 +163,20 @@
       <div class="steps">
         <div class="step">
           <div>
+            <strong>Tạo tài khoản</strong>
+            <p>Đăng ký username + email + số điện thoại + mật khẩu, xác nhận OTP email lần đầu.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div>
             <strong>Chọn gói và chuyển khoản</strong>
-            <p id="pay-hint">Nội dung CK: <span class="mono" id="transfer-content">GH 3M email@cua.ban</span></p>
+            <p id="pay-hint">Nội dung CK: <span class="mono" id="transfer-content">GH 3M username</span></p>
           </div>
         </div>
         <div class="step">
           <div>
-            <strong>Đăng nhập email (OTP)</strong>
-            <p>Hệ thống gửi mã / link vào hộp thư. Xác nhận xong mới chứng minh đúng chủ email.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div>
-            <strong>Admin cấp quyền</strong>
-            <p>Sau khi nhận tiền, admin gắn gói + ngày hết hạn cho email của bạn trên máy chủ.</p>
+            <strong>Admin cấp quyền theo username</strong>
+            <p>Sau khi nhận tiền, admin gắn gói + ngày hết hạn cho username của bạn.</p>
           </div>
         </div>
       </div>
@@ -185,29 +186,8 @@
       </div>
     </section>
 
-    <section id="dang-nhap">
-      <h2>Đăng nhập email</h2>
-      <p class="lead">Không dùng mật khẩu cố định — mỗi lần gửi OTP / link xác nhận vào mail.</p>
-      <div class="panel">
-        <label for="email">Email</label>
-        <input id="email" type="email" autocomplete="email" placeholder="ban@email.com" />
-        <div class="row-actions">
-          <button type="button" class="btn btn-primary" id="btn-send">Gửi mã OTP</button>
-          <button type="button" class="btn btn-ghost" id="btn-logout">Đăng xuất</button>
-        </div>
-        <div id="otp-wrap" hidden style="margin-top:0.9rem">
-          <label for="otp">Mã OTP</label>
-          <input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456" />
-          <div class="row-actions">
-            <button type="button" class="btn btn-primary" id="btn-verify">Xác nhận OTP</button>
-          </div>
-        </div>
-        <div class="status" id="status" hidden></div>
-      </div>
-    </section>
-
     <footer>
-      <p>GIAHUY · Thành viên lưu trên hosting PHP: email ↔ gói ↔ ngày hết hạn.</p>
+      <p>GIA HUY · Thành viên: username ↔ gói ↔ ngày hết hạn · Quên mật khẩu gửi link qua email.</p>
     </footer>
   </div>
 
@@ -215,25 +195,24 @@
   <script>
     (function () {
       var statusEl = document.getElementById("status");
-      var emailEl = document.getElementById("email");
-      var otpEl = document.getElementById("otp");
-      var otpWrap = document.getElementById("otp-wrap");
       var payInfo = document.getElementById("pay-info");
       var transferContent = document.getElementById("transfer-content");
       var brandStatus = document.getElementById("brand-status");
       var plansEl = document.getElementById("plans");
       var selected = { plan: "3m", price: 249000 };
       var PAY = {};
+      var hintUser = "username";
 
       function showStatus(ok, html) {
-        statusEl.hidden = false;
+        statusEl.hidden = !textOrEmpty(html);
         statusEl.className = "status " + (ok ? "ok" : "bad");
-        statusEl.innerHTML = html;
+        statusEl.innerHTML = html || "";
       }
+      function textOrEmpty(html) { return !!(html && String(html).trim()); }
       function money(n) { return Number(n).toLocaleString("vi-VN") + "đ"; }
       function updateTransferHint() {
         transferContent.textContent =
-          "GH " + selected.plan.toUpperCase() + " " + (emailEl.value || "email@cua.ban") + " · " + money(selected.price);
+          "GH " + selected.plan.toUpperCase() + " " + hintUser + " · " + money(selected.price);
       }
 
       async function loadCfg() {
@@ -264,77 +243,38 @@
 
       async function paint() {
         var me = await GiaHuyMembership.getMe();
-        if (me.email) emailEl.value = me.email;
         var st = me.member;
+        if (me.username) hintUser = me.username;
+        updateTransferHint();
         if (st && st.active) {
           if (brandStatus) {
             brandStatus.style.color = "var(--ok)";
             brandStatus.textContent =
-              "Đang hoạt động · " + (st.plan || "") + " · hết hạn " +
+              "Đang hoạt động · " + (me.username || "") + " · " +
               GiaHuyMembership.formatExpiry({
                 active: true, plan: st.plan, daysLeft: st.days_left, expiresAtMs: st.expires_at * 1000
               });
           }
-          showStatus(true, "Email <strong>" + me.email + "</strong> · gói <strong>" + (st.plan || "—") +
+          showStatus(true, "Username <strong>" + (me.username || "—") + "</strong> · gói <strong>" + (st.plan || "—") +
             "</strong> · " + GiaHuyMembership.formatExpiry({
               active: true, plan: st.plan, daysLeft: st.days_left, expiresAtMs: st.expires_at * 1000
             }));
-        } else if (me.email) {
+        } else if (me.username || me.email) {
           if (brandStatus) {
             brandStatus.style.color = "var(--muted)";
-            brandStatus.textContent = "Đã xác nhận email · chờ cấp gói";
+            brandStatus.textContent = "Đã đăng nhập · chờ cấp gói";
           }
-          showStatus(false, "Email đã xác nhận nhưng chưa có gói còn hạn. Hãy chuyển khoản rồi chờ admin cấp quyền.");
+          showStatus(false, "Đã đăng nhập nhưng chưa có gói còn hạn. Hãy chuyển khoản rồi chờ admin cấp theo username.");
         } else if (brandStatus) {
           brandStatus.style.color = "var(--muted)";
-          brandStatus.textContent = "Thành viên · Email OTP";
+          brandStatus.textContent = "Thành viên · username";
+          statusEl.hidden = true;
         }
       }
-
-      document.getElementById("btn-send").addEventListener("click", async function () {
-        try {
-          var data = await GiaHuyMembership.requestOtp(emailEl.value);
-          otpWrap.hidden = false;
-          showStatus(true, data.message || "Đã gửi OTP.");
-          updateTransferHint();
-        } catch (e) {
-          showStatus(false, (e && e.message) || "Không gửi được.");
-        }
-      });
-      document.getElementById("btn-verify").addEventListener("click", async function () {
-        try {
-          await GiaHuyMembership.verifyOtp(emailEl.value, otpEl.value, "");
-          await paint();
-        } catch (e) {
-          showStatus(false, (e && e.message) || "OTP sai.");
-        }
-      });
-      document.getElementById("btn-logout").addEventListener("click", async function () {
-        await GiaHuyMembership.logout();
-        showStatus(false, "Đã đăng xuất.");
-        if (brandStatus) {
-          brandStatus.style.color = "var(--muted)";
-          brandStatus.textContent = "Thành viên · Email OTP";
-        }
-      });
-      emailEl.addEventListener("input", updateTransferHint);
 
       (async function () {
         try { await loadCfg(); } catch (e) { payInfo.textContent = "Không tải được cấu hình API."; }
         await paint();
-        try {
-          var q = new URLSearchParams(location.search);
-          var em = q.get("email");
-          var tk = q.get("token");
-          if (em && tk) {
-            emailEl.value = em;
-            await GiaHuyMembership.verifyOtp(em, "", tk);
-            await paint();
-            history.replaceState({}, "", location.pathname);
-          }
-        } catch (e) {
-          showStatus(false, (e && e.message) || "Link xác nhận không hợp lệ.");
-        }
       })();
     })();
   </script>
