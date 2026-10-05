@@ -2,6 +2,7 @@ import { PDFDocument, PDFFont, PDFPage, degrees, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import {
   STOCK_M,
+  compareScheduleMarks,
   computeModel,
   economy2TopZones,
   effectiveZones,
@@ -1410,45 +1411,27 @@ function buildPdfScheduleRows(ctx: Ctx): Array<ScheduleRow & { stt: number | str
     project,
     project.info.cover || 50,
   );
-  // Cắt tối ưu: STT = mark thống nhất (cùng Ø/L/hình → cùng số; nối mới thêm a/b/c)
+  // Cắt tối ưu: STT = mark (1a,1b,… rồi 2a,2b…); lớp dưới/trên số hiệu khác nhau
   if (isOptimizeCutOn(project)) {
-    const layerOrder = (L: string) =>
-      L === "bottom" ? 0 : L === "structural" ? 1 : L === "top" ? 2 : 3;
     return rows
       .map((row) => ({
         ...row,
         stt: row.mark as unknown as number,
       }))
-      .sort((a, b) => {
-        const am = String(a.stt);
-        const bm = String(b.stt);
-        const pa = /^(\d+)([a-z]?)$/i.exec(am);
-        const pb = /^(\d+)([a-z]?)$/i.exec(bm);
-        if (pa && pb) {
-          const na = Number(pa[1]);
-          const nb = Number(pb[1]);
-          if (na !== nb) return na - nb;
-          const la = (pa[2] || "").toLowerCase();
-          const lb = (pb[2] || "").toLowerCase();
-          if (la !== lb) {
-            if (!la) return -1;
-            if (!lb) return 1;
-            return la.localeCompare(lb);
-          }
-          return (
-            layerOrder(a.layer) - layerOrder(b.layer) ||
-            a.direction.localeCompare(b.direction) ||
-            b.barLength - a.barLength
-          );
-        }
-        return (
-          am.localeCompare(bm, "vi") ||
-          layerOrder(a.layer) - layerOrder(b.layer) ||
-          a.direction.localeCompare(b.direction)
-        );
-      });
+      .sort(
+        (a, b) =>
+          compareScheduleMarks(String(a.stt), String(b.stt)) ||
+          a.direction.localeCompare(b.direction) ||
+          b.barLength - a.barLength,
+      );
   }
   return rows;
+}
+
+function scheduleLayerLabel(layer: ScheduleRow["layer"]): string {
+  if (layer === "top") return "Thép lớp trên";
+  if (layer === "structural") return "Thép cấu tạo";
+  return "Thép lớp dưới";
 }
 
 
@@ -2322,17 +2305,19 @@ function drawSectionCutsAboveSchedule(
 function drawScheduleTable(ctx: Ctx, x: number, y: number) {
   const { project } = ctx;
   const rows = buildPdfScheduleRows(ctx);
+  // Tên CK | Lớp (dưới/trên) | STT | …
   const cols = [
     { w: 36 },
-    { w: 40 },
-    { w: 168 },
-    { w: 28 },
-    { w: 52 },
-    { w: 28 },
+    { w: 54 },
     { w: 36 },
-    { w: 40 },
-    { w: 48 },
+    { w: 158 },
+    { w: 26 },
     { w: 50 },
+    { w: 26 },
+    { w: 34 },
+    { w: 38 },
+    { w: 46 },
+    { w: 48 },
   ];
   const w = cols.reduce((s, c) => s + c.w, 0);
   const headerH = 34;
@@ -2353,6 +2338,7 @@ function drawScheduleTable(ctx: Ctx, x: number, y: number) {
 
   const headers = [
     "TÊN CK",
+    "LỚP",
     "STT",
     "HÌNH DẠNG",
     "Ø",
@@ -2368,20 +2354,21 @@ function drawScheduleTable(ctx: Ctx, x: number, y: number) {
   rows.forEach((row, i) => {
     const ry = ty0 + headerH + i * rowH;
     line(ctx, colX[1], ry + rowH, x + w, ry + rowH, 0.3);
+    textSimple(ctx, scheduleLayerLabel(row.layer), mid(1), ry + rowH / 2 + 2, 5.4, false, "center");
     const sttLabel = String(row.stt);
     const sttSize = sttLabel.length >= 3 ? 6.2 : 7;
-    textSimple(ctx, sttLabel, mid(1), ry + rowH / 2 + 2, sttSize, true, "center");
-    drawShape(ctx, row, colX[2] + 2, ry + 1, cols[2].w - 4, rowH - 2);
-    textSimple(ctx, String(row.dia), mid(3), ry + rowH / 2 + 2, 7, false, "center");
-    textSimple(ctx, String(row.barLength), mid(4), ry + rowH / 2 + 2, 7, false, "center");
-    textSimple(ctx, String(row.qtyMembers), mid(5), ry + rowH / 2 + 2, 7, false, "center");
-    textSimple(ctx, String(row.qtyEach), mid(6), ry + rowH / 2 + 2, 7, false, "center");
-    textSimple(ctx, String(row.qtyTotal), mid(7), ry + rowH / 2 + 2, 7, false, "center");
-    textSimple(ctx, fmtNum(row.totalM), mid(8), ry + rowH / 2 + 2, 6.8, false, "center");
-    textSimple(ctx, fmtNum(row.weight), mid(9), ry + rowH / 2 + 2, 6.8, false, "center");
+    textSimple(ctx, sttLabel, mid(2), ry + rowH / 2 + 2, sttSize, true, "center");
+    drawShape(ctx, row, colX[3] + 2, ry + 1, cols[3].w - 4, rowH - 2);
+    textSimple(ctx, String(row.dia), mid(4), ry + rowH / 2 + 2, 7, false, "center");
+    textSimple(ctx, String(row.barLength), mid(5), ry + rowH / 2 + 2, 7, false, "center");
+    textSimple(ctx, String(row.qtyMembers), mid(6), ry + rowH / 2 + 2, 7, false, "center");
+    textSimple(ctx, String(row.qtyEach), mid(7), ry + rowH / 2 + 2, 7, false, "center");
+    textSimple(ctx, String(row.qtyTotal), mid(8), ry + rowH / 2 + 2, 7, false, "center");
+    textSimple(ctx, fmtNum(row.totalM), mid(9), ry + rowH / 2 + 2, 6.8, false, "center");
+    textSimple(ctx, fmtNum(row.weight), mid(10), ry + rowH / 2 + 2, 6.8, false, "center");
   });
   if (rows.length === 0) {
-    textSimple(ctx, "—", mid(1), ty0 + headerH + rowH / 2, 7, false, "center");
+    textSimple(ctx, "—", mid(2), ty0 + headerH + rowH / 2, 7, false, "center");
   }
   textVertical(
     ctx,
@@ -2450,7 +2437,7 @@ function scheduleSummaryBlockSize(ctx: Ctx): {
   blockH: number;
 } {
   const rows = buildPdfScheduleRows(ctx);
-  const schedW = 36 + 40 + 168 + 28 + 52 + 28 + 36 + 40 + 48 + 50;
+  const schedW = 36 + 54 + 36 + 158 + 26 + 50 + 26 + 34 + 38 + 46 + 48;
   const schedH = 18 + 34 + Math.max(rows.length, 1) * 18;
   const dias = new Set(rows.map((r) => r.dia));
   const sumW = 138 + Math.max(dias.size, 1) * 78;

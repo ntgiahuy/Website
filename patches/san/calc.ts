@@ -361,8 +361,14 @@ export function economy2TopZones(project: SlabProject): RebarZone[] {
   return applyPresetZones({ ...project, layoutPreset: "economy2" }).filter((z) => z.layer === "top");
 }
 
-/** Khóa thanh: Ø + chiều dài phát triển + móc + hình dạng. */
+/** Lớp dưới / cấu tạo → bottom; lớp trên → top (số hiệu tách theo lớp). */
+function scheduleLayerKey(layer: RebarLayer): "bottom" | "top" {
+  return layer === "top" ? "top" : "bottom";
+}
+
+/** Khóa thanh: lớp + Ø + chiều dài phát triển + móc + hình dạng. */
 function barPieceSpecKey(r: {
+  layer: RebarLayer;
   dia: number;
   barLength: number;
   leftHook: number;
@@ -370,6 +376,7 @@ function barPieceSpecKey(r: {
   shape: string;
 }): string {
   return [
+    scheduleLayerKey(r.layer),
     Math.round(r.dia),
     Math.round(r.barLength),
     Math.round(r.leftHook),
@@ -408,12 +415,14 @@ function expandRowForOptimizeCut(
     return [{ ...row, mark: "" }];
   }
 
-  // Chữ ký họ nối (tập đoạn) — họ giống nhau → cùng số hiệu 1a/1b…
+  // Chữ ký họ nối trong cùng lớp — họ giống nhau → cùng số hiệu 1a/1b…
+  const layer = scheduleLayerKey(row.layer);
   const ranked = pieces
     .map((p, i) => ({
       i,
       len: p.barLength,
       spec: barPieceSpecKey({
+        layer: row.layer,
         dia: row.dia,
         barLength: p.barLength,
         leftHook: p.leftHook,
@@ -435,7 +444,7 @@ function expandRowForOptimizeCut(
     const totalM = (p.barLength * qtyTotal) / 1000;
     return {
       ...row,
-      mark: `CUT:${cutSig}:${letter[i]}`,
+      mark: `CUT:${layer}:${cutSig}:${letter[i]}`,
       barLength: p.barLength,
       leftHook: p.leftHook,
       rightHook: p.rightHook,
@@ -449,11 +458,14 @@ function expandRowForOptimizeCut(
   });
 }
 
+const CUT_MARK_RE = /^CUT:(bottom|top):(.+):([a-z])$/i;
+
 /**
  * Gán số hiệu thống nhất:
- * - Cùng Ø + L + móc + hình dạng → cùng số hiệu
- * - Họ nối ≥ 2 đoạn (>11,7 m) → thêm a,b,c (1a, 1b…); họ giống nhau dùng chung
- * - Thanh không nối → chỉ số (1, 2, 3…); nếu trùng kích thước đoạn nối thì dùng chung mark đó
+ * - Cùng lớp + Ø + L + móc + hình dạng → cùng số hiệu
+ * - Lớp dưới / lớp trên cùng thông số → số hiệu khác nhau
+ * - Họ nối ≥ 2 đoạn (>11,7 m) → thêm a,b,c (1a, 1b…); sắp 1a,1b,… rồi 2a,2b…
+ * - Thanh không nối → chỉ số (1, 2, 3…)
  */
 function assignUnifiedScheduleMarks(rows: ScheduleRow[]): ScheduleRow[] {
   let next = 1;
@@ -461,26 +473,40 @@ function assignUnifiedScheduleMarks(rows: ScheduleRow[]): ScheduleRow[] {
   const cutMarkByProvisional = new Map<string, string>();
   const markBySpec = new Map<string, string>();
 
-  for (const r of rows) {
-    const m = /^CUT:(.+):([a-z])$/i.exec(r.mark);
-    if (!m) continue;
-    const sig = m[1]!;
-    if (!cutFamilyNum.has(sig)) cutFamilyNum.set(sig, next++);
-  }
-  for (const r of rows) {
-    const m = /^CUT:(.+):([a-z])$/i.exec(r.mark);
-    if (!m) continue;
-    const mark = `${cutFamilyNum.get(m[1]!) ?? 1}${m[2]!.toLowerCase()}`;
-    cutMarkByProvisional.set(r.mark, mark);
-    const spec = barPieceSpecKey(r);
-    if (!markBySpec.has(spec)) markBySpec.set(spec, mark);
-  }
-  for (const r of rows) {
-    if (/^CUT:/i.test(r.mark)) continue;
-    const spec = barPieceSpecKey(r);
-    if (markBySpec.has(spec)) continue;
-    const mark = String(next++);
-    markBySpec.set(spec, mark);
+  const layerRank = (L: RebarLayer) => (scheduleLayerKey(L) === "bottom" ? 0 : 1);
+  // Xong hết lớp dưới (1a,1b,…,2…) rồi mới lớp trên (3a,3b,…,4…)
+  const layers: Array<"bottom" | "top"> = ["bottom", "top"];
+  for (const layer of layers) {
+    const layerRows = rows
+      .filter((r) => scheduleLayerKey(r.layer) === layer)
+      .sort(
+        (a, b) =>
+          a.direction.localeCompare(b.direction) ||
+          b.barLength - a.barLength,
+      );
+
+    for (const r of layerRows) {
+      const m = CUT_MARK_RE.exec(r.mark);
+      if (!m) continue;
+      const famKey = `${m[1]!.toLowerCase()}|${m[2]!}`;
+      if (!cutFamilyNum.has(famKey)) cutFamilyNum.set(famKey, next++);
+    }
+    for (const r of layerRows) {
+      const m = CUT_MARK_RE.exec(r.mark);
+      if (!m) continue;
+      const famKey = `${m[1]!.toLowerCase()}|${m[2]!}`;
+      const mark = `${cutFamilyNum.get(famKey) ?? 1}${m[3]!.toLowerCase()}`;
+      cutMarkByProvisional.set(r.mark, mark);
+      const spec = barPieceSpecKey(r);
+      if (!markBySpec.has(spec)) markBySpec.set(spec, mark);
+    }
+    for (const r of layerRows) {
+      if (CUT_MARK_RE.test(r.mark) || /^CUT:/i.test(r.mark)) continue;
+      const spec = barPieceSpecKey(r);
+      if (markBySpec.has(spec)) continue;
+      const mark = String(next++);
+      markBySpec.set(spec, mark);
+    }
   }
 
   return rows.map((r) => {
@@ -495,6 +521,19 @@ function assignUnifiedScheduleMarks(rows: ScheduleRow[]): ScheduleRow[] {
     const mark = markBySpec.get(barPieceSpecKey(r)) ?? "1";
     return { ...r, mark };
   });
+}
+
+/** So sánh STT: 1a, 1b, 1c, … rồi 2a, 2b, 2c… (số → chữ). */
+export function compareScheduleMarks(a: string, b: string): number {
+  const pa = /^(\d+)([a-z]*)$/i.exec(String(a || "").trim());
+  const pb = /^(\d+)([a-z]*)$/i.exec(String(b || "").trim());
+  if (pa && pb) {
+    const na = Number(pa[1]);
+    const nb = Number(pb[1]);
+    if (na !== nb) return na - nb;
+    return (pa[2] || "").toLowerCase().localeCompare((pb[2] || "").toLowerCase(), "en");
+  }
+  return String(a).localeCompare(String(b), "vi");
 }
 
 /**
@@ -746,21 +785,13 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
     ? assignUnifiedScheduleMarks(schedule)
     : schedule;
   const merged = mergeScheduleRows(withMarks);
-  /** 1, 2, 1a, 1b… — số rồi chữ; cùng mark thì L lớn trước. */
-  merged.sort((a, b) => {
-    const pa = /^(\d+)([a-z]?)$/i.exec(a.mark);
-    const pb = /^(\d+)([a-z]?)$/i.exec(b.mark);
-    if (pa && pb) {
-      const na = Number(pa[1]);
-      const nb = Number(pb[1]);
-      if (na !== nb) return na - nb;
-      const la = (pa[2] || "a").toLowerCase();
-      const lb = (pb[2] || "a").toLowerCase();
-      if (la !== lb) return la.localeCompare(lb);
-      return b.barLength - a.barLength;
-    }
-    return a.mark.localeCompare(b.mark, "vi") || b.barLength - a.barLength;
-  });
+  /** 1a, 1b, 1c… rồi 2a, 2b… — cùng mark thì L lớn trước. */
+  merged.sort(
+    (a, b) =>
+      compareScheduleMarks(a.mark, b.mark) ||
+      b.barLength - a.barLength ||
+      a.direction.localeCompare(b.direction),
+  );
 
   const byDiaMap = new Map<number, DiaSummary>();
   for (const r of merged) {
