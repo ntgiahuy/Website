@@ -709,38 +709,41 @@ function scheduleRowsByStt(
   }
 
   const usedStts = new Set([...groups.values()].map((r) => r.stt));
-  for (const info of registry.values()) {
-    if (usedStts.has(info.stt)) continue;
-    const key = rebarSpecKey(
-      info.dia,
-      info.spacing,
-      info.lengthMm,
-      info.leftHook,
-      info.rightHook,
-    );
-    const hit = qtyByKey.get(key);
-    const qty = Math.max(1, hit?.qty ?? 1);
-    const totalM = (info.lengthMm * qty) / 1000;
-    const hooked = info.leftHook > 0 || info.rightHook > 0;
-    const mbKey = `${info.stt}|bottom|${hit?.dir ?? "X"}|MB-${info.stt}`;
-    groups.set(mbKey, {
-      mark: `MB-${info.stt}`,
-      layer: "bottom",
-      direction: hit?.dir ?? "X",
-      dia: info.dia,
-      spacing: info.spacing,
-      barLength: info.lengthMm,
-      leftHook: info.leftHook,
-      rightHook: info.rightHook,
-      qtyEach: qty,
-      qtyMembers: 1,
-      qtyTotal: qty,
-      totalM,
-      weight: totalM * weightPerMeter(info.dia),
-      shape: hooked ? "hooked" : "straight",
-      note: "Đoạn mặt bằng (cắt/ngắn)",
-      stt: info.stt,
-    });
+  // Cắt tối ưu: schedule đã có đủ đoạn 1a/1b… — không thêm dòng MB-* từ thanh đầy đủ trên MB
+  if (!isOptimizeCutOn(project)) {
+    for (const info of registry.values()) {
+      if (usedStts.has(info.stt)) continue;
+      const key = rebarSpecKey(
+        info.dia,
+        info.spacing,
+        info.lengthMm,
+        info.leftHook,
+        info.rightHook,
+      );
+      const hit = qtyByKey.get(key);
+      const qty = Math.max(1, hit?.qty ?? 1);
+      const totalM = (info.lengthMm * qty) / 1000;
+      const hooked = info.leftHook > 0 || info.rightHook > 0;
+      const mbKey = `${info.stt}|bottom|${hit?.dir ?? "X"}|MB-${info.stt}`;
+      groups.set(mbKey, {
+        mark: `MB-${info.stt}`,
+        layer: "bottom",
+        direction: hit?.dir ?? "X",
+        dia: info.dia,
+        spacing: info.spacing,
+        barLength: info.lengthMm,
+        leftHook: info.leftHook,
+        rightHook: info.rightHook,
+        qtyEach: qty,
+        qtyMembers: 1,
+        qtyTotal: qty,
+        totalM,
+        weight: totalM * weightPerMeter(info.dia),
+        shape: hooked ? "hooked" : "straight",
+        note: "Đoạn mặt bằng (cắt/ngắn)",
+        stt: info.stt,
+      });
+    }
   }
 
   const layerOrder = (L: string) =>
