@@ -126,3 +126,13 @@ function valid_phone(string $phone): bool {
   // VN: 09..., 03..., +849... hoặc 10–11 số
   return (bool) preg_match('/^(\+?84|0)\d{8,10}$/', $phone);
 }
+
+function normalize_full_name(?string $name): string {
+  $n = trim(preg_replace('/\s+/u', ' ', (string) $name));
+  return $n;
+}
+
+function valid_full_name(string $name): bool {
+  $len = function_exists('mb_strlen') ? mb_strlen($name, 'UTF-8') : strlen($name);
+  return $len >= 2 && $len <= 80;
+}

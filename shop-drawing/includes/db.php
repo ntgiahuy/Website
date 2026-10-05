@@ -94,6 +94,7 @@ function db_migrate_sqlite(PDO $pdo): void {
 CREATE TABLE IF NOT EXISTS members (
   email TEXT PRIMARY KEY,
   username TEXT NOT NULL DEFAULT '',
+  full_name TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL DEFAULT '',
   phone TEXT NOT NULL DEFAULT '',
   email_verified INTEGER NOT NULL DEFAULT 0,
@@ -115,6 +116,7 @@ CREATE TABLE IF NOT EXISTS otps (
 CREATE TABLE IF NOT EXISTS pending_signups (
   email TEXT PRIMARY KEY,
   username TEXT NOT NULL,
+  full_name TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL,
   phone TEXT NOT NULL DEFAULT '',
   code_hash TEXT NOT NULL,
@@ -173,12 +175,18 @@ function db_ensure_member_auth_columns_sqlite(PDO $pdo): void {
   if (!in_array('phone', $names, true)) {
     $pdo->exec("ALTER TABLE members ADD COLUMN phone TEXT NOT NULL DEFAULT ''");
   }
+  if (!in_array('full_name', $names, true)) {
+    $pdo->exec("ALTER TABLE members ADD COLUMN full_name TEXT NOT NULL DEFAULT ''");
+  }
   $pcols = $pdo->query('PRAGMA table_info(pending_signups)')->fetchAll();
   $pnames = array_map(static function ($c) {
     return $c['name'];
   }, $pcols);
   if ($pnames && !in_array('phone', $pnames, true)) {
     $pdo->exec("ALTER TABLE pending_signups ADD COLUMN phone TEXT NOT NULL DEFAULT ''");
+  }
+  if ($pnames && !in_array('full_name', $pnames, true)) {
+    $pdo->exec("ALTER TABLE pending_signups ADD COLUMN full_name TEXT NOT NULL DEFAULT ''");
   }
 }
 
@@ -197,6 +205,7 @@ function db_migrate_mysql(PDO $pdo): void {
 CREATE TABLE IF NOT EXISTS members (
   email VARCHAR(191) NOT NULL PRIMARY KEY,
   username VARCHAR(64) NULL DEFAULT NULL,
+  full_name VARCHAR(120) NOT NULL DEFAULT '',
   password_hash VARCHAR(255) NOT NULL DEFAULT '',
   phone VARCHAR(32) NOT NULL DEFAULT '',
   email_verified TINYINT NOT NULL DEFAULT 0,
@@ -218,6 +227,7 @@ CREATE TABLE IF NOT EXISTS otps (
 CREATE TABLE IF NOT EXISTS pending_signups (
   email VARCHAR(191) NOT NULL PRIMARY KEY,
   username VARCHAR(64) NOT NULL,
+  full_name VARCHAR(120) NOT NULL DEFAULT '',
   password_hash VARCHAR(255) NOT NULL,
   phone VARCHAR(32) NOT NULL DEFAULT '',
   code_hash VARCHAR(255) NOT NULL,
@@ -265,9 +275,19 @@ SQL);
   if (!db_mysql_has_column($pdo, 'members', 'phone')) {
     $pdo->exec("ALTER TABLE members ADD COLUMN phone VARCHAR(32) NOT NULL DEFAULT ''");
   }
+  if (!db_mysql_has_column($pdo, 'members', 'full_name')) {
+    $pdo->exec("ALTER TABLE members ADD COLUMN full_name VARCHAR(120) NOT NULL DEFAULT ''");
+  }
   if (!db_mysql_has_column($pdo, 'pending_signups', 'phone')) {
     try {
       $pdo->exec("ALTER TABLE pending_signups ADD COLUMN phone VARCHAR(32) NOT NULL DEFAULT ''");
+    } catch (Throwable $e) {
+      // ignore
+    }
+  }
+  if (!db_mysql_has_column($pdo, 'pending_signups', 'full_name')) {
+    try {
+      $pdo->exec("ALTER TABLE pending_signups ADD COLUMN full_name VARCHAR(120) NOT NULL DEFAULT ''");
     } catch (Throwable $e) {
       // ignore
     }

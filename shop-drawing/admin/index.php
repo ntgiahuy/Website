@@ -158,7 +158,7 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
           <div style="overflow:auto">
             <table>
               <thead>
-                <tr><th>User</th><th>Email</th><th>SĐT</th><th>Gói</th><th>Hết hạn</th><th>Trạng thái</th><th>Ghi chú</th></tr>
+                <tr><th>Họ tên</th><th>User</th><th>Email</th><th>SĐT</th><th>Gói</th><th>Hết hạn</th><th>Trạng thái</th><th>Ghi chú</th></tr>
               </thead>
               <tbody id="rows"></tbody>
             </table>
@@ -345,6 +345,7 @@ $configOk = is_file(dirname(__DIR__) . '/config.php');
         (data.members || []).forEach(function (m) {
           var tr = document.createElement("tr");
           tr.innerHTML =
+            "<td>" + (m.full_name || "—") + "</td>" +
             '<td class="mono">' + (m.username || "—") + "</td>" +
             '<td class="mono">' + (m.email || "") + "</td>" +
             '<td class="mono">' + (m.phone || "—") + "</td>" +

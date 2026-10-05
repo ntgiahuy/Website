@@ -90,6 +90,8 @@
         reason: "missing",
         username: "",
         email: "",
+        phone: "",
+        full_name: "",
         plan: "",
         expiresAt: null,
         expiresAtMs: 0,
@@ -101,6 +103,8 @@
       reason: member.active ? "ok" : "expired",
       username: member.username || "",
       email: member.email || "",
+      phone: member.phone || "",
+      full_name: member.full_name || "",
       plan: member.plan || "",
       expiresAt: member.expires_at_iso || null,
       expiresAtMs: (member.expires_at || 0) * 1000,
@@ -117,7 +121,7 @@
     return statusFromMember(me.member);
   }
 
-  async function registerRequest(username, email, password, phone) {
+  async function registerRequest(username, email, password, phone, fullName) {
     return api("auth_register_request.php", {
       method: "POST",
       body: {
@@ -125,6 +129,7 @@
         email: email,
         password: password,
         phone: phone || "",
+        full_name: fullName || "",
       },
     });
   }

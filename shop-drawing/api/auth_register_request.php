@@ -11,7 +11,8 @@ try {
     (string) ($body['username'] ?? ''),
     (string) ($body['email'] ?? ''),
     (string) ($body['password'] ?? ''),
-    (string) ($body['phone'] ?? '')
+    (string) ($body['phone'] ?? ''),
+    (string) ($body['full_name'] ?? ($body['fullname'] ?? ''))
   );
   json_out($result, !empty($result['ok']) ? 200 : 400);
 } catch (Throwable $e) {

@@ -30,6 +30,7 @@ function member_public(?array $row): ?array {
   $daysLeft = $active ? (int) max(0, ceil(($exp - time()) / 86400)) : 0;
   return [
     'username' => (string) ($row['username'] ?? ''),
+    'full_name' => (string) ($row['full_name'] ?? ''),
     'email' => $row['email'],
     'phone' => (string) ($row['phone'] ?? ''),
     'email_verified' => !empty($row['email_verified']),
@@ -93,12 +94,16 @@ function pending_rate_limited(string $email): bool {
   return (time() - (int) $row['created_at']) < 45;
 }
 
-function register_request(string $username, string $email, string $password, string $phone = ''): array {
+function register_request(string $username, string $email, string $password, string $phone = '', string $fullName = ''): array {
   $username = normalize_username($username);
   $email = normalize_email($email);
   $password = (string) $password;
   $phone = normalize_phone($phone);
+  $fullName = normalize_full_name($fullName);
 
+  if (!valid_full_name($fullName)) {
+    return ['ok' => false, 'error' => 'Nhập họ và tên (2–80 ký tự).'];
+  }
   if (!valid_username($username)) {
     return ['ok' => false, 'error' => 'Username 3–32 ký tự: a-z, 0-9, gạch dưới.'];
   }
@@ -145,10 +150,11 @@ function register_request(string $username, string $email, string $password, str
   if (db_is_mysql()) {
     db()->prepare(
       'INSERT INTO pending_signups
-        (email, username, password_hash, phone, code_hash, token_hash, expires_at, attempts, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+        (email, username, full_name, password_hash, phone, code_hash, token_hash, expires_at, attempts, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
        ON DUPLICATE KEY UPDATE
          username = VALUES(username),
+         full_name = VALUES(full_name),
          password_hash = VALUES(password_hash),
          phone = VALUES(phone),
          code_hash = VALUES(code_hash),
@@ -156,14 +162,15 @@ function register_request(string $username, string $email, string $password, str
          expires_at = VALUES(expires_at),
          attempts = 0,
          created_at = VALUES(created_at)'
-    )->execute([$email, $username, $passHash, $phone, $codeHash, $tokenHash, $now + ($ttl * 60), $now]);
+    )->execute([$email, $username, $fullName, $passHash, $phone, $codeHash, $tokenHash, $now + ($ttl * 60), $now]);
   } else {
     db()->prepare(
       'INSERT INTO pending_signups
-        (email, username, password_hash, phone, code_hash, token_hash, expires_at, attempts, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+        (email, username, full_name, password_hash, phone, code_hash, token_hash, expires_at, attempts, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
        ON CONFLICT(email) DO UPDATE SET
          username = excluded.username,
+         full_name = excluded.full_name,
          password_hash = excluded.password_hash,
          phone = excluded.phone,
          code_hash = excluded.code_hash,
@@ -171,7 +178,7 @@ function register_request(string $username, string $email, string $password, str
          expires_at = excluded.expires_at,
          attempts = 0,
          created_at = excluded.created_at'
-    )->execute([$email, $username, $passHash, $phone, $codeHash, $tokenHash, $now + ($ttl * 60), $now]);
+    )->execute([$email, $username, $fullName, $passHash, $phone, $codeHash, $tokenHash, $now + ($ttl * 60), $now]);
   }
 
   $base = rtrim((string) cfg('base_url', ''), '/');
@@ -188,6 +195,7 @@ function register_request(string $username, string $email, string $password, str
     'ok' => true,
     'email' => $email,
     'username' => $username,
+    'full_name' => $fullName,
     'phone' => $phone,
     'expires_in' => $ttl * 60,
     'message' => 'Đã gửi mã OTP tới email. Nhập mã để hoàn tất đăng ký.',
@@ -228,6 +236,7 @@ function register_verify(string $email, string $code = '', string $token = ''): 
 
   $username = normalize_username((string) $row['username']);
   $phone = normalize_phone((string) ($row['phone'] ?? ''));
+  $fullName = normalize_full_name((string) ($row['full_name'] ?? ''));
   if (!valid_username($username)) {
     return ['ok' => false, 'error' => 'Username không hợp lệ.'];
   }
@@ -239,13 +248,13 @@ function register_verify(string $email, string $code = '', string $token = ''): 
   $existing = member_row($email);
   if ($existing) {
     db()->prepare(
-      'UPDATE members SET username = ?, password_hash = ?, phone = ?, email_verified = 1, updated_at = ? WHERE email = ?'
-    )->execute([$username, $row['password_hash'], $phone, $now, $email]);
+      'UPDATE members SET username = ?, full_name = ?, password_hash = ?, phone = ?, email_verified = 1, updated_at = ? WHERE email = ?'
+    )->execute([$username, $fullName, $row['password_hash'], $phone, $now, $email]);
   } else {
     db()->prepare(
-      'INSERT INTO members (email, username, password_hash, phone, email_verified, plan, expires_at, note, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 1, ?, 0, ?, ?, ?)'
-    )->execute([$email, $username, $row['password_hash'], $phone, '', 'Chưa cấp gói', $now, $now]);
+      'INSERT INTO members (email, username, full_name, password_hash, phone, email_verified, plan, expires_at, note, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, 0, ?, ?, ?)'
+    )->execute([$email, $username, $fullName, $row['password_hash'], $phone, '', 'Chưa cấp gói', $now, $now]);
   }
 
   db()->prepare('DELETE FROM pending_signups WHERE email = ?')->execute([$email]);
