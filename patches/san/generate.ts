@@ -812,6 +812,31 @@ function textVertical(ctx: Ctx, str: string, cx: number, yMid: number, size = 11
   textVerticalBeside(ctx, str, cx - size * 0.35, yMid, size, "left", bold);
 }
 
+/** Chữ đứng xoay 90° canh giữa cột [colX .. colX+colW]. */
+function textVerticalInColumn(
+  ctx: Ctx,
+  str: string,
+  colX: number,
+  colW: number,
+  yMid: number,
+  size: number,
+  bold = true,
+) {
+  const font = bold ? ctx.fontBold : ctx.font;
+  const textLen = font.widthOfTextAtSize(str, size);
+  // rot90 CCW: origin ≈ mép phải chữ; thân chữ kéo sang −X ≈ 0.72·size
+  const glyphH = size * 0.72;
+  const originX = colX + (colW + glyphH) / 2;
+  ctx.page.drawText(str, {
+    x: originX,
+    y: ty(yMid) - textLen / 2,
+    size,
+    font,
+    color: BLACK,
+    rotate: degrees(90),
+  });
+}
+
 function dimH(ctx: Ctx, x1: number, x2: number, y: number, label: string, size = 6.5) {
   const lo = Math.min(x1, x2);
   const hi = Math.max(x1, x2);
@@ -2463,17 +2488,18 @@ function drawScheduleTable(ctx: Ctx, x: number, y: number) {
     textSimple(ctx, "—", mid(2), ty0 + headerH + rowH / 2, 7, false, "center");
   }
 
-  // TÊN CK: 1 chữ đứng đậm suốt cột
-  textVertical(
+  // TÊN CK: 1 chữ đứng đậm, canh giữa cột
+  textVerticalInColumn(
     ctx,
     project.info.name || "SÀN",
-    mid(0),
+    colX[0],
+    cols[0].w,
     ty0 + headerH + (Math.max(rows.length, 1) * rowH) / 2,
     9,
     true,
   );
 
-  // LỚP: 1 chữ đứng đậm / nhóm (Lớp dưới | Lớp trên) — giống TÊN CK
+  // LỚP: 1 chữ đứng đậm / nhóm (Lớp dưới | Lớp trên), canh giữa cột
   let gi = 0;
   while (gi < rows.length) {
     const key = layerKeyOf(rows[gi]!.layer);
@@ -2483,10 +2509,9 @@ function drawScheduleTable(ctx: Ctx, x: number, y: number) {
     const y1 = ty0 + headerH + gj * rowH;
     const label = scheduleLayerLabel(rows[gi]!.layer);
     const span = Math.max(12, y1 - y0 - 4);
-    // Cỡ chữ vừa chiều cao nhóm (chữ xoay đứng)
     let size = 8;
     while (size > 5.2 && ctx.fontBold.widthOfTextAtSize(label, size) > span) size -= 0.3;
-    textVertical(ctx, label, mid(1), (y0 + y1) / 2, size, true);
+    textVerticalInColumn(ctx, label, colX[1], cols[1].w, (y0 + y1) / 2, size, true);
     gi = gj;
   }
 
