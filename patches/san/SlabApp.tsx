@@ -2307,6 +2307,9 @@ export function SlabApp() {
                   </label>
                   {project.info.optimizeCut !== false && (
                     <div className="space-y-1.5 rounded border border-zinc-700/80 bg-zinc-900/60 p-2">
+                      <p className="text-[11px] leading-snug text-zinc-500">
+                        Chỉ áp dụng thép ≥ Ø10. Nhỏ hơn phi 10 giữ nguyên chiều dài.
+                      </p>
                       <Field label="Cách cắt" wide>
                         <select
                           className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"

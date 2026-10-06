@@ -12,8 +12,19 @@ import { rebarBarStraightLenMm } from "./grid";
 /** Chiều dài thép cây max (mm). */
 export const STOCK_BAR_MM = 11700;
 
+/** Phi tối thiểu (mm) để áp dụng cắt tối ưu. Nhỏ hơn → giữ nguyên chiều dài. */
+export const OPTIMIZE_CUT_MIN_DIA = 10;
+
 export function isOptimizeCutOn(project: SlabProject): boolean {
   return project.info.optimizeCut !== false;
+}
+
+/**
+ * Cắt thép sàn tối ưu chỉ khi bật tùy chọn và đường kính ≥ Ø10.
+ * Sắt nhỏ hơn phi 10: không cắt — để nguyên chiều dài.
+ */
+export function shouldOptimizeCut(project: SlabProject, dia: number): boolean {
+  return isOptimizeCutOn(project) && (Number(dia) || 0) >= OPTIMIZE_CUT_MIN_DIA;
 }
 
 export function optimizeCutModeOf(project: SlabProject): OptimizeCutMode {
@@ -354,7 +365,7 @@ export function planCutsForBar(
   dia: number,
   topZones: RebarZone[],
 ): number[] {
-  if (!isOptimizeCutOn(project)) return [];
+  if (!shouldOptimizeCut(project, dia)) return [];
   const straight = rebarBarStraightLenMm(bar);
   if (straight <= STOCK_BAR_MM) return [];
   const lap = lapLengthMm(dia, lapMulOf(project));
@@ -385,9 +396,10 @@ export function cutPiecesWithMarks(
   familyNum: number,
 ): { pieces: StockPiece[]; marks: string[]; cuts: number[] } {
   const straight = rebarBarStraightLenMm(bar);
+  const optOn = shouldOptimizeCut(project, dia);
   const cuts = planCutsForBar(project, bar, layer, dia, topZones);
   const pieces = stockPiecesForStraight(straight, leftHook, rightHook, {
-    on: isOptimizeCutOn(project),
+    on: optOn,
     mode: optimizeCutModeOf(project),
     lapMm: lapLengthMm(dia, lapMulOf(project)),
     cutsMm: cuts,

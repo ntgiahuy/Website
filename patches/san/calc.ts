@@ -29,6 +29,7 @@ import {
   lapMulOf,
   optimizeCutModeOf,
   planCutsForBar,
+  shouldOptimizeCut,
   stockPiecesForStraight,
 } from "./cut-optimize";
 
@@ -418,7 +419,8 @@ function expandRowForOptimizeCut(
   typicalBar: RebarBarSeg | null,
   topZones: RebarZone[],
 ): ScheduleRow[] {
-  if (!isOptimizeCutOn(project)) return [row];
+  // Φ < 10: không cắt tối ưu — giữ nguyên chiều dài thanh
+  if (!shouldOptimizeCut(project, row.dia)) return [row];
   const straight = Math.max(0, row.barLength - row.leftHook - row.rightHook);
   const mul = lapMulOf(project);
   const lap = lapLengthMm(row.dia, mul);
