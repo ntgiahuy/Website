@@ -4,8 +4,16 @@ import type {
   RebarZone,
   SlabProject,
 } from "./types";
+import { rebarLayerMark } from "./types";
 import {
+  beamSectionOnAxis,
+  clampPlanSizeMm,
   ensureAxes,
+  ensureSectionCuts,
+  groupTypicalRebarByBayStrip,
+  hooksForRebarBar,
+  rebarBarStraightLenMm,
+  setPlanSize,
   slabDistRangeForBar,
   buildMergedDistRanges,
   sortAxes,
@@ -14,8 +22,18 @@ import {
 } from "./grid";
 import { createSampleS1 } from "./sample";
 import { uid } from "./utils";
+import {
+  STOCK_BAR_MM,
+  isOptimizeCutOn,
+  lapLengthMm,
+  lapMulOf,
+  optimizeCutModeOf,
+  planCutsForBar,
+  shouldOptimizeCut,
+  stockPiecesForStraight,
+} from "./cut-optimize";
 
-const STOCK_M = 11.7;
+const STOCK_M = STOCK_BAR_MM / 1000;
 
 /** kg/m theo d²/162.2 */
 export function weightPerMeter(dia: number) {
@@ -135,10 +153,10 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
   if (project.layoutPreset === "manual") return project.zones;
 
   const pad = Math.max(...project.beams.map((b) => parseBeamSize(b.size).b / 2), 110);
-  const cover = project.info.cover;
+  const cover = Math.max(0, Math.round(Number(project.info.cover) || 0));
   const W = project.planWidth;
   const H = project.planHeight;
-  const box = { x1: pad, y1: pad, x2: W - pad, y2: H - pad, cover: 50 };
+  const box = { x1: pad, y1: pad, x2: W - pad, y2: H - pad, cover };
 
   if (project.layoutPreset === "simple2") {
     const bot = parseSteelSpec(project.simple2.bottomSpec) ?? { dia: 10, spacing: 150 };
@@ -147,8 +165,8 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
     const th = project.simple2.topHook;
     return [
       {
-        id: uid("zone"),
-        mark: "MC 1-1",
+        id: "preset-simple2-bot-x",
+        mark: rebarLayerMark("bottom"),
         layer: "bottom",
         direction: "X",
         dia: bot.dia,
@@ -161,8 +179,8 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
         note: "Lớp dưới X",
       },
       {
-        id: uid("zone"),
-        mark: "MC 2-2",
+        id: "preset-simple2-bot-y",
+        mark: rebarLayerMark("bottom"),
         layer: "bottom",
         direction: "Y",
         dia: bot.dia,
@@ -175,8 +193,8 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
         note: "Lớp dưới Y",
       },
       {
-        id: uid("zone"),
-        mark: "MT 1-1",
+        id: "preset-simple2-top-x",
+        mark: rebarLayerMark("top"),
         layer: "top",
         direction: "X",
         dia: top.dia,
@@ -189,8 +207,8 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
         note: "Lớp trên X",
       },
       {
-        id: uid("zone"),
-        mark: "MT 2-2",
+        id: "preset-simple2-top-y",
+        mark: rebarLayerMark("top"),
         layer: "top",
         direction: "Y",
         dia: top.dia,
@@ -205,22 +223,20 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
     ];
   }
 
-  // economy2
+  // economy2 — lớp dưới chỉ thép chịu lực; cấu tạo gắn vùng mũ (ngược phương).
   const bot = parseSteelSpec(project.economy2.bottomSpec) ?? { dia: 10, spacing: 200 };
   const top = parseSteelSpec(project.economy2.topSpec) ?? { dia: 10, spacing: 150 };
   const st = parseSteelSpec(project.economy2.structuralSpec) ?? { dia: 6, spacing: 150 };
   const bh = project.economy2.bottomHook;
   const th = project.economy2.topHook;
   const sh = project.economy2.structuralHook;
-  const shortIsX = W <= H;
-  const hatDir: RebarDir = project.economy2.hatAlongShort ? (shortIsX ? "X" : "Y") : shortIsX ? "Y" : "X";
-  const mid = shortIsX ? W / 2 : H / 2;
-  const hatHalf = Math.max(W, H) / project.economy2.distToCenter;
+  /** KC đến tim 1/n — từ tim dầm ra mỗi phía L/n (L = nhịp tim−tim). */
+  const n = Math.max(1, Math.round(Number(project.economy2.distToCenter) || 4));
 
   const zones: RebarZone[] = [
     {
-      id: uid("zone"),
-      mark: "MC 1-1",
+      id: "preset-economy2-bot-x",
+      mark: rebarLayerMark("bottom"),
       layer: "bottom",
       direction: "X",
       dia: bot.dia,
@@ -233,8 +249,8 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
       note: "Lớp dưới X",
     },
     {
-      id: uid("zone"),
-      mark: "MC 2-2",
+      id: "preset-economy2-bot-y",
+      mark: rebarLayerMark("bottom"),
       layer: "bottom",
       direction: "Y",
       dia: bot.dia,
@@ -246,66 +262,336 @@ function applyPresetZones(project: SlabProject): RebarZone[] {
       spacingSymbol: "a",
       note: "Lớp dưới Y",
     },
-    {
-      id: uid("zone"),
-      mark: "CT 1",
-      layer: "structural",
-      direction: hatDir === "X" ? "Y" : "X",
-      dia: st.dia,
-      spacing: st.spacing,
-      leftHook: sh,
-      rightHook: sh,
-      ...box,
-      showSpacing: true,
-      spacingSymbol: "a",
-      note: "Thép cấu tạo",
-    },
   ];
 
-  if (hatDir === "X") {
-    zones.push({
-      id: uid("zone"),
-      mark: "MT 1-1",
-      layer: "top",
-      direction: "X",
-      dia: top.dia,
-      spacing: top.spacing,
-      leftHook: th,
-      rightHook: th,
-      x1: box.x1,
-      y1: box.y1,
-      x2: Math.min(box.x2, mid + hatHalf),
-      y2: box.y2,
-      cover: box.cover,
-      showSpacing: true,
-      spacingSymbol: "a",
-      note: "Thép mũ cạnh ngắn",
-    });
-  } else {
-    zones.push({
-      id: uid("zone"),
-      mark: "MT 1-1",
-      layer: "top",
-      direction: "Y",
-      dia: top.dia,
-      spacing: top.spacing,
-      leftHook: th,
-      rightHook: th,
-      x1: box.x1,
-      y1: box.y1,
-      x2: box.x2,
-      y2: Math.min(box.y2, mid + hatHalf),
-      cover: box.cover,
-      showSpacing: true,
-      spacingSymbol: "a",
-      note: "Thép mũ cạnh ngắn",
-    });
+  // Thép mũ X + Y: mỗi tim dầm (trục đỡ) kéo dài L_trái/n + L_phải/n.
+  // Cấu tạo: ngược phương mũ, cùng vùng mũ; không đưa vào lớp dưới.
+  for (const hatDir of ["X", "Y"] as const) {
+    const supportAxes =
+      hatDir === "X" ? sortAxes(project.axesX ?? []) : sortAxes(project.axesY ?? []);
+    for (let i = 0; i < supportAxes.length; i++) {
+      const ax = supportAxes[i]!;
+      const prev = supportAxes[i - 1];
+      const next = supportAxes[i + 1];
+      const leftExt = prev ? (ax.pos - prev.pos) / n : 0;
+      const rightExt = next ? (next.pos - ax.pos) / n : 0;
+      if (leftExt + rightExt < 50) continue;
+
+      // Dầm mũ gác qua: mũ X → dầm đứng (phương Y); mũ Y → dầm ngang (phương X).
+      const supportBeamDir = hatDir === "X" ? "Y" : "X";
+      const supportBeamB = beamSectionOnAxis(project, supportBeamDir, ax).bw;
+      const ctDir: "X" | "Y" = hatDir === "X" ? "Y" : "X";
+
+      if (hatDir === "X") {
+        const x1 = Math.max(box.x1, ax.pos - leftExt);
+        const x2 = Math.min(box.x2, ax.pos + rightExt);
+        if (x2 - x1 < 50) continue;
+        const muLengthMm = x2 - x1;
+        zones.push({
+          id: `preset-economy2-hat-x-${i}`,
+          mark: rebarLayerMark("top"),
+          layer: "top",
+          direction: "X",
+          dia: top.dia,
+          spacing: top.spacing,
+          leftHook: th,
+          rightHook: th,
+          x1,
+          y1: box.y1,
+          x2,
+          y2: box.y2,
+          cover: 0,
+          showSpacing: true,
+          spacingSymbol: "a",
+          note: "Thép mũ X",
+        });
+        zones.push({
+          id: `preset-economy2-ct-y-${i}`,
+          mark: rebarLayerMark("structural"),
+          layer: "structural",
+          direction: ctDir,
+          dia: st.dia,
+          spacing: st.spacing,
+          leftHook: sh,
+          rightHook: sh,
+          x1,
+          y1: box.y1,
+          x2,
+          y2: box.y2,
+          cover: 0,
+          showSpacing: true,
+          spacingSymbol: "a",
+          note: "Thép cấu tạo Y",
+          muLengthMm,
+          supportBeamBMm: supportBeamB,
+        });
+      } else {
+        const y1 = Math.max(box.y1, ax.pos - leftExt);
+        const y2 = Math.min(box.y2, ax.pos + rightExt);
+        if (y2 - y1 < 50) continue;
+        const muLengthMm = y2 - y1;
+        zones.push({
+          id: `preset-economy2-hat-y-${i}`,
+          mark: rebarLayerMark("top"),
+          layer: "top",
+          direction: "Y",
+          dia: top.dia,
+          spacing: top.spacing,
+          leftHook: th,
+          rightHook: th,
+          x1: box.x1,
+          y1,
+          x2: box.x2,
+          y2,
+          cover: 0,
+          showSpacing: true,
+          spacingSymbol: "a",
+          note: "Thép mũ Y",
+        });
+        zones.push({
+          id: `preset-economy2-ct-x-${i}`,
+          mark: rebarLayerMark("structural"),
+          layer: "structural",
+          direction: ctDir,
+          dia: st.dia,
+          spacing: st.spacing,
+          leftHook: sh,
+          rightHook: sh,
+          x1: box.x1,
+          y1,
+          x2: box.x2,
+          y2,
+          cover: 0,
+          showSpacing: true,
+          spacingSymbol: "a",
+          note: "Thép cấu tạo X",
+          muLengthMm,
+          supportBeamBMm: supportBeamB,
+        });
+      }
+    }
   }
   return zones;
 }
 
 export function effectiveZones(project: SlabProject): RebarZone[] {
   return applyPresetZones(project);
+}
+
+/** Vùng thép mũ (lớp trên) của preset Thép 2 lớp tiết kiệm — dùng cho cắt tránh vùng. */
+export function economy2TopZones(project: SlabProject): RebarZone[] {
+  return applyPresetZones({ ...project, layoutPreset: "economy2" }).filter((z) => z.layer === "top");
+}
+
+/** Tách số hiệu theo lớp: dưới | cấu tạo | trên. */
+function scheduleLayerKey(layer: RebarLayer): "bottom" | "structural" | "top" {
+  if (layer === "top") return "top";
+  if (layer === "structural") return "structural";
+  return "bottom";
+}
+
+/** Khóa thanh: lớp + Ø + chiều dài phát triển + móc + hình dạng. */
+function barPieceSpecKey(r: {
+  layer: RebarLayer;
+  dia: number;
+  barLength: number;
+  leftHook: number;
+  rightHook: number;
+  shape: string;
+}): string {
+  return [
+    scheduleLayerKey(r.layer),
+    Math.round(r.dia),
+    Math.round(r.barLength),
+    Math.round(r.leftHook),
+    Math.round(r.rightHook),
+    r.shape,
+  ].join("|");
+}
+
+/**
+ * Tách thanh > 11,7 m thành ≥ 2 đoạn (tạm mark CUT:…).
+ * Thanh không nối: mark rỗng — gán số hiệu thống nhất sau.
+ */
+function expandRowForOptimizeCut(
+  row: ScheduleRow,
+  project: SlabProject,
+  typicalBar: RebarBarSeg | null,
+  topZones: RebarZone[],
+): ScheduleRow[] {
+  // Φ < 10: không cắt tối ưu — giữ nguyên chiều dài thanh
+  if (!shouldOptimizeCut(project, row.dia)) return [row];
+  const straight = Math.max(0, row.barLength - row.leftHook - row.rightHook);
+  const mul = lapMulOf(project);
+  const lap = lapLengthMm(row.dia, mul);
+  const mode = optimizeCutModeOf(project);
+  const cuts =
+    mode === "avoidZones" && typicalBar
+      ? planCutsForBar(
+          project,
+          typicalBar,
+          row.layer,
+          row.dia,
+          topZones,
+          row.leftHook,
+          row.rightHook,
+        )
+      : undefined;
+  let pieces = stockPiecesForStraight(straight, row.leftHook, row.rightHook, {
+    on: true,
+    mode,
+    lapMm: lap,
+    cutsMm: cuts,
+  });
+
+  // Phòng hờ: vẫn còn đoạn > 11,7 m → buộc cắt theo cây thương mại
+  if (pieces.some((p) => p.barLength > STOCK_BAR_MM + 0.5)) {
+    pieces = stockPiecesForStraight(straight, row.leftHook, row.rightHook, {
+      on: true,
+      mode: "byStock",
+      lapMm: lap,
+    });
+  }
+
+  if (pieces.length <= 1) {
+    const bl = Math.min(STOCK_BAR_MM, Math.round(row.barLength));
+    const lh = Math.max(0, Math.round(row.leftHook) || 0);
+    const rh = Math.max(0, Math.round(row.rightHook) || 0);
+    const qtyTotal = row.qtyEach * row.qtyMembers;
+    const totalM = (bl * qtyTotal) / 1000;
+    return [
+      {
+        ...row,
+        mark: "",
+        barLength: bl,
+        leftHook: lh,
+        rightHook: rh,
+        shape: lh > 0 || rh > 0 ? "hooked" : "straight",
+        qtyTotal,
+        totalM,
+        weight: totalM * weightPerMeter(row.dia),
+      },
+    ];
+  }
+
+  // Chữ ký họ nối trong cùng lớp — họ giống nhau → cùng số hiệu 1a/1b…
+  const layer = scheduleLayerKey(row.layer);
+  const ranked = pieces
+    .map((p, i) => ({
+      i,
+      len: p.barLength,
+      spec: barPieceSpecKey({
+        layer: row.layer,
+        dia: row.dia,
+        barLength: p.barLength,
+        leftHook: p.leftHook,
+        rightHook: p.rightHook,
+        shape: p.shape,
+      }),
+    }))
+    .sort((a, b) => b.len - a.len || a.i - b.i);
+  const letter = new Array<string>(pieces.length);
+  ranked.forEach((r, rank) => {
+    letter[r.i] = String.fromCharCode(97 + rank);
+  });
+  const cutSig = ranked.map((r) => r.spec).join(";");
+  const tag = `nối ${mul}D · cắt tối ưu`;
+
+  return pieces.map((p, i) => {
+    const qtyEach = row.qtyEach;
+    const qtyTotal = qtyEach * row.qtyMembers;
+    const totalM = (p.barLength * qtyTotal) / 1000;
+    return {
+      ...row,
+      mark: `CUT:${layer}:${cutSig}:${letter[i]}`,
+      barLength: p.barLength,
+      leftHook: p.leftHook,
+      rightHook: p.rightHook,
+      shape: p.shape,
+      qtyEach,
+      qtyTotal,
+      totalM,
+      weight: totalM * weightPerMeter(row.dia),
+      note: `${row.note} · ${tag}`,
+    };
+  });
+}
+
+const CUT_MARK_RE = /^CUT:(bottom|structural|top):(.+):([a-z])$/i;
+
+/**
+ * Gán số hiệu thống nhất:
+ * - Cùng lớp + Ø + L + móc + hình dạng → cùng số hiệu
+ * - Lớp dưới / cấu tạo / lớp trên cùng thông số → số hiệu khác nhau
+ * - Họ nối ≥ 2 đoạn (>11,7 m) → thêm a,b,c (1a, 1b…); sắp 1a,1b,… rồi 2a,2b…
+ * - Thanh không nối → chỉ số (1, 2, 3…)
+ */
+function assignUnifiedScheduleMarks(rows: ScheduleRow[]): ScheduleRow[] {
+  let next = 1;
+  const cutFamilyNum = new Map<string, number>();
+  const cutMarkByProvisional = new Map<string, string>();
+  const markBySpec = new Map<string, string>();
+
+  // dưới → cấu tạo → trên
+  const layers: Array<"bottom" | "structural" | "top"> = ["bottom", "structural", "top"];
+  for (const layer of layers) {
+    const layerRows = rows
+      .filter((r) => scheduleLayerKey(r.layer) === layer)
+      .sort(
+        (a, b) =>
+          a.direction.localeCompare(b.direction) ||
+          b.barLength - a.barLength,
+      );
+
+    for (const r of layerRows) {
+      const m = CUT_MARK_RE.exec(r.mark);
+      if (!m) continue;
+      const famKey = `${m[1]!.toLowerCase()}|${m[2]!}`;
+      if (!cutFamilyNum.has(famKey)) cutFamilyNum.set(famKey, next++);
+    }
+    for (const r of layerRows) {
+      const m = CUT_MARK_RE.exec(r.mark);
+      if (!m) continue;
+      const famKey = `${m[1]!.toLowerCase()}|${m[2]!}`;
+      const mark = `${cutFamilyNum.get(famKey) ?? 1}${m[3]!.toLowerCase()}`;
+      cutMarkByProvisional.set(r.mark, mark);
+      const spec = barPieceSpecKey(r);
+      if (!markBySpec.has(spec)) markBySpec.set(spec, mark);
+    }
+    for (const r of layerRows) {
+      if (CUT_MARK_RE.test(r.mark) || /^CUT:/i.test(r.mark)) continue;
+      const spec = barPieceSpecKey(r);
+      if (markBySpec.has(spec)) continue;
+      const mark = String(next++);
+      markBySpec.set(spec, mark);
+    }
+  }
+
+  return rows.map((r) => {
+    const cutMark = cutMarkByProvisional.get(r.mark);
+    if (cutMark) {
+      return {
+        ...r,
+        mark: cutMark,
+        note: r.note.includes(cutMark) ? r.note : `${r.note} · ${cutMark}`,
+      };
+    }
+    const mark = markBySpec.get(barPieceSpecKey(r)) ?? "1";
+    return { ...r, mark };
+  });
+}
+
+/** So sánh STT: 1a, 1b, 1c, … rồi 2a, 2b, 2c… (số → chữ). */
+export function compareScheduleMarks(a: string, b: string): number {
+  const pa = /^(\d+)([a-z]*)$/i.exec(String(a || "").trim());
+  const pb = /^(\d+)([a-z]*)$/i.exec(String(b || "").trim());
+  if (pa && pb) {
+    const na = Number(pa[1]);
+    const nb = Number(pb[1]);
+    if (na !== nb) return na - nb;
+    return (pa[2] || "").toLowerCase().localeCompare((pb[2] || "").toLowerCase(), "en");
+  }
+  return String(a).localeCompare(String(b), "vi");
 }
 
 /**
@@ -336,7 +622,15 @@ export function qtyEachFromDistRanges(
     if (mx < zx0 - 1 || mx > zx1 + 1 || my < zy0 - 1 || my > zy1 + 1) return "";
     return zoneKey;
   };
-  const merged = buildMergedDistRanges(project, axesX, axesY, segs, markKeyOf);
+  const merged = buildMergedDistRanges(
+    project,
+    axesX,
+    axesY,
+    segs,
+    markKeyOf,
+    undefined,
+    effectiveZones(project),
+  );
   const mine = merged.filter((m) => m.markKey === zoneKey);
   if (mine.length) {
     return Math.max(
@@ -348,8 +642,87 @@ export function qtyEachFromDistRanges(
   return barsFromDistLength(width, zone.spacing);
 }
 
+/** Gộp dòng thống kê trùng số hiệu + Ø + a + L + móc (nhiều vùng mũ cùng loại). */
+function mergeScheduleRows(rows: ScheduleRow[]): ScheduleRow[] {
+  const map = new Map<string, ScheduleRow>();
+  for (const r of rows) {
+    const k = [
+      r.mark,
+      r.layer,
+      r.direction,
+      r.dia,
+      r.spacing,
+      r.barLength,
+      r.leftHook,
+      r.rightHook,
+      r.shape,
+    ].join("|");
+    const cur = map.get(k);
+    if (!cur) {
+      map.set(k, { ...r });
+      continue;
+    }
+    cur.qtyEach += r.qtyEach;
+    cur.qtyTotal += r.qtyTotal;
+    cur.totalM += r.totalM;
+    cur.weight += r.weight;
+  }
+  return [...map.values()];
+}
+
+/**
+ * Số hiệu gốc dải ô: A, B, C… (ổn định theo lớp + phương + chỉ số dải).
+ * Biến thiên chiều dài → Aa/Ab/Ac hoặc giữ A nếu chỉ 1 cỡ.
+ */
+function stripFamilyMark(
+  layer: RebarLayer,
+  dir: RebarDir,
+  stripIndex: number,
+): string {
+  const layerBase = layer === "bottom" ? 0 : layer === "top" ? 8 : 16;
+  const dirBase = dir === "Y" ? 0 : 4;
+  const idx = layerBase + dirBase + Math.max(0, stripIndex);
+  return String.fromCharCode(65 + (idx % 26)); // A..Z
+}
+
+function nextStripFamilyMark(
+  dir: RebarDir,
+  stripIndex: number,
+  layer: RebarLayer,
+): string {
+  return stripFamilyMark(layer, dir, stripIndex);
+}
+
+/**
+ * Chia thanh trong một dải ô thành ≤ maxClasses bậc chiều dài (lớn → bé).
+ * Sàn đều (ΔL nhỏ) → 1 lớp; dầm lệch → Xa/Xb/Xc.
+ */
+function partitionVaryingLengthClasses(
+  bars: RebarBarSeg[],
+  maxClasses = 3,
+): RebarBarSeg[][] {
+  if (!bars.length) return [];
+  const sorted = [...bars].sort(
+    (a, b) => rebarBarStraightLenMm(b) - rebarBarStraightLenMm(a),
+  );
+  const maxL = rebarBarStraightLenMm(sorted[0]!);
+  const minL = rebarBarStraightLenMm(sorted[sorted.length - 1]!);
+  if (maxL - minL < 80 || maxClasses <= 1) return [sorted];
+
+  const n = Math.min(maxClasses, sorted.length);
+  const classes: RebarBarSeg[][] = Array.from({ length: n }, () => []);
+  for (const bar of sorted) {
+    const L = rebarBarStraightLenMm(bar);
+    const t = (maxL - L) / Math.max(1, maxL - minL); // 0 = dài nhất
+    const idx = Math.min(n - 1, Math.floor(t * n + 1e-9));
+    classes[idx]!.push(bar);
+  }
+  return classes.filter((c) => c.length > 0);
+}
+
 export function computeModel(project: SlabProject): ComputedSlabModel {
   const zones = effectiveZones(project);
+  const topZonesEco = economy2TopZones(project);
   const axesX = sortAxes(project.axesX ?? []);
   const axesY = sortAxes(project.axesY ?? []);
   const bars =
@@ -357,27 +730,250 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
       ? stripRebarBarSegments(project, axesX, axesY)
       : [];
   const schedule: ScheduleRow[] = [];
+  const qtyMembers = Math.max(1, project.info.quantity);
+
+  const pushRows = (row: ScheduleRow, typical: RebarBarSeg | null) => {
+    schedule.push(...expandRowForOptimizeCut(row, project, typical, topZonesEco));
+  };
+
+  /** Chiều dài phát triển thanh lớp dưới theo phương — dùng cho thép cấu tạo. */
+  const bottomDevelopedLen = (dir: "X" | "Y"): { barLength: number; left: number; right: number } => {
+    const botZone = zones.find((zz) => zz.layer === "bottom" && zz.direction === dir);
+    const left = botZone?.leftHook ?? project.economy2?.bottomHook ?? 0;
+    const right = botZone?.rightHook ?? project.economy2?.bottomHook ?? 0;
+    const dirBars = bars.filter((b) => b.dir === dir);
+    if (dirBars.length) {
+      const lengths = dirBars.map(rebarBarStraightLenMm).sort((a, b) => a - b);
+      const straight = lengths[Math.floor((lengths.length - 1) / 2)] ?? lengths[0]!;
+      return { barLength: barDevelopedLength(straight, left, right), left, right };
+    }
+    if (botZone) {
+      const { length } = zoneSpanMm(botZone);
+      return { barLength: barDevelopedLength(length, left, right), left, right };
+    }
+    return { barLength: 0, left, right };
+  };
+
   for (const z of zones) {
-    const row = scheduleFromZone(z, project.info.quantity);
-    if (!row) continue;
-    // 1 CK = Σ (L khoảng rải / a) theo thanh mặt bằng
-    const qtyEach = qtyEachFromDistRanges(project, z, bars);
-    const qtyMembers = Math.max(1, project.info.quantity);
-    const qtyTotal = qtyEach * qtyMembers;
-    const totalM = (row.barLength * qtyTotal) / 1000;
-    schedule.push({
-      ...row,
-      qtyEach,
-      qtyMembers,
-      qtyTotal,
-      totalM,
-      weight: totalM * weightPerMeter(row.dia),
+    // Thép mũ (economy2 top): vẫn theo vùng chữ nhật L/n — không dùng dải full-nhịp.
+    if (project.layoutPreset === "economy2" && z.layer === "top") {
+      const row = scheduleFromZone(z, project.info.quantity);
+      if (!row) continue;
+      const qtyEach = barsFromDistLength(zoneSpanMm(z).width, z.spacing);
+      const qtyTotal = qtyEach * qtyMembers;
+      const totalM = (row.barLength * qtyTotal) / 1000;
+      pushRows(
+        {
+          ...row,
+          qtyEach,
+          qtyMembers,
+          qtyTotal,
+          totalM,
+          weight: totalM * weightPerMeter(row.dia),
+        },
+        null,
+      );
+      continue;
+    }
+
+    /**
+     * Thép cấu tạo (economy2): ngược phương mũ; L = thanh cùng phương lớp dưới;
+     * SL = (L_mũ − B dầm mũ gác) / a.
+     * ≥ Ø10: theo đoạn cắt tối ưu lớp dưới (1a/1b…); không cắt lại.
+     * < Ø10: không cắt tối ưu — một thanh nguyên chiều dài lớp dưới.
+     */
+    if (project.layoutPreset === "economy2" && z.layer === "structural") {
+      const muLen = Math.max(0, Number(z.muLengthMm) || 0);
+      const beamB = Math.max(0, Number(z.supportBeamBMm) || 0);
+      const distMm = Math.max(0, muLen - beamB);
+      const qtyEach = barsFromDistLength(distMm, z.spacing);
+      if (qtyEach <= 0) continue;
+
+      const pieces: Array<{
+        barLength: number;
+        leftHook: number;
+        rightHook: number;
+        shape: "hooked" | "straight";
+      }> = [];
+
+      if (!shouldOptimizeCut(project, z.dia)) {
+        // Φ < 10: giữ nguyên chiều dài — không kế thừa đoạn cắt 1a/1b của lớp dưới
+        const bot = bottomDevelopedLen(z.direction);
+        if (bot.barLength < 50) continue;
+        const straight = Math.max(0, bot.barLength - bot.left - bot.right);
+        const left = z.leftHook;
+        const right = z.rightHook;
+        pieces.push({
+          barLength: barDevelopedLength(straight, left, right),
+          leftHook: left,
+          rightHook: right,
+          shape: left > 0 || right > 0 ? "hooked" : "straight",
+        });
+      } else {
+        const bottomRaw = schedule.filter(
+          (r) => r.layer === "bottom" && r.direction === z.direction,
+        );
+        const seenLen = new Set<string>();
+        for (const r of bottomRaw) {
+          const key = `${r.barLength}|${r.leftHook}|${r.rightHook}`;
+          if (seenLen.has(key)) continue;
+          seenLen.add(key);
+          pieces.push({
+            barLength: r.barLength,
+            leftHook: r.leftHook,
+            rightHook: r.rightHook,
+            shape: r.shape === "hooked" ? "hooked" : "straight",
+          });
+        }
+        if (!pieces.length) {
+          const bot = bottomDevelopedLen(z.direction);
+          if (bot.barLength < 50) continue;
+          pieces.push({
+            barLength: bot.barLength,
+            leftHook: z.leftHook,
+            rightHook: z.rightHook,
+            shape: z.leftHook > 0 || z.rightHook > 0 ? "hooked" : "straight",
+          });
+        }
+      }
+
+      for (const p of pieces) {
+        const qtyTotal = qtyEach * qtyMembers;
+        const totalM = (p.barLength * qtyTotal) / 1000;
+        // Đẩy thẳng — không cắt lại trên chính dòng cấu tạo.
+        schedule.push({
+          mark: "",
+          layer: "structural",
+          direction: z.direction,
+          dia: z.dia,
+          spacing: z.spacing,
+          barLength: p.barLength,
+          leftHook: p.leftHook,
+          rightHook: p.rightHook,
+          qtyEach,
+          qtyMembers,
+          qtyTotal,
+          totalM,
+          weight: totalM * weightPerMeter(z.dia),
+          shape: p.shape,
+          note: z.note ?? `Thép cấu tạo ${z.direction}`,
+        });
+      }
+      continue;
+    }
+
+    const zx0 = Math.min(z.x1, z.x2);
+    const zx1 = Math.max(z.x1, z.x2);
+    const zy0 = Math.min(z.y1, z.y2);
+    const zy1 = Math.max(z.y1, z.y2);
+    const zoneBars = bars.filter((bar) => {
+      if (bar.dir !== z.direction) return false;
+      const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;
+      const my = bar.dir === "X" ? bar.y : (bar.y0 + bar.y1) / 2;
+      return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
     });
+
+    if (!zoneBars.length) {
+      const row = scheduleFromZone(z, project.info.quantity);
+      if (!row) continue;
+      const qtyEach = qtyEachFromDistRanges(project, z, bars);
+      const qtyTotal = qtyEach * qtyMembers;
+      const totalM = (row.barLength * qtyTotal) / 1000;
+      pushRows(
+        {
+          ...row,
+          qtyEach,
+          qtyMembers,
+          qtyTotal,
+          totalM,
+          weight: totalM * weightPerMeter(row.dia),
+        },
+        null,
+      );
+      continue;
+    }
+
+    // Mỗi dải ô (trục 1–2, 2–3…): 1 số hiệu gốc; nếu L biến thiên → Xa/Xb/Xc (≤3 bậc).
+    const stripGroups = groupTypicalRebarByBayStrip(
+      project,
+      zoneBars,
+      axesX,
+      axesY,
+      zones,
+    );
+    for (const sg of stripGroups) {
+      if (sg.typical.dir !== z.direction) continue;
+      const classes = partitionVaryingLengthClasses(sg.bars, 3);
+      const family = nextStripFamilyMark(z.direction, sg.stripIndex ?? 0, z.layer);
+      const useSuffix = classes.length > 1;
+      classes.forEach((classBars, bi) => {
+        const lengths = classBars.map(rebarBarStraightLenMm).sort((a, b) => a - b);
+        const straight =
+          lengths[Math.floor((lengths.length - 1) / 2)] ?? rebarBarStraightLenMm(sg.typical);
+        const typical = classBars[0] ?? sg.typical;
+        const hooks = hooksForRebarBar(project, typical, zones);
+        const barLength = barDevelopedLength(straight, hooks.left, hooks.right);
+        const qtyEach = Math.max(1, classBars.length);
+        const qtyTotal = qtyEach * qtyMembers;
+        const totalM = (barLength * qtyTotal) / 1000;
+        const hooked = hooks.left > 0 || hooks.right > 0;
+        const suffix = useSuffix ? String.fromCharCode(97 + bi) : ""; // a,b,c
+        pushRows(
+          {
+            mark: `${family}${suffix}`,
+            layer: z.layer,
+            direction: z.direction,
+            dia: z.dia,
+            spacing: z.spacing,
+            barLength,
+            leftHook: hooks.left,
+            rightHook: hooks.right,
+            qtyEach,
+            qtyMembers,
+            qtyTotal,
+            totalM,
+            weight: totalM * weightPerMeter(z.dia),
+            shape: hooked ? "hooked" : "straight",
+            note: useSuffix
+              ? `${z.note ?? z.layer} · biến thiên ${family}${suffix}`
+              : (z.note ?? `${z.layer} ${z.direction}`),
+          },
+          { ...typical, layer: z.layer === "structural" ? "bottom" : z.layer },
+        );
+      });
+    }
   }
-  schedule.sort((a, b) => a.mark.localeCompare(b.mark, "vi"));
+  const withMarks = isOptimizeCutOn(project)
+    ? assignUnifiedScheduleMarks(schedule)
+    : schedule;
+  const merged = mergeScheduleRows(withMarks);
+  /** 1a, 1b, 1c… rồi 2a, 2b… — cùng mark thì L lớn trước. */
+  merged.sort(
+    (a, b) =>
+      compareScheduleMarks(a.mark, b.mark) ||
+      b.barLength - a.barLength ||
+      a.direction.localeCompare(b.direction),
+  );
+
+  // Chốt cứng: Ø≥10 khi cắt tối ưu → DÀI 1 ≤ 11,7 m (kể cả móc + nối)
+  for (const r of merged) {
+    if (!shouldOptimizeCut(project, r.dia)) continue;
+    if (r.barLength <= STOCK_BAR_MM) continue;
+    const lh = Math.max(0, Math.round(r.leftHook) || 0);
+    const rh = Math.max(0, Math.round(r.rightHook) || 0);
+    r.barLength = STOCK_BAR_MM;
+    if (lh + rh > STOCK_BAR_MM) {
+      r.leftHook = Math.min(lh, STOCK_BAR_MM);
+      r.rightHook = Math.max(0, STOCK_BAR_MM - r.leftHook);
+    }
+    const qtyTotal = r.qtyEach * r.qtyMembers;
+    r.qtyTotal = qtyTotal;
+    r.totalM = (r.barLength * qtyTotal) / 1000;
+    r.weight = r.totalM * weightPerMeter(r.dia);
+  }
 
   const byDiaMap = new Map<number, DiaSummary>();
-  for (const r of schedule) {
+  for (const r of merged) {
     const cur = byDiaMap.get(r.dia) ?? { dia: r.dia, lengthM: 0, weight: 0 };
     cur.lengthM += r.totalM;
     cur.weight += r.weight;
@@ -387,7 +983,7 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
   const totalWeight = byDia.reduce((s, d) => s + d.weight, 0);
 
   return {
-    schedule,
+    schedule: merged,
     byDia,
     totalWeight,
     planWidth: project.planWidth,
@@ -489,7 +1085,14 @@ export function normalizeProject(raw: SlabProject): SlabProject {
     axesX,
     axesY,
   };
-  return ensureAxes(merged);
+  const withAxes = ensureAxes(merged);
+  // Dùng kích thước từ file (đã clamp) — ensureAxes có thể kéo plan về theo trục cũ.
+  const sized = setPlanSize(
+    withAxes,
+    clampPlanSizeMm(Number(raw.planWidth) || withAxes.planWidth),
+    clampPlanSizeMm(Number(raw.planHeight) || withAxes.planHeight),
+  );
+  return { ...sized, sections: ensureSectionCuts(sized) };
 }
 
 export { STOCK_M };
