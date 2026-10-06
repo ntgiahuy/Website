@@ -1850,7 +1850,7 @@ export function buildSectionAlongSegs(
 }
 
 /**
- * Đường chỉ sắt trên mặt cắt: nét dẫn → đường ngang 1 hàng;
+ * Đường chỉ sắt trên mặt cắt: nét đứng vuông góc → đường ngang 1 hàng;
  * vòng STT + Øa nằm TRÊN đường ngang (không đè line).
  * `shelfY` = cao độ đường ngang chung.
  */
@@ -1871,10 +1871,10 @@ function drawSectionRebarLeader(
   // Vòng + chữ nằm trên đường ngang (hở rõ, không đè line)
   const calloutCy = shelfY - r - 3.5;
   const shelfLeft = Math.min(tipX, labelCx - r - 2);
-  const shelfRight = labelCx + r + gap + labelW + 2;
-  const midX = tipX + (labelCx - tipX) * 0.4;
-  line(ctx, tipX, tipY, midX, shelfY, 0.5, REBAR_RED);
-  line(ctx, Math.min(midX, shelfLeft), shelfY, shelfRight, shelfY, 0.5, REBAR_RED);
+  const shelfRight = Math.max(tipX, labelCx + r + gap + labelW + 2);
+  // Nét đứng vuông góc với đường ngang (không xéo)
+  line(ctx, tipX, tipY, tipX, shelfY, 0.5, REBAR_RED);
+  line(ctx, shelfLeft, shelfY, shelfRight, shelfY, 0.5, REBAR_RED);
   ctx.page.drawCircle({ x: tipX, y: ty(tipY), size: 1.2, color: REBAR_RED });
   drawRebarCallout(ctx, labelCx, calloutCy, stt, dia, spacing, "X");
 }
