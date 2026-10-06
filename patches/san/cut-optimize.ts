@@ -265,10 +265,18 @@ export function stockPiecesForStraight(
   }
 
   let segs: Array<{ t0: number; t1: number; straightMm: number }>;
+  const lap = Math.max(0, Math.round(opts.lapMm) || 0);
   if (opts.mode === "avoidZones" && opts.cutsMm && opts.cutsMm.length) {
-    segs = segmentsFromCuts(straight, opts.cutsMm);
+    // Đoạn hình học theo điểm cắt; mỗi mối nối cộng thêm chiều dài nối (lap = n·D)
+    segs = segmentsFromCuts(straight, opts.cutsMm).map((seg, i, arr) =>
+      i < arr.length - 1 && lap > 0
+        ? { ...seg, straightMm: seg.straightMm + lap }
+        : seg,
+    );
   } else {
-    const lens = splitStraightByStock(straight, stockMm, opts.lapMm);
+    // byStock: splitStraightByStock đã trừ lap khi tiến (advance = stock − lap)
+    // → tổng L đoạn = L thẳng + (số nối)·lap
+    const lens = splitStraightByStock(straight, stockMm, lap);
     segs = [];
     let t = 0;
     for (const s of lens) {

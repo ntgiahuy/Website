@@ -2214,18 +2214,6 @@ function drawRebarSectionCut(
   const yTopOf = (top: number) => top + slabT * 0.32;
   const yBotOf = (top: number) => top + slabT * 0.68;
 
-  /** economy2: chấm lớp trên chỉ trong dải mũ (phương ⊥ mặt cắt). */
-  const topPerpHats = zones.filter((z) => z.layer === "top" && z.direction === perpDir);
-  const alongInTopPerpHat = (alongMm: number) => {
-    if (project.layoutPreset !== "economy2") return true;
-    if (!topPerpHats.length) return false;
-    return topPerpHats.some((z) => {
-      const lo = alongDir === "X" ? Math.min(z.x1, z.x2) : Math.min(z.y1, z.y2);
-      const hi = alongDir === "X" ? Math.max(z.x1, z.x2) : Math.max(z.y1, z.y2);
-      return alongMm >= lo - 1 && alongMm <= hi + 1;
-    });
-  };
-
   /**
    * Nét thép dọc: lớp dưới xuyên nhịp; lớp trên economy2 = từng đoạn mũ (hở giữa sàn).
    * Móc xuống: đầu móc vừa chạm đường đáy sàn (không vượt khỏi line sàn).
@@ -2237,6 +2225,12 @@ function drawRebarSectionCut(
         ? buildEconomy2HatSectionRuns(project, alongDir)
         : buildSectionLongRebarRuns(segs, coverMm)
       : [];
+  /** economy2: chấm lớp trên chỉ dưới đoạn sắt mũ (không vẽ giữa nhịp). */
+  const alongUnderTopMu = (alongMm: number) => {
+    if (project.layoutPreset !== "economy2") return true;
+    if (!topRuns.length) return false;
+    return topRuns.some((r) => alongMm >= r.loMm - 1 && alongMm <= r.hiMm + 1);
+  };
   /** Móc từ cao độ thanh xuống vừa chạm đáy sàn (trừ nửa nét để không vượt line). */
   const drawHookToSlabBot = (x: number, yBar: number, slabBotY: number) => {
     const tipY = slabBotY - 0.35;
@@ -2270,9 +2264,14 @@ function drawRebarSectionCut(
     drawLongRun(run, yTopOf(top), topHookL, topHookR, top + slabT);
   }
 
-  // Chấm ⊥ vẽ SAU nét thép — lớp dưới dưới nét; lớp trên trên nét, vừa chạm (không hở).
+  /**
+   * Chấm ⊥ vẽ SAU nét thép (đặc như nhau):
+   * - Lớp dưới: luôn dưới nét thép
+   * - economy2 (mũ): chỉ dưới đoạn sắt mũ — không chấm giữa nhịp
+   * - manual / simple2: chấm lớp trên nằm trên nét thép, vừa chạm
+   */
   const DOT_R = 1.6 * 0.4;
-  const DOT_BORDER = Math.max(0.22, 0.6 * 0.4);
+  const topDotsBelowBar = project.layoutPreset === "economy2";
   for (const seg of segs) {
     if (seg.kind !== "slab") continue;
     const x0 = toAlong(seg.lo) + 2;
@@ -2288,7 +2287,6 @@ function drawRebarSectionCut(
       const alongMm = seg.lo + (seg.hi - seg.lo) * t;
       const px = x0 + (x1 - x0) * t;
       if (hasBot) {
-        // Chấm đặc nằm dưới nét thép lớp dưới (mép trên vừa chạm nét)
         ctx.page.drawCircle({
           x: px,
           y: ty(yBot + DOT_R),
@@ -2296,14 +2294,13 @@ function drawRebarSectionCut(
           color: REBAR_RED,
         });
       }
-      if (hasTop && alongInTopPerpHat(alongMm)) {
-        // Chấm rỗng nằm trên nét thép lớp trên — mép dưới vừa chạm (không hở)
+      if (hasTop && alongUnderTopMu(alongMm)) {
+        const cy = topDotsBelowBar ? yTopR + DOT_R : yTopR - DOT_R;
         ctx.page.drawCircle({
           x: px,
-          y: ty(yTopR - DOT_R - DOT_BORDER * 0.5),
+          y: ty(cy),
           size: DOT_R,
-          borderColor: REBAR_RED,
-          borderWidth: DOT_BORDER,
+          color: REBAR_RED,
         });
       }
     }
