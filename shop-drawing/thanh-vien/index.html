@@ -50,31 +50,33 @@
       .nav {
         align-items: flex-end; gap: 0.55rem; padding: 0.65rem 0;
       }
-      .brand { gap: 0.45rem; min-width: 0; }
-      .brand .custom-logo { width: 80px; height: 80px; }
+      .brand { gap: 0.45rem; min-width: 0; align-items: flex-end; }
+      .brand .custom-logo { width: 40px; height: 40px; }
       .brand strong {
-        font-size: 1.02rem; letter-spacing: 0.06em; padding-bottom: 0.2rem;
+        font-size: 0.98rem; letter-spacing: 0.06em; padding-bottom: 0;
+        line-height: 1; white-space: nowrap;
       }
       .nav-links {
         display: grid;
-        grid-template-columns: auto auto;
-        gap: 0.12rem 0.7rem;
+        grid-template-columns: max-content max-content;
+        column-gap: 0.85rem;
+        row-gap: 0.1rem;
         justify-content: end;
-        justify-items: end;
+        justify-items: start;
         align-content: end;
+        text-align: left;
         margin-left: auto;
-        flex: 1;
-        min-width: 0;
+        flex: none;
       }
       .nav-links a {
         padding: 0.12rem 0; border: 0; border-radius: 0; background: transparent;
-        font-size: 0.8rem; line-height: 1.25;
+        font-size: 0.8rem; line-height: 1.25; text-align: left;
       }
       .nav-links a:hover { background: transparent; border-color: transparent; color: var(--ink); }
       .nav-links .brand-status {
         grid-column: 1 / -1;
-        justify-self: end;
-        text-align: right;
+        justify-self: start;
+        text-align: left;
         padding: 0.08rem 0 0;
         font-size: 0.72rem; line-height: 1.25;
       }
