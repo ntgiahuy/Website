@@ -176,6 +176,12 @@ export interface RebarZone {
   showSpacing: boolean;
   spacingSymbol: string;
   note?: string;
+  /**
+   * economy2 — thép cấu tạo (ngược phương mũ):
+   * SL = (muLengthMm − supportBeamBMm) / a.
+   */
+  muLengthMm?: number;
+  supportBeamBMm?: number;
 }
 
 export interface Simple2Layer {

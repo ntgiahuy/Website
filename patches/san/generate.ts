@@ -947,9 +947,14 @@ function drawPlan(
   const { project } = ctx;
   const planTitle =
     layer === "top" ? "MẶT BẰNG CỐT THÉP SÀN LỚP TRÊN" : "MẶT BẰNG CỐT THÉP SÀN LỚP DƯỚI";
-  /** Zone thuộc lớp đang vẽ (structural gộp vào lớp dưới). */
+  /**
+   * Lớp dưới: chỉ thép chịu lực (không cấu tạo).
+   * Lớp trên: thép mũ + thép cấu tạo (ngược phương mũ, economy2).
+   */
   const layerZones = zones.filter((z) =>
-    layer === "top" ? z.layer === "top" : z.layer === "bottom" || z.layer === "structural",
+    layer === "top"
+      ? z.layer === "top" || z.layer === "structural"
+      : z.layer === "bottom",
   );
   const s = planScale(project, maxW, maxH);
   const pw = project.planWidth * s;
@@ -1108,7 +1113,8 @@ function drawPlan(
             r.direction === bar.dir &&
             r.dia === dia &&
             r.spacing === spacing &&
-            (r.layer === layer || (layer === "bottom" && r.layer === "structural")),
+            (r.layer === layer ||
+              (layer === "top" && r.layer === "structural")),
         );
         // Nhiều thanh giống nhau dùng chung 1a/1b — chỉ tránh trùng trong 1 thanh
         const usedOnBar = new Set<string>();
@@ -1165,7 +1171,8 @@ function drawPlan(
           r.dia === dia &&
           r.spacing === spacing &&
           r.direction === bar.dir &&
-          (r.layer === layer || (layer === "bottom" && r.layer === "structural")) &&
+          (r.layer === layer ||
+            (layer === "top" && r.layer === "structural")) &&
           Math.abs(r.barLength - developed) <= 2 &&
           Math.round(r.leftHook) === Math.round(hooks.left) &&
           Math.round(r.rightHook) === Math.round(hooks.right),
@@ -1974,9 +1981,10 @@ function drawRebarSectionCut(
   const padL = 28;
   const padR = 48;
   const drawW = maxW - padL - padR;
-  // Tỉ lệ mặt cắt 1/75 (clamp nếu nhịp dài hơn bề rộng cột)
-  const s = Math.min(sectionS, drawW / spanMm);
+  // TL 1/75 đúng tỉ lệ; chỉ thu nhỏ khi nhịp dài hơn bề rộng khung vẽ
+  const s = spanMm * sectionS <= drawW + 0.5 ? sectionS : drawW / spanMm;
   const usedW = spanMm * s;
+  const scaleLabelN = Math.max(1, Math.round(72 / (25.4 * s)));
   const xBase = x + padL + (drawW - usedW) / 2;
   const toAlong = (mm: number) => xBase + (mm - along0) * s;
 
@@ -2387,7 +2395,7 @@ function drawRebarSectionCut(
   textSimple(ctx, title, x + maxW / 2, titleY, 8.5, true, "center");
   textSimple(
     ctx,
-    `TL 1/${SECTION_DRAWING_SCALE} · Lớp BV ${project.info.cover}`,
+    `TL 1/${scaleLabelN} · Lớp BV ${project.info.cover}`,
     x + maxW / 2,
     titleY + 12,
     6.2,
@@ -2399,7 +2407,7 @@ function drawRebarSectionCut(
   return titleY + 36;
 }
 
-/** A-A trên, B-B dưới — tỉ lệ mặt cắt 1/75 (đặt dưới mặt bằng lớp dưới). */
+/** A-A trên, B-B dưới — tỉ lệ mặt cắt 1/75 (dùng gần full bề rộng trang). */
 function drawSectionCutsAboveSchedule(
   ctx: Ctx,
   x: number,
@@ -2407,7 +2415,7 @@ function drawSectionCutsAboveSchedule(
   maxW: number,
   sectionS: number,
 ): number {
-  const gap = 10;
+  const gap = 14;
   const bottomA = drawRebarSectionCut(ctx, x, y, maxW, "X", sectionS);
   const bottomB = drawRebarSectionCut(ctx, x, bottomA + gap, maxW, "Y", sectionS);
   return bottomB;
@@ -2716,8 +2724,9 @@ export async function generateSlabPdf(
   const afterTop = drawPlan(ctx, rightX, topY, colW, planH, zones, "top");
   const afterPlans = Math.max(afterBottom, afterTop);
 
-  // A-A / B-B nằm dưới mặt bằng lớp dưới (cột trái) — TL 1/75
-  drawSectionCutsAboveSchedule(ctx, leftX, afterPlans + gap, colW, sectionS);
+  // A-A / B-B dưới mặt bằng — full bề rộng 2 cột để giữ đúng TL 1/75
+  const sectionW = PAGE_W - marginX * 2;
+  drawSectionCutsAboveSchedule(ctx, leftX, afterPlans + gap, sectionW, sectionS);
 
   // Bảng TK + Tổng hợp: cùng hàng, neo góc dưới phải (trong khung trang)
   const tablesX = PAGE_W - pagePad - tableBlock.blockW;

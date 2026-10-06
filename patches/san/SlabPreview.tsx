@@ -229,7 +229,7 @@ export const SlabPreview = memo(function SlabPreview({
           r.direction === bar.dir &&
           r.dia === dia &&
           r.spacing === spacing &&
-          (r.layer === layer || (layer === "bottom" && r.layer === "structural")),
+          (r.layer === layer || (layer === "top" && r.layer === "structural")),
       );
       // Đánh dấu tạm trong 1 thanh — nhiều thanh giống nhau dùng chung 1a/1b
       const usedOnBar = new Set<string>();
