@@ -31,15 +31,54 @@
       display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
       padding: 0.75rem 0; border-bottom: 1px solid var(--line);
     }
-    .brand { display: flex; align-items: center; gap: 0.7rem; text-decoration: none; color: #fff; }
-    .brand .custom-logo { width: 40px; height: 40px; display: block; }
-    .brand strong { font-size: 1.12rem; letter-spacing: 0.08em; color: #fff; }
+    .brand { display: flex; align-items: flex-end; gap: 0.7rem; text-decoration: none; color: #fff; }
+    .brand .custom-logo { width: 40px; height: 40px; display: block; flex: none; }
+    .brand strong {
+      font-size: 1.12rem; letter-spacing: 0.08em; color: #fff;
+      white-space: nowrap; line-height: 1; padding-bottom: 0.12rem;
+    }
     .nav-links { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center; }
     .nav-links a {
       color: var(--muted); text-decoration: none; font-size: 0.84rem; font-weight: 600;
       padding: 0.42rem 0.72rem; border-radius: 999px; border: 1px solid transparent;
     }
     .nav-links a:hover { color: var(--ink); border-color: var(--line); background: rgba(255,255,255,0.04); }
+    .nav-links .brand-status {
+      color: var(--muted); font-size: 0.78rem; padding: 0.42rem 0.5rem; white-space: nowrap;
+    }
+    @media (max-width: 760px) {
+      .nav {
+        align-items: flex-end; gap: 0.55rem; padding: 0.65rem 0;
+      }
+      .brand { gap: 0.45rem; min-width: 0; }
+      .brand .custom-logo { width: 80px; height: 80px; }
+      .brand strong {
+        font-size: 1.02rem; letter-spacing: 0.06em; padding-bottom: 0.2rem;
+      }
+      .nav-links {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 0.12rem 0.7rem;
+        justify-content: end;
+        justify-items: end;
+        align-content: end;
+        margin-left: auto;
+        flex: 1;
+        min-width: 0;
+      }
+      .nav-links a {
+        padding: 0.12rem 0; border: 0; border-radius: 0; background: transparent;
+        font-size: 0.8rem; line-height: 1.25;
+      }
+      .nav-links a:hover { background: transparent; border-color: transparent; color: var(--ink); }
+      .nav-links .brand-status {
+        grid-column: 1 / -1;
+        justify-self: end;
+        text-align: right;
+        padding: 0.08rem 0 0;
+        font-size: 0.72rem; line-height: 1.25;
+      }
+    }
     .hero {
       padding: 3.2rem 0 2.4rem; min-height: min(60vh, 520px);
       display: grid; align-content: center; gap: 1.1rem; position: relative;
@@ -135,10 +174,10 @@
       </a>
       <nav class="nav-links">
         <a href="../">Hub shop</a>
-        <a href="../dang-nhap/">Đăng nhập</a>
-        <a href="../dang-ky/">Đăng ký</a>
         <a href="#goi">Gói</a>
-        <span class="brand-status" id="brand-status" style="color:var(--muted);font-size:0.78rem;padding:0.42rem 0.5rem">Thành viên · username</span>
+        <a href="../dang-ky/">Đăng ký</a>
+        <a href="../dang-nhap/">Đăng nhập</a>
+        <span class="brand-status" id="brand-status">Thành viên · username</span>
       </nav>
     </header>
 
