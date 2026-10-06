@@ -743,9 +743,10 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
     }
 
     /**
-     * Thép cấu tạo (economy2): ngược phương mũ; L = đúng thanh cùng phương lớp dưới
-     * (kể cả đoạn nối 1a/1b); SL = (L_mũ − B dầm mũ gác) / a.
-     * Không cắt lại — giữ nguyên chiều dài lớp dưới.
+     * Thép cấu tạo (economy2): ngược phương mũ; L = thanh cùng phương lớp dưới;
+     * SL = (L_mũ − B dầm mũ gác) / a.
+     * ≥ Ø10: theo đoạn cắt tối ưu lớp dưới (1a/1b…); không cắt lại.
+     * < Ø10: không cắt tối ưu — một thanh nguyên chiều dài lớp dưới.
      */
     if (project.layoutPreset === "economy2" && z.layer === "structural") {
       const muLen = Math.max(0, Number(z.muLengthMm) || 0);
@@ -754,42 +755,58 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
       const qtyEach = barsFromDistLength(distMm, z.spacing);
       if (qtyEach <= 0) continue;
 
-      const bottomRaw = schedule.filter(
-        (r) => r.layer === "bottom" && r.direction === z.direction,
-      );
-      const seenLen = new Set<string>();
       const pieces: Array<{
         barLength: number;
         leftHook: number;
         rightHook: number;
         shape: "hooked" | "straight";
       }> = [];
-      for (const r of bottomRaw) {
-        const key = `${r.barLength}|${r.leftHook}|${r.rightHook}`;
-        if (seenLen.has(key)) continue;
-        seenLen.add(key);
-        pieces.push({
-          barLength: r.barLength,
-          leftHook: r.leftHook,
-          rightHook: r.rightHook,
-          shape: r.shape === "hooked" ? "hooked" : "straight",
-        });
-      }
-      if (!pieces.length) {
+
+      if (!shouldOptimizeCut(project, z.dia)) {
+        // Φ < 10: giữ nguyên chiều dài — không kế thừa đoạn cắt 1a/1b của lớp dưới
         const bot = bottomDevelopedLen(z.direction);
         if (bot.barLength < 50) continue;
+        const straight = Math.max(0, bot.barLength - bot.left - bot.right);
+        const left = z.leftHook;
+        const right = z.rightHook;
         pieces.push({
-          barLength: bot.barLength,
-          leftHook: z.leftHook,
-          rightHook: z.rightHook,
-          shape: z.leftHook > 0 || z.rightHook > 0 ? "hooked" : "straight",
+          barLength: barDevelopedLength(straight, left, right),
+          leftHook: left,
+          rightHook: right,
+          shape: left > 0 || right > 0 ? "hooked" : "straight",
         });
+      } else {
+        const bottomRaw = schedule.filter(
+          (r) => r.layer === "bottom" && r.direction === z.direction,
+        );
+        const seenLen = new Set<string>();
+        for (const r of bottomRaw) {
+          const key = `${r.barLength}|${r.leftHook}|${r.rightHook}`;
+          if (seenLen.has(key)) continue;
+          seenLen.add(key);
+          pieces.push({
+            barLength: r.barLength,
+            leftHook: r.leftHook,
+            rightHook: r.rightHook,
+            shape: r.shape === "hooked" ? "hooked" : "straight",
+          });
+        }
+        if (!pieces.length) {
+          const bot = bottomDevelopedLen(z.direction);
+          if (bot.barLength < 50) continue;
+          pieces.push({
+            barLength: bot.barLength,
+            leftHook: z.leftHook,
+            rightHook: z.rightHook,
+            shape: z.leftHook > 0 || z.rightHook > 0 ? "hooked" : "straight",
+          });
+        }
       }
 
       for (const p of pieces) {
         const qtyTotal = qtyEach * qtyMembers;
         const totalM = (p.barLength * qtyTotal) / 1000;
-        // Đẩy thẳng — không cắt lại (giữ L trùng lớp dưới).
+        // Đẩy thẳng — không cắt lại trên chính dòng cấu tạo.
         schedule.push({
           mark: "",
           layer: "structural",
