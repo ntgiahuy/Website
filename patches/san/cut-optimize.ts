@@ -128,50 +128,86 @@ export function allowedSpliceIntervals(
   return inside.length ? inside : [{ lo: 0, hi: L }];
 }
 
+/**
+ * Chiều dài thẳng tối đa của một cây (mm) để sau khi cộng móc (+ nối nếu có)
+ * vẫn ≤ stockMm (11,7 m).
+ */
+export function maxStraightForStockPiece(
+  stockMm: number,
+  hooksMm: number,
+  lapMm = 0,
+): number {
+  return Math.max(100, Math.round(stockMm) - Math.max(0, Math.round(hooksMm) || 0) - Math.max(0, Math.round(lapMm) || 0));
+}
+
 /** Cắt theo 11,7 m — chiều dài đoạn thẳng từng cây (mm), thứ tự dọc thanh. */
 export function splitStraightByStock(
   straightMm: number,
   stockMm = STOCK_BAR_MM,
   lapMm = 0,
+  leftHook = 0,
+  rightHook = 0,
 ): number[] {
   const L = Math.max(0, Math.round(straightMm));
-  if (L <= stockMm) return L > 0 ? [L] : [];
-  const advance = Math.max(100, stockMm - Math.max(0, Math.round(lapMm) || 0));
+  const lap = Math.max(0, Math.round(lapMm) || 0);
+  const lh = Math.max(0, Math.round(leftHook) || 0);
+  const rh = Math.max(0, Math.round(rightHook) || 0);
+  if (L + lh + rh <= stockMm) return L > 0 ? [L] : [];
+
   const pieces: number[] = [];
   let covered = 0;
+  let isFirst = true;
   while (covered < L - 0.5) {
     const remain = L - covered;
-    if (remain <= stockMm + 0.5) {
+    const hookL = isFirst ? lh : 0;
+    // Đoạn cuối: thẳng + móc ≤ stock
+    if (remain + hookL + rh <= stockMm + 0.5) {
       pieces.push(Math.round(remain));
       break;
     }
-    pieces.push(stockMm);
-    covered += advance;
+    // Vật liệu đoạn = stock − móc; lap nằm trong cây (tiến hình học = thẳng − lap)
+    const pieceStraight = maxStraightForStockPiece(stockMm, hookL, 0);
+    pieces.push(pieceStraight);
+    covered += Math.max(100, pieceStraight - lap);
+    isFirst = false;
   }
   return pieces;
 }
 
 /**
- * Cắt tránh vùng — ưu tiên đoạn đúng 11,7 m; mối nối trong vùng cho phép.
- * Trả về điểm cắt (mm từ đầu) theo thứ tự dọc thanh.
+ * Cắt tránh vùng — ưu tiên đoạn dài gần max (≤ 11,7 m gồm nối + móc);
+ * mối nối trong vùng cho phép.
+ * Trả về điểm cắt hình học (mm từ đầu) theo thứ tự dọc thanh.
+ * `lapMm`: mỗi đoạn không cuối sẽ cộng thêm lap vào chiều dài vật liệu.
  */
 export function splicePositionsPreferStock(
   straightMm: number,
   stockMm: number,
   allowed: Interval[],
+  lapMm = 0,
+  leftHook = 0,
+  rightHook = 0,
 ): number[] {
   const L = Math.max(0, Math.round(straightMm));
-  if (L <= stockMm) return [];
+  const lap = Math.max(0, Math.round(lapMm) || 0);
+  const lh = Math.max(0, Math.round(leftHook) || 0);
+  const rh = Math.max(0, Math.round(rightHook) || 0);
+  if (L + lh + rh <= stockMm) return [];
+
   const windows = mergeIntervals(allowed.filter((a) => a.hi > a.lo));
   const cuts: number[] = [];
   let start = 0;
-  const minPiece = Math.min(stockMm * 0.5, 3000);
+  const minPiece = Math.min(stockMm * 0.35, 2500);
 
-  while (L - start > stockMm + 1) {
-    const ideal = start + stockMm;
+  // Còn cần cắt khi phần còn lại (+ móc cuối) vượt stock
+  while (L - start + rh > stockMm + 1) {
+    const hookL = start === 0 ? lh : 0;
+    // Đoạn này sẽ cộng lap → geom tối đa = stock − móc − lap
+    const maxGeom = maxStraightForStockPiece(stockMm, hookL, lap);
+    const ideal = start + maxGeom;
     let cut: number | null = null;
 
-    // 1) Ưu tiên đúng 11,7 m nếu điểm nối nằm trong vùng cho phép
+    // 1) Ưu tiên đúng maxGeom nếu điểm nối nằm trong vùng cho phép
     for (const w of windows) {
       if (ideal >= w.lo - 0.5 && ideal <= w.hi + 0.5 && ideal < L - 150) {
         cut = ideal;
@@ -179,14 +215,14 @@ export function splicePositionsPreferStock(
       }
     }
 
-    // 2) Đoạn dài nhất ≤ 11,7 m kết thúc trong vùng cho phép (lớn → gần 11,7 m)
+    // 2) Đoạn dài nhất ≤ maxGeom kết thúc trong vùng cho phép
     if (cut == null) {
       let bestLen = -1;
       for (const w of windows) {
         const lo = Math.max(w.lo, start + minPiece);
-        const hi = Math.min(w.hi, start + stockMm, L - 150);
+        const hi = Math.min(w.hi, start + maxGeom, L - 150);
         if (hi < lo) continue;
-        const cand = hi; // dài nhất có thể trong cửa sổ
+        const cand = hi;
         const len = cand - start;
         if (len > bestLen) {
           bestLen = len;
@@ -195,8 +231,12 @@ export function splicePositionsPreferStock(
       }
     }
 
-    // 3) Fallback: cắt tại 11,7 m
+    // 3) Fallback: cắt tại maxGeom
     if (cut == null) cut = Math.min(ideal, L - 150);
+
+    // Đảm bảo đoạn sau cắt vẫn có chỗ cho móc cuối / đoạn tối thiểu
+    cut = Math.min(Math.round(cut), L - Math.max(150, Math.min(rh + 50, 500)));
+    if (cut <= start + 50) cut = Math.min(start + maxGeom, L - 150);
 
     cuts.push(Math.round(cut));
     start = Math.round(cut);
@@ -209,8 +249,11 @@ export function splicePositionsMm(
   straightMm: number,
   stockMm: number,
   allowed: Interval[],
+  lapMm = 0,
+  leftHook = 0,
+  rightHook = 0,
 ): number[] {
-  return splicePositionsPreferStock(straightMm, stockMm, allowed);
+  return splicePositionsPreferStock(straightMm, stockMm, allowed, lapMm, leftHook, rightHook);
 }
 
 /** Đổi danh sách điểm cắt → các đoạn {t0,t1,straight}. */
@@ -247,8 +290,10 @@ export function stockPiecesForStraight(
   const lh = Math.max(0, Math.round(leftHook) || 0);
   const rh = Math.max(0, Math.round(rightHook) || 0);
   const stockMm = opts.stockMm ?? STOCK_BAR_MM;
+  const lap = Math.max(0, Math.round(opts.lapMm) || 0);
 
-  if (!opts.on || straight <= stockMm) {
+  // Một cây: thẳng + móc ≤ 11,7 m → không cắt
+  if (!opts.on || straight + lh + rh <= stockMm) {
     const hooked = lh > 0 || rh > 0;
     return [
       {
@@ -265,23 +310,28 @@ export function stockPiecesForStraight(
   }
 
   let segs: Array<{ t0: number; t1: number; straightMm: number }>;
-  const lap = Math.max(0, Math.round(opts.lapMm) || 0);
   if (opts.mode === "avoidZones" && opts.cutsMm && opts.cutsMm.length) {
     // Đoạn hình học theo điểm cắt; mỗi mối nối cộng thêm chiều dài nối (lap = n·D)
-    segs = segmentsFromCuts(straight, opts.cutsMm).map((seg, i, arr) =>
-      i < arr.length - 1 && lap > 0
-        ? { ...seg, straightMm: seg.straightMm + lap }
-        : seg,
-    );
+    // Điểm cắt đã trừ sẵn lap (+ móc) → geom + lap + móc ≤ stock
+    segs = segmentsFromCuts(straight, opts.cutsMm).map((seg, i, arr) => {
+      if (i < arr.length - 1 && lap > 0) {
+        const hookBudget = i === 0 ? lh : 0;
+        const maxStr = maxStraightForStockPiece(stockMm, hookBudget, 0);
+        return { ...seg, straightMm: Math.min(seg.straightMm + lap, maxStr) };
+      }
+      return seg;
+    });
   } else {
-    // byStock: splitStraightByStock đã trừ lap khi tiến (advance = stock − lap)
-    // → tổng L đoạn = L thẳng + (số nối)·lap
-    const lens = splitStraightByStock(straight, stockMm, lap);
+    // byStock: mỗi đoạn thẳng ≤ stock − móc (− lap với đoạn không cuối)
+    const lens = splitStraightByStock(straight, stockMm, lap, lh, rh);
     segs = [];
     let t = 0;
-    for (const s of lens) {
+    for (let i = 0; i < lens.length; i++) {
+      const s = lens[i]!;
+      const isLast = i === lens.length - 1;
       segs.push({ t0: t, t1: t + s, straightMm: s });
-      t += s;
+      // Tiến hình học: đoạn không cuối chồng lap với đoạn sau
+      t += isLast ? s : Math.max(100, s - lap);
     }
   }
 
@@ -289,9 +339,12 @@ export function stockPiecesForStraight(
     const left = i === 0 ? lh : 0;
     const right = i === segs.length - 1 ? rh : 0;
     const hooked = left > 0 || right > 0;
+    // An toàn: không bao giờ vượt 11,7 m
+    const barLength = Math.min(stockMm, Math.round(seg.straightMm + left + right));
+    const straightAdj = Math.max(0, barLength - left - right);
     return {
-      barLength: Math.round(seg.straightMm + left + right),
-      straightMm: seg.straightMm,
+      barLength,
+      straightMm: straightAdj,
       leftHook: left,
       rightHook: right,
       shape: (hooked ? "hooked" : "straight") as "hooked" | "straight",
@@ -372,24 +425,30 @@ export function planCutsForBar(
   layer: RebarLayer,
   dia: number,
   topZones: RebarZone[],
+  leftHook = 0,
+  rightHook = 0,
 ): number[] {
   if (!shouldOptimizeCut(project, dia)) return [];
   const straight = rebarBarStraightLenMm(bar);
-  if (straight <= STOCK_BAR_MM) return [];
+  const lh = Math.max(0, Math.round(leftHook) || 0);
+  const rh = Math.max(0, Math.round(rightHook) || 0);
+  if (straight + lh + rh <= STOCK_BAR_MM) return [];
   const lap = lapLengthMm(dia, lapMulOf(project));
   const mode = optimizeCutModeOf(project);
   if (mode === "byStock") {
-    const segs = splitStraightByStock(straight, STOCK_BAR_MM, lap);
+    const segs = splitStraightByStock(straight, STOCK_BAR_MM, lap, lh, rh);
     const cuts: number[] = [];
     let acc = 0;
     for (let i = 0; i < segs.length - 1; i++) {
-      acc += segs[i]!;
+      const s = segs[i]!;
+      // Điểm cắt hình học = hết đoạn vật liệu trừ vùng chồng nối
+      acc += Math.max(100, s - lap);
       cuts.push(acc);
     }
     return cuts;
   }
   const allowed = allowedSpliceIntervals(bar, layer, topZones);
-  return splicePositionsPreferStock(straight, STOCK_BAR_MM, allowed);
+  return splicePositionsPreferStock(straight, STOCK_BAR_MM, allowed, lap, lh, rh);
 }
 
 /** Tách thanh thành pieces + marks (1a,1b…) — dùng chung preview/PDF/thống kê. */
@@ -405,7 +464,7 @@ export function cutPiecesWithMarks(
 ): { pieces: StockPiece[]; marks: string[]; cuts: number[] } {
   const straight = rebarBarStraightLenMm(bar);
   const optOn = shouldOptimizeCut(project, dia);
-  const cuts = planCutsForBar(project, bar, layer, dia, topZones);
+  const cuts = planCutsForBar(project, bar, layer, dia, topZones, leftHook, rightHook);
   const pieces = stockPiecesForStraight(straight, leftHook, rightHook, {
     on: optOn,
     mode: optimizeCutModeOf(project),

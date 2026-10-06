@@ -427,7 +427,15 @@ function expandRowForOptimizeCut(
   const mode = optimizeCutModeOf(project);
   const cuts =
     mode === "avoidZones" && typicalBar
-      ? planCutsForBar(project, typicalBar, row.layer, row.dia, topZones)
+      ? planCutsForBar(
+          project,
+          typicalBar,
+          row.layer,
+          row.dia,
+          topZones,
+          row.leftHook,
+          row.rightHook,
+        )
       : undefined;
   const pieces = stockPiecesForStraight(straight, row.leftHook, row.rightHook, {
     on: true,
