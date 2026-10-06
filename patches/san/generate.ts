@@ -2226,7 +2226,53 @@ function drawRebarSectionCut(
     });
   };
 
-  // Chấm ⊥ chỉ trong lòng sàn (không vẽ trên thân dầm)
+  /**
+   * Nét thép dọc: lớp dưới xuyên nhịp; lớp trên economy2 = từng đoạn mũ (hở giữa sàn).
+   * Móc xuống: đầu móc vừa chạm đường đáy sàn (không vượt khỏi line sàn).
+   */
+  const botRuns = hasBotLong ? buildSectionLongRebarRuns(segs, coverMm) : [];
+  const topRuns =
+    hasTopLong
+      ? project.layoutPreset === "economy2"
+        ? buildEconomy2HatSectionRuns(project, alongDir)
+        : buildSectionLongRebarRuns(segs, coverMm)
+      : [];
+  /** Móc từ cao độ thanh xuống vừa chạm đáy sàn (trừ nửa nét để không vượt line). */
+  const drawHookToSlabBot = (x: number, yBar: number, slabBotY: number) => {
+    const tipY = slabBotY - 0.35;
+    if (tipY - yBar < 0.8) return;
+    line(ctx, x, yBar, x, tipY, 0.7, REBAR_RED);
+  };
+  const drawLongRun = (
+    run: SectionLongRebarRun,
+    yBar: number,
+    hookL: number,
+    hookR: number,
+    slabBotY: number,
+  ) => {
+    const x0 = toAlong(run.loMm);
+    const x1 = toAlong(run.hiMm);
+    if (x1 - x0 < 2) return;
+    line(ctx, x0, yBar, x1, yBar, 0.55, REBAR_RED);
+    if (run.leftTerm && hookL > 0) drawHookToSlabBot(x0, yBar, slabBotY);
+    if (run.rightTerm && hookR > 0) drawHookToSlabBot(x1, yBar, slabBotY);
+  };
+  for (const run of botRuns) {
+    const dropPx = run.drop > 0 ? run.drop * s : 0;
+    const top = slabTopY + dropPx;
+    // Lớp dưới: móc xuống vừa chạm đáy sàn
+    drawLongRun(run, yBotOf(top), botHookL, botHookR, top + slabT);
+  }
+  for (const run of topRuns) {
+    const dropPx = run.drop > 0 ? run.drop * s : 0;
+    const top = slabTopY + dropPx;
+    // Lớp trên: móc xuống vừa chạm đáy sàn
+    drawLongRun(run, yTopOf(top), topHookL, topHookR, top + slabT);
+  }
+
+  // Chấm ⊥ vẽ SAU nét thép — lớp dưới dưới nét; lớp trên trên nét, vừa chạm (không hở).
+  const DOT_R = 1.6 * 0.4;
+  const DOT_BORDER = Math.max(0.22, 0.6 * 0.4);
   for (const seg of segs) {
     if (seg.kind !== "slab") continue;
     const x0 = toAlong(seg.lo) + 2;
@@ -2242,61 +2288,28 @@ function drawRebarSectionCut(
       const alongMm = seg.lo + (seg.hi - seg.lo) * t;
       const px = x0 + (x1 - x0) * t;
       if (hasBot) {
-        ctx.page.drawCircle({ x: px, y: ty(yBot), size: 1.6, color: REBAR_RED });
-      }
-      if (hasTop && alongInTopPerpHat(alongMm)) {
+        // Chấm đặc nằm dưới nét thép lớp dưới (mép trên vừa chạm nét)
         ctx.page.drawCircle({
           x: px,
-          y: ty(yTopR),
-          size: 1.6,
+          y: ty(yBot + DOT_R),
+          size: DOT_R,
+          color: REBAR_RED,
+        });
+      }
+      if (hasTop && alongInTopPerpHat(alongMm)) {
+        // Chấm rỗng nằm trên nét thép lớp trên — mép dưới vừa chạm (không hở)
+        ctx.page.drawCircle({
+          x: px,
+          y: ty(yTopR - DOT_R - DOT_BORDER * 0.5),
+          size: DOT_R,
           borderColor: REBAR_RED,
-          borderWidth: 0.6,
+          borderWidth: DOT_BORDER,
         });
       }
     }
     if (!leaderSlab && x1 - x0 > 28) {
       leaderSlab = { x0, x1, yBot, yTop: yTopR };
     }
-  }
-
-  /**
-   * Nét thép dọc: lớp dưới xuyên nhịp; lớp trên economy2 = từng đoạn mũ (hở giữa sàn).
-   * Móc: lớp dưới hướng lên vào trong sàn; lớp trên hướng xuống vào trong sàn.
-   */
-  const botRuns = hasBotLong ? buildSectionLongRebarRuns(segs, coverMm) : [];
-  const topRuns =
-    hasTopLong
-      ? project.layoutPreset === "economy2"
-        ? buildEconomy2HatSectionRuns(project, alongDir)
-        : buildSectionLongRebarRuns(segs, coverMm)
-      : [];
-  const hookLenPx = Math.max(7, Math.min(slabT * 0.85, Math.max(80, coverMm * 4) * s));
-  const drawHook = (x: number, yBar: number, dir: -1 | 1) => {
-    line(ctx, x, yBar, x, yBar + dir * hookLenPx, 0.7, REBAR_RED);
-  };
-  const drawLongRun = (
-    run: SectionLongRebarRun,
-    yBar: number,
-    hookL: number,
-    hookR: number,
-    hookDir: -1 | 1,
-  ) => {
-    const x0 = toAlong(run.loMm);
-    const x1 = toAlong(run.hiMm);
-    if (x1 - x0 < 2) return;
-    line(ctx, x0, yBar, x1, yBar, 0.55, REBAR_RED);
-    if (run.leftTerm && hookL > 0) drawHook(x0, yBar, hookDir);
-    if (run.rightTerm && hookR > 0) drawHook(x1, yBar, hookDir);
-  };
-  for (const run of botRuns) {
-    const dropPx = run.drop > 0 ? run.drop * s : 0;
-    // Lớp dưới: móc xuống dưới
-    drawLongRun(run, yBotOf(slabTopY + dropPx), botHookL, botHookR, 1);
-  }
-  for (const run of topRuns) {
-    const dropPx = run.drop > 0 ? run.drop * s : 0;
-    // Lớp trên: móc xuống (vào trong bề dày sàn)
-    drawLongRun(run, yTopOf(slabTopY + dropPx), topHookL, topHookR, 1);
   }
 
   // Đường chỉ sắt — mọi số hiệu trên CÙNG một hàng ngang, chữ nằm trên line
