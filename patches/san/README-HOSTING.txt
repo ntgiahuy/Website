@@ -1,30 +1,44 @@
-Shop drawing thép sàn — gói chạy độc lập (hosting tĩnh)
-=======================================================
+Shop drawing thép sàn — deploy lên giahuy.net (KHÔNG CDN)
+=========================================================
 
-Cấu trúc (chỉ file cần thiết)
------------------------------
-  index.html
-  assets/index-*.js      ← app + thư viện xuất PDF (pdf-lib) đã đóng gói sẵn
-  assets/index-*.css
-  fonts/*.ttf            ← font nhúng khi Xuất PDF
-  fonts/*.woff2          ← font giao diện
+Ngày 6/10/2026
 
-Không kèm: favicon, membership.js, public-jwk.json, file PDF mẫu.
-
-Về file PDF
+Zip CHỈ gồm
 -----------
-Không có file .pdf sẵn trong zip. PDF được tạo ngay trong trình duyệt
-khi bấm nút «Xuất PDF» (dùng JS + fonts/*.ttf). Lưu file kết quả từ
-hộp thoại tải xuống của trình duyệt.
+  shop-drawing/san/app/index.html
+  shop-drawing/san/app/assets/
+  shop-drawing/san/app/fonts/
 
-Chạy
-----
-  npx --yes serve -l 5173 .
-  # hoặc: python3 -m http.server 5173
-  Mở http://localhost:5173/ (hoặc domain hosting của bạn)
+KHÔNG đóng gói: san/index.php, shop-drawing/app/, membership.js,
+shop-drawing/index.html, favicon.
 
-Ghi chú
+Cài đặt
 -------
-- Mọi liên kết dùng đường dẫn tương đối (./) — không cần CDN ngoài.
-- Gói này giống bước cột Lớp = Ø / nhãn Lớp dưới·trên / mặt cắt TL 1/75:
-  không khóa xuất PDF bằng membership.
+1. Giải nén zip.
+2. Copy nội dung vào:
+     public_html/shop-drawing/san/app/
+3. KHÔNG ghi đè:
+     public_html/shop-drawing/san/index.php   (cổng)
+     public_html/shop-drawing/assets/membership.js
+     public_html/shop-drawing/app/            (móng)
+
+membership.js (hub — đã có sẵn)
+-------------------------------
+index.html gọi:
+  /shop-drawing/assets/membership.js
+  data-api="/shop-drawing/api/"
+  data-activate-url="/shop-drawing/dang-nhap/"
+KHÔNG copy file này vào san/app/.
+
+Đối tác nhúng CỔNG (không nhúng san/app/):
+  <iframe src="https://giahuy.net/shop-drawing/san/"
+    width="100%" height="980" style="border:0" allow="download"></iframe>
+
+Admin URL sàn = ./san/
+
+Kiểm tra
+--------
+  rg -n "fonts.google|gstatic|unpkg|jsdelivr|github.io" dist/   → 0
+  rg -n "membership.js" shop-drawing/san/app/index.html
+    → chỉ /shop-drawing/assets/membership.js
+  Trong zip KHÔNG có file membership.js.
