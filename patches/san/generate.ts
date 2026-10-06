@@ -53,9 +53,9 @@ import {
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarLayer, RebarZone, SlabProject } from "../types";
 
-/** Khổ A1 ngang (mm → pt @ 72dpi): 841×594 mm. */
-const PAGE_W = Math.round((841 * 72) / 25.4); // 2384
-const PAGE_H = Math.round((594 * 72) / 25.4); // 1684
+/** Khổ A2 ngang (mm → pt @ 72dpi): 594×420 mm. */
+const PAGE_W = Math.round((594 * 72) / 25.4); // 1684
+const PAGE_H = Math.round((420 * 72) / 25.4); // 1191
 const BLACK = rgb(0, 0, 0);
 /** Tiêu đề khung tên shop drawing. */
 const SHOP_TITLE = "SHOP DRAWING THÉP SÀN (BY GIAHUY.NET)";
@@ -2741,23 +2741,23 @@ export async function generateSlabPdf(
   const zones = effectiveZones(project);
   const ctx: Ctx = { page, font, fontBold, boldKit, project, model };
 
-  const pagePad = 28;
-  // Khung ngoài khổ A1
+  const pagePad = 22;
+  // Khung ngoài khổ A2
   ctx.page.drawRectangle({
-    x: 16,
-    y: 16,
-    width: PAGE_W - 32,
-    height: PAGE_H - 32,
+    x: 12,
+    y: 12,
+    width: PAGE_W - 24,
+    height: PAGE_H - 24,
     borderColor: BLACK,
-    borderWidth: 1.35,
+    borderWidth: 1.2,
   });
 
   /**
    * Tiêu đề phía trên (không khung viền):
    * SHOP DRAWING… đậm lớn → gạch chân ngang bằng chân dấu ()
-   * → tên sàn + dòng bê tông/thép/BV/A1 (cỡ = 2/3 tiêu đề = gấp đôi 1/3 cũ).
+   * → tên sàn + dòng bê tông/thép/BV/A2 (cỡ = 2/3 tiêu đề = gấp đôi 1/3 cũ).
    */
-  const shopSize = 28;
+  const shopSize = 22;
   const subSize = (shopSize / 3) * 2; // gấp đôi cỡ phụ trước đó (~18.7pt)
   const titleY = pagePad + 22;
   textSimple(ctx, SHOP_TITLE, PAGE_W / 2, titleY, shopSize, true, "center");
@@ -2780,7 +2780,7 @@ export async function generateSlabPdf(
   const gradesY = projY + subSize + 12;
   textSimple(
     ctx,
-    `Bê tông ${project.info.concreteGrade} · Thép ${project.info.steelGrade} · Lớp BV ${project.info.cover}mm · Khổ A1`,
+    `Bê tông ${project.info.concreteGrade} · Thép ${project.info.steelGrade} · Lớp BV ${project.info.cover}mm · Khổ A2`,
     PAGE_W / 2,
     gradesY,
     subSize,
@@ -2789,7 +2789,7 @@ export async function generateSlabPdf(
   );
 
   /**
-   * Một trang A1:
+   * Một trang A2:
    * Hàng trên: Lớp dưới (trái) | Lớp trên (phải).
    * Dưới lớp dưới: Mặt cắt A-A → B-B.
    * Góc dưới phải: Bảng thống kê | Tổng hợp (cùng một hàng).

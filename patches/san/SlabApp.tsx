@@ -1121,7 +1121,7 @@ export function SlabApp() {
             ? "Thép 2 lớp đơn giản"
             : "Vẽ thép sàn";
       downloadPdf(bytes, `KetCauSan_${exportProject.info.name.replace(/\s+/g, "_")}.pdf`);
-      setStatus(`Đã xuất PDF A1 (${modeLabel}).`);
+      setStatus(`Đã xuất PDF A2 (${modeLabel}).`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Xuất PDF thất bại.");
     } finally {
