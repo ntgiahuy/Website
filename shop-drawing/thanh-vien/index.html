@@ -48,37 +48,47 @@
     }
     @media (max-width: 760px) {
       .nav {
-        align-items: flex-end; gap: 0.55rem; padding: 0.65rem 0;
+        align-items: flex-end; gap: 0.5rem; padding: 0.55rem 0;
       }
-      .brand { gap: 0.45rem; min-width: 0; align-items: flex-end; }
-      .brand .custom-logo { width: 40px; height: 40px; }
+      .brand { gap: 0.4rem; min-width: 0; align-items: flex-end; }
+      /* 2× = 80px → giảm 0,5 lần còn 1,5× = 60px */
+      .brand .custom-logo { width: 60px; height: 60px; }
       .brand strong {
-        font-size: 0.98rem; letter-spacing: 0.06em; padding-bottom: 0;
+        font-size: 1rem; letter-spacing: 0.05em; padding-bottom: 0;
         line-height: 1; white-space: nowrap;
       }
       .nav-links {
         display: grid;
         grid-template-columns: max-content max-content;
-        column-gap: 0.85rem;
-        row-gap: 0.1rem;
+        grid-template-areas:
+          "hub goi"
+          "dk dn"
+          "st st";
+        column-gap: 0.75rem;
+        row-gap: 0;
         justify-content: end;
         justify-items: start;
         align-content: end;
+        align-items: start;
         text-align: left;
         margin-left: auto;
         flex: none;
       }
-      .nav-links a {
-        padding: 0.12rem 0; border: 0; border-radius: 0; background: transparent;
-        font-size: 0.8rem; line-height: 1.25; text-align: left;
+      .nav-links a:nth-child(1) { grid-area: hub; }
+      .nav-links a:nth-child(2) { grid-area: goi; }
+      .nav-links a:nth-child(3) { grid-area: dk; }
+      .nav-links a:nth-child(4) { grid-area: dn; }
+      .nav-links a,
+      .nav-links .brand-status {
+        display: block;
+        padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent;
+        font-size: 0.78rem; line-height: 1.2; text-align: left;
+        white-space: nowrap;
       }
       .nav-links a:hover { background: transparent; border-color: transparent; color: var(--ink); }
       .nav-links .brand-status {
-        grid-column: 1 / -1;
-        justify-self: start;
-        text-align: left;
-        padding: 0.08rem 0 0;
-        font-size: 0.72rem; line-height: 1.25;
+        grid-area: st;
+        font-size: 0.7rem; justify-self: start;
       }
     }
     .hero {
