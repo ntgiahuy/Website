@@ -334,6 +334,7 @@ function drawDistBarJunction(ctx: Ctx, cx: number, cy: number) {
  * Số hiệu thép: vòng STT + Ødia a spacing trên 1 hàng (đỏ, không đậm).
  * dir = phương thanh — chữ song song thanh (X ngang / Y dọc).
  * (cx,cy) = tâm vòng (đã offset khỏi nét thép).
+ * `scale` — thu nhỏ (mặt cắt dùng 0.5).
  */
 function drawRebarCallout(
   ctx: Ctx,
@@ -343,18 +344,20 @@ function drawRebarCallout(
   dia: number,
   spacing: number,
   dir: "X" | "Y" = "X",
+  scale = 1,
 ) {
-  const r = REBAR_MARK_R;
+  const k = Math.max(0.25, scale);
+  const r = REBAR_MARK_R * k;
   const color = REBAR_RED;
   ctx.page.drawCircle({
     x: cx,
     y: ty(cy),
     size: r,
     borderColor: color,
-    borderWidth: 0.35,
+    borderWidth: 0.35 * k,
   });
   const sttStr = String(stt);
-  const sttSize = sttStr.length >= 3 ? 4.8 : 5.6;
+  const sttSize = (sttStr.length >= 3 ? 4.8 : 5.6) * k;
   const sttW = ctx.font.widthOfTextAtSize(sttStr, sttSize);
   ctx.page.drawText(sttStr, {
     x: cx - sttW / 2,
@@ -365,9 +368,9 @@ function drawRebarCallout(
   });
 
   const label = `Ø${dia}a${spacing}`;
-  const labelSize = 6.2;
+  const labelSize = 6.2 * k;
   const labelW = ctx.font.widthOfTextAtSize(label, labelSize);
-  const gap = 2.5;
+  const gap = 2.5 * k;
   if (dir === "X") {
     ctx.page.drawText(label, {
       x: cx + r + gap,
@@ -1849,9 +1852,13 @@ export function buildSectionAlongSegs(
   return { segs: merged, along0, along1, axes: alongAxes };
 }
 
+/** Tỉ lệ số hiệu / đường chỉ trên mặt cắt (0.5 = nửa kích thước mặt bằng). */
+const SECTION_CALLOUT_SCALE = 0.5;
+
 /**
  * Đường chỉ sắt trên mặt cắt: nét đứng vuông góc → đường ngang 1 hàng;
  * vòng STT + Øa nằm TRÊN đường ngang (không đè line).
+ * Thanh ngang = đúng bề rộng vòng STT + Øa; tip neo một đầu thanh ngang.
  * `shelfY` = cao độ đường ngang chung.
  */
 function drawSectionRebarLeader(
@@ -1864,19 +1871,25 @@ function drawSectionRebarLeader(
   dia: number,
   spacing: number,
 ) {
-  const r = REBAR_MARK_R;
+  const k = SECTION_CALLOUT_SCALE;
+  const r = REBAR_MARK_R * k;
   const label = `Ø${dia}a${spacing}`;
-  const labelW = ctx.font.widthOfTextAtSize(label, 6.2);
-  const gap = 2.5;
+  const labelSize = 6.2 * k;
+  const labelW = ctx.font.widthOfTextAtSize(label, labelSize);
+  const gap = 2.5 * k;
+  const rowW = r * 2 + gap + labelW;
+  // Neo tip vào một đầu thanh ngang; nhãn nằm phía labelCx
+  const labelOnLeft = labelCx <= tipX;
+  const shelfLeft = labelOnLeft ? tipX - rowW : tipX;
+  const shelfRight = labelOnLeft ? tipX : tipX + rowW;
+  const circleCx = shelfLeft + r;
   // Vòng + chữ nằm trên đường ngang (hở rõ, không đè line)
-  const calloutCy = shelfY - r - 3.5;
-  const shelfLeft = Math.min(tipX, labelCx - r - 2);
-  const shelfRight = Math.max(tipX, labelCx + r + gap + labelW + 2);
+  const calloutCy = shelfY - r - 3.5 * k;
   // Nét đứng vuông góc với đường ngang (không xéo)
-  line(ctx, tipX, tipY, tipX, shelfY, 0.5, REBAR_RED);
-  line(ctx, shelfLeft, shelfY, shelfRight, shelfY, 0.5, REBAR_RED);
-  ctx.page.drawCircle({ x: tipX, y: ty(tipY), size: 1.2, color: REBAR_RED });
-  drawRebarCallout(ctx, labelCx, calloutCy, stt, dia, spacing, "X");
+  line(ctx, tipX, tipY, tipX, shelfY, 0.4, REBAR_RED);
+  line(ctx, shelfLeft, shelfY, shelfRight, shelfY, 0.4, REBAR_RED);
+  ctx.page.drawCircle({ x: tipX, y: ty(tipY), size: 1.2 * k, color: REBAR_RED });
+  drawRebarCallout(ctx, circleCx, calloutCy, stt, dia, spacing, "X", k);
 }
 
 /** Đoạn thép mũ economy2 trên mặt cắt — chỉ vùng L/n, hở giữa nhịp. */
@@ -2277,7 +2290,8 @@ function drawRebarSectionCut(
   };
   for (const run of botRuns) {
     const dropPx = run.drop > 0 ? run.drop * s : 0;
-    drawLongRun(run, yBotOf(slabTopY + dropPx), botHookL, botHookR, -1);
+    // Lớp dưới: móc xuống dưới
+    drawLongRun(run, yBotOf(slabTopY + dropPx), botHookL, botHookR, 1);
   }
   for (const run of topRuns) {
     const dropPx = run.drop > 0 ? run.drop * s : 0;
@@ -2288,7 +2302,8 @@ function drawRebarSectionCut(
   // Đường chỉ sắt — mọi số hiệu trên CÙNG một hàng ngang, chữ nằm trên line
   if (leaderSlab) {
     const mid = (leaderSlab.x0 + leaderSlab.x1) / 2;
-    const shelfY = slabTopY - 20;
+    // Cao đường ngang / thanh đứng ≈ nửa so với trước
+    const shelfY = slabTopY - 10;
     const botInfo = hasBot ? sectionSteelCallout(ctx, "bottom", perpDir) : null;
     const topInfo = hasTop ? sectionSteelCallout(ctx, "top", perpDir) : null;
     const longBotPieces = hasBotLong ? sectionCutPieceCallouts(ctx, "bottom", alongDir) : [];
@@ -2321,7 +2336,7 @@ function drawRebarSectionCut(
       jobs.push({
         tipX,
         tipY: leaderSlab.yBot,
-        labelCx: tipX - 36,
+        labelCx: tipX - 18,
         stt: botInfo.stt,
         dia: botInfo.dia,
         spacing: botInfo.spacing,
@@ -2332,7 +2347,7 @@ function drawRebarSectionCut(
       jobs.push({
         tipX,
         tipY: leaderSlab.yTop,
-        labelCx: tipX + 42,
+        labelCx: tipX + 21,
         stt: topInfo.stt,
         dia: topInfo.dia,
         spacing: topInfo.spacing,
@@ -2376,7 +2391,7 @@ function drawRebarSectionCut(
         jobs.push({
           tipX,
           tipY: yBar,
-          labelCx: side === "left" ? tipX - 28 : tipX + 34,
+          labelCx: side === "left" ? tipX - 14 : tipX + 17,
           stt: p.stt,
           dia: p.dia,
           spacing: p.spacing,
@@ -2398,7 +2413,7 @@ function drawRebarSectionCut(
       jobs.push({
         tipX: mid,
         tipY: leaderSlab.yBot,
-        labelCx: mid - 10,
+        labelCx: mid - 5,
         stt: longBot.stt,
         dia: longBot.dia,
         spacing: longBot.spacing,
@@ -2412,16 +2427,16 @@ function drawRebarSectionCut(
       jobs.push({
         tipX,
         tipY: leaderSlab.yTop,
-        labelCx: tipX + 34,
+        labelCx: tipX + 17,
         stt: longTop.stt,
         dia: longTop.dia,
         spacing: longTop.spacing,
       });
     }
 
-    // Tránh đè nhãn: sắp theo tipX, lệch labelCx nếu trùng
+    // Tránh đè nhãn: sắp theo tipX, lệch labelCx nếu trùng (callout mặt cắt ×0.5)
     jobs.sort((a, b) => a.tipX - b.tipX);
-    const minGap = 52;
+    const minGap = 26;
     for (let i = 1; i < jobs.length; i++) {
       const prev = jobs[i - 1]!;
       const cur = jobs[i]!;
