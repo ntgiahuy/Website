@@ -437,15 +437,41 @@ function expandRowForOptimizeCut(
           row.rightHook,
         )
       : undefined;
-  const pieces = stockPiecesForStraight(straight, row.leftHook, row.rightHook, {
+  let pieces = stockPiecesForStraight(straight, row.leftHook, row.rightHook, {
     on: true,
     mode,
     lapMm: lap,
     cutsMm: cuts,
   });
 
+  // Phòng hờ: vẫn còn đoạn > 11,7 m → buộc cắt theo cây thương mại
+  if (pieces.some((p) => p.barLength > STOCK_BAR_MM + 0.5)) {
+    pieces = stockPiecesForStraight(straight, row.leftHook, row.rightHook, {
+      on: true,
+      mode: "byStock",
+      lapMm: lap,
+    });
+  }
+
   if (pieces.length <= 1) {
-    return [{ ...row, mark: "" }];
+    const bl = Math.min(STOCK_BAR_MM, Math.round(row.barLength));
+    const lh = Math.max(0, Math.round(row.leftHook) || 0);
+    const rh = Math.max(0, Math.round(row.rightHook) || 0);
+    const qtyTotal = row.qtyEach * row.qtyMembers;
+    const totalM = (bl * qtyTotal) / 1000;
+    return [
+      {
+        ...row,
+        mark: "",
+        barLength: bl,
+        leftHook: lh,
+        rightHook: rh,
+        shape: lh > 0 || rh > 0 ? "hooked" : "straight",
+        qtyTotal,
+        totalM,
+        weight: totalM * weightPerMeter(row.dia),
+      },
+    ];
   }
 
   // Chữ ký họ nối trong cùng lớp — họ giống nhau → cùng số hiệu 1a/1b…
@@ -928,6 +954,23 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
       b.barLength - a.barLength ||
       a.direction.localeCompare(b.direction),
   );
+
+  // Chốt cứng: Ø≥10 khi cắt tối ưu → DÀI 1 ≤ 11,7 m (kể cả móc + nối)
+  for (const r of merged) {
+    if (!shouldOptimizeCut(project, r.dia)) continue;
+    if (r.barLength <= STOCK_BAR_MM) continue;
+    const lh = Math.max(0, Math.round(r.leftHook) || 0);
+    const rh = Math.max(0, Math.round(r.rightHook) || 0);
+    r.barLength = STOCK_BAR_MM;
+    if (lh + rh > STOCK_BAR_MM) {
+      r.leftHook = Math.min(lh, STOCK_BAR_MM);
+      r.rightHook = Math.max(0, STOCK_BAR_MM - r.leftHook);
+    }
+    const qtyTotal = r.qtyEach * r.qtyMembers;
+    r.qtyTotal = qtyTotal;
+    r.totalM = (r.barLength * qtyTotal) / 1000;
+    r.weight = r.totalM * weightPerMeter(r.dia);
+  }
 
   const byDiaMap = new Map<number, DiaSummary>();
   for (const r of merged) {

@@ -295,16 +295,20 @@ export function stockPiecesForStraight(
   // Một cây: thẳng + móc ≤ 11,7 m → không cắt
   if (!opts.on || straight + lh + rh <= stockMm) {
     const hooked = lh > 0 || rh > 0;
+    // Dù không cắt: vẫn không cho vượt cây thương mại khi đang bật tối ưu
+    const raw = Math.round(straight + lh + rh);
+    const barLength = opts.on ? Math.min(stockMm, raw) : raw;
+    const straightOut = Math.max(0, barLength - lh - rh);
     return [
       {
-        barLength: Math.round(straight + lh + rh),
-        straightMm: straight,
+        barLength,
+        straightMm: straightOut,
         leftHook: lh,
         rightHook: rh,
         shape: hooked ? "hooked" : "straight",
         geomIndex: 0,
         t0: 0,
-        t1: straight,
+        t1: straightOut,
       },
     ];
   }
