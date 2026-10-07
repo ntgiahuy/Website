@@ -3,3 +3,10 @@
 **/*private-jwk*.json
 .env
 .env.*
+
+# Hosting PHP secrets & runtime DB
+shop-drawing/config.php
+shop-drawing/data/*.sqlite
+shop-drawing/data/*.sqlite-*
+shop-drawing/data/*.db
+

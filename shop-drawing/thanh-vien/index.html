@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Thành viên GIA HUY</title>
+  <meta name="description" content="Đăng ký username + mật khẩu, đăng nhập và mở khóa Shop Drawing theo thời hạn thành viên." />
+  <link rel="icon" href="../assets/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #0f1419; --bg1: #182029; --ink: #e8eef4; --muted: #93a4b5;
+      --line: rgba(232, 238, 244, 0.12); --amber: #e8a317; --amber-dim: #b87d0d;
+      --ok: #3ecf8e; --danger: #ff6b6b; --max: 980px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: "Be Vietnam Pro", sans-serif; color: var(--ink);
+      background:
+        radial-gradient(900px 480px at 12% -10%, rgba(232, 163, 23, 0.18), transparent 55%),
+        radial-gradient(700px 420px at 90% 0%, rgba(62, 140, 180, 0.16), transparent 50%),
+        linear-gradient(180deg, var(--bg0), var(--bg1) 40%, #10161d);
+      line-height: 1.55;
+    }
+    a { color: var(--amber); }
+    .wrap { width: min(100% - 2rem, var(--max)); margin: 0 auto; }
+    .nav {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+      padding: 0.75rem 0; border-bottom: 1px solid var(--line);
+    }
+    .brand {
+      display: flex; align-items: flex-end; gap: 0.1rem;
+      text-decoration: none; color: #fff; flex: none;
+    }
+    .brand .custom-logo { width: 45px; height: 45px; display: block; flex: none; }
+    .brand strong {
+      font-size: 1.4rem; letter-spacing: 0.03em; color: #fff;
+      padding-bottom: 5px; line-height: 1; white-space: nowrap;
+    }
+    .nav-links { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center; }
+    .nav-links .nav-row { display: contents; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: 0.84rem; font-weight: 600;
+      padding: 0.42rem 0.72rem; border-radius: 999px; border: 1px solid transparent;
+    }
+    .nav-links a:hover { color: var(--ink); border-color: var(--line); background: rgba(255,255,255,0.04); }
+    .nav-links .brand-status {
+      color: var(--muted); font-size: 0.78rem; padding: 0.42rem 0.5rem; white-space: nowrap;
+    }
+    @media (max-width: 760px) {
+      .nav {
+        align-items: flex-end; gap: 0.85rem; padding: 0.55rem 0;
+      }
+      .brand { min-width: 0; flex: 0 0 auto; }
+      .nav-links {
+        display: flex;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        align-items: flex-end;
+        justify-content: flex-end;
+        gap: 0.32rem;
+        margin-left: auto;
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: calc(100% - 10.75rem);
+      }
+      .nav-links .nav-row {
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 0.45rem;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .nav-links a {
+        display: inline-block;
+        padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent;
+        font-size: 0.7rem; line-height: 1.2; text-align: right;
+        white-space: nowrap; flex: none;
+      }
+      .nav-links a:hover { background: transparent; border-color: transparent; color: var(--ink); }
+      .nav-links .brand-status {
+        display: block;
+        padding: 0; margin: 0;
+        font-size: 0.62rem; line-height: 1.25;
+        text-align: right;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+    .hero {
+      padding: 3.2rem 0 2.4rem; min-height: min(60vh, 520px);
+      display: grid; align-content: center; gap: 1.1rem; position: relative;
+    }
+    .hero::before {
+      content: "";
+      position: absolute; inset: 8% -8% auto auto; width: min(52vw, 420px); height: min(52vw, 420px);
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(232,238,244,0.04) 19px),
+        repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(232,238,244,0.04) 19px);
+      mask-image: radial-gradient(circle at center, #000 30%, transparent 72%);
+      pointer-events: none; animation: drift 18s ease-in-out infinite alternate;
+    }
+    @keyframes drift {
+      from { transform: translate3d(0,0,0) rotate(0deg); opacity: 0.7; }
+      to { transform: translate3d(-18px, 12px, 0) rotate(2deg); opacity: 1; }
+    }
+    .hero h1 {
+      margin: 0; font-size: clamp(2rem, 5.2vw, 3.2rem); line-height: 1.08;
+      letter-spacing: -0.035em; max-width: 14ch; position: relative;
+    }
+    .hero p { margin: 0; color: var(--muted); font-size: 1.05rem; max-width: 40ch; position: relative; }
+    .cta-row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.4rem; position: relative; }
+    .btn {
+      appearance: none; border: 0; cursor: pointer; text-decoration: none;
+      font: inherit; font-weight: 700; border-radius: 10px; padding: 0.85rem 1.15rem;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: transform 0.18s ease, background 0.18s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--amber); color: #1a1203; }
+    .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    section { padding: 2.4rem 0; border-top: 1px solid var(--line); }
+    section h2 { margin: 0 0 0.45rem; font-size: clamp(1.35rem, 3vw, 1.8rem); letter-spacing: -0.02em; }
+    section .lead { margin: 0 0 1.4rem; color: var(--muted); max-width: 52ch; }
+    .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.85rem; }
+    .plan {
+      border: 1px solid var(--line); border-radius: 14px; padding: 1.15rem 1.1rem 1.2rem;
+      background: rgba(255,255,255,0.02);
+    }
+    .plan.featured { border-color: rgba(232,163,23,0.55); }
+    .plan .name { font-weight: 700; margin: 0 0 0.35rem; }
+    .plan .price { font-family: "IBM Plex Mono", monospace; font-size: 1.3rem; margin: 0 0 0.35rem; color: var(--amber); }
+    .plan .hint { margin: 0 0 1rem; color: var(--muted); font-size: 0.9rem; }
+    .plan button { width: 100%; }
+    .panel {
+      border: 1px solid var(--line); border-radius: 14px; padding: 1.2rem; background: rgba(0,0,0,0.18);
+    }
+    label { display: block; font-size: 0.88rem; color: var(--muted); margin-bottom: 0.35rem; }
+    input[type="text"], input[type="email"] {
+      width: 100%; font: inherit; color: var(--ink); background: #0c1116;
+      border: 1px solid var(--line); border-radius: 10px; padding: 0.8rem 0.9rem;
+    }
+    .row-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.85rem; }
+    .status {
+      margin-top: 1rem; padding: 0.85rem 0.95rem; border-radius: 10px;
+      background: rgba(255,255,255,0.03); border: 1px solid var(--line); font-size: 0.95rem;
+    }
+    .status.ok { border-color: rgba(62,207,142,0.35); color: var(--ok); }
+    .status.bad { border-color: rgba(255,107,107,0.35); color: var(--danger); }
+    .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.86rem; word-break: break-all; }
+    .steps { display: grid; gap: 0.9rem; counter-reset: step; }
+    .step { display: grid; grid-template-columns: auto 1fr; gap: 0.8rem; align-items: start; }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      width: 1.7rem; height: 1.7rem; border-radius: 999px; display: grid; place-items: center;
+      background: rgba(232,163,23,0.15); color: var(--amber); font-weight: 700; font-size: 0.85rem;
+    }
+    .step p { margin: 0.15rem 0 0; color: var(--muted); }
+    footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--line); }
+    footer a { color: var(--amber); font-weight: 700; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="nav">
+      <a class="brand" href="../" aria-label="GIA HUY">
+        <svg class="custom-logo" width="40" height="40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280" fill="#CE2C90" role="img" aria-labelledby="logoTitle">
+          <title id="logoTitle">GH</title>
+          <path fill-rule="evenodd" d="M640 84 0 572h1280L640 84Zm0 126L166 572h948L640 210Z"></path>
+          <rect x="570" y="334" width="63" height="63"></rect>
+          <rect x="652" y="334" width="63" height="63"></rect>
+          <rect x="570" y="416" width="63" height="63"></rect>
+          <rect x="652" y="416" width="63" height="63"></rect>
+          <path d="M161 575h97v333.23A192 192 0 0 0 531 949.62V779h87v213.22A282 282 0 0 1 161 920.54V575Z"></path>
+          <rect x="406" y="779" width="125" height="86"></rect>
+          <rect x="693" y="575" width="93" height="491"></rect>
+          <rect x="1026" y="575" width="93" height="491"></rect>
+          <rect x="693" y="780" width="426" height="87"></rect>
+        </svg>
+        <strong>GIA HUY</strong>
+      </a>
+      <nav class="nav-links">
+        <div class="nav-row">
+          <a href="../">Hub shop</a>
+          <a href="#goi">Gói</a>
+          <a href="../dang-ky/">Đăng ký</a>
+          <a href="../dang-nhap/">Đăng nhập</a>
+        </div>
+        <span class="brand-status" id="brand-status">Thành viên · username</span>
+      </nav>
+    </header>
+
+    <section class="hero" style="border:0;padding-top:2.6rem">
+      <h1>Thành viên username.<br />Mở khóa theo hạn.</h1>
+      <p>Đăng ký: username + email + SĐT + mật khẩu (OTP xác nhận email lần đầu). Đăng nhập bằng username và mật khẩu. Admin cấp gói theo username.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="../dang-nhap/">Đăng nhập</a>
+        <a class="btn btn-ghost" href="../dang-ky/">Đăng ký</a>
+        <a class="btn btn-ghost" href="../">Về hub dùng thử</a>
+      </div>
+      <div class="status" id="status" hidden style="position:relative;max-width:42ch"></div>
+    </section>
+
+    <section id="goi">
+      <h2>Gói theo thời gian</h2>
+      <p class="lead">Một tài khoản username mở khóa toàn bộ tiện ích trên hub trong thời hạn còn hiệu lực.</p>
+      <div class="plans" id="plans"></div>
+    </section>
+
+    <section id="huong-dan">
+      <h2>Cách đăng ký</h2>
+      <div class="steps">
+        <div class="step">
+          <div>
+            <strong>Tạo tài khoản</strong>
+            <p>Đăng ký username + email + số điện thoại + mật khẩu, xác nhận OTP email lần đầu.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div>
+            <strong>Chọn gói và chuyển khoản</strong>
+            <p id="pay-hint">Nội dung CK: <span class="mono" id="transfer-content">GH username</span></p>
+          </div>
+        </div>
+        <div class="step">
+          <div>
+            <strong>Admin cấp quyền theo username</strong>
+            <p>Sau khi nhận tiền, admin gắn gói + ngày hết hạn cho username của bạn.</p>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:1.2rem">
+        <p style="margin:0 0 0.5rem;color:var(--muted);font-size:0.9rem">Thông tin thanh toán:</p>
+        <p id="pay-info" class="mono" style="margin:0;color:var(--ink)">Đang tải…</p>
+      </div>
+    </section>
+
+    <footer>
+      <p>Copyright © by <a href="https://giahuy.net" target="_blank" rel="noopener noreferrer">GIAHUY</a></p>
+    </footer>
+  </div>
+
+  <script src="../assets/membership.js"></script>
+  <script>
+    (function () {
+      var statusEl = document.getElementById("status");
+      var payInfo = document.getElementById("pay-info");
+      var transferContent = document.getElementById("transfer-content");
+      var brandStatus = document.getElementById("brand-status");
+      var plansEl = document.getElementById("plans");
+      var selected = { plan: "3m", price: 249000 };
+      var PAY = {};
+      var hintUser = "username";
+
+      function showStatus(ok, html) {
+        statusEl.hidden = !textOrEmpty(html);
+        statusEl.className = "status " + (ok ? "ok" : "bad");
+        statusEl.innerHTML = html || "";
+      }
+      function textOrEmpty(html) { return !!(html && String(html).trim()); }
+      function money(n) { return Number(n).toLocaleString("vi-VN") + "đ"; }
+      function updateTransferHint() {
+        transferContent.textContent =
+          "GH " + hintUser + " · " + money(selected.price);
+      }
+
+      async function loadCfg() {
+        var cfg = await GiaHuyMembership.loadPublicConfig();
+        PAY = cfg.pay || {};
+        payInfo.textContent =
+          (PAY.bank || "") + " · STK " + (PAY.account || "") + " · " + (PAY.holder || "") +
+          (PAY.note ? " · " + PAY.note : "");
+        plansEl.innerHTML = "";
+        (cfg.plans || []).forEach(function (p, i) {
+          var art = document.createElement("article");
+          art.className = "plan" + (i === 0 ? " featured" : "");
+          art.innerHTML =
+            '<p class="name">' + p.label + '</p>' +
+            '<p class="price">' + money(p.price) + '</p>' +
+            '<p class="hint">' + (p.days > 20000 ? "Không hết hạn" : p.days + " ngày") + '</p>' +
+            '<button type="button" class="btn ' + (i === 0 ? "btn-primary" : "btn-ghost") + '">Chọn gói này</button>';
+          art.querySelector("button").addEventListener("click", function () {
+            selected = { plan: p.id, price: p.price };
+            updateTransferHint();
+            document.getElementById("huong-dan").scrollIntoView({ behavior: "smooth" });
+          });
+          plansEl.appendChild(art);
+          if (i === 0) selected = { plan: p.id, price: p.price };
+        });
+        updateTransferHint();
+      }
+
+      async function paint() {
+        var me = await GiaHuyMembership.getMe();
+        var st = me.member;
+        if (me.username) hintUser = me.username;
+        updateTransferHint();
+        if (st && st.active) {
+          if (brandStatus) {
+            brandStatus.style.color = "var(--ok)";
+            brandStatus.textContent =
+              "Đang hoạt động · " + (me.username || "") + " · " +
+              GiaHuyMembership.formatExpiry({
+                active: true, plan: st.plan, daysLeft: st.days_left, expiresAtMs: st.expires_at * 1000
+              });
+          }
+          showStatus(true, "Username <strong>" + (me.username || "—") + "</strong> · gói <strong>" + (st.plan || "—") +
+            "</strong> · " + GiaHuyMembership.formatExpiry({
+              active: true, plan: st.plan, daysLeft: st.days_left, expiresAtMs: st.expires_at * 1000
+            }));
+        } else if (me.username || me.email) {
+          if (brandStatus) {
+            brandStatus.style.color = "var(--muted)";
+            brandStatus.textContent = "Đã đăng nhập · chờ cấp gói";
+          }
+          showStatus(false, "Đã đăng nhập nhưng chưa có gói còn hạn. Hãy chuyển khoản rồi chờ admin cấp theo username.");
+        } else if (brandStatus) {
+          brandStatus.style.color = "var(--muted)";
+          brandStatus.textContent = "Thành viên · username";
+          statusEl.hidden = true;
+        }
+      }
+
+      (async function () {
+        try { await loadCfg(); } catch (e) { payInfo.textContent = "Không tải được cấu hình API."; }
+        await paint();
+      })();
+    })();
+  </script>
+</body>
+</html>

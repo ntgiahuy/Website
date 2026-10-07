@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GIA HUY — Shop Drawing</title>
+  <meta name="description" content="Shop thép móng, cột, dầm, sàn. Đăng nhập username + mật khẩu · dùng thử · thành viên theo thời hạn." />
+  <link rel="icon" href="./assets/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg0: #0c1218; --bg1: #15202b; --ink: #eef3f8; --muted: #8fa3b6;
+      --line: rgba(238, 243, 248, 0.12); --amber: #e8a317; --amber-2: #f0b531;
+      --ok: #3ecf8e; --danger: #ff6b6b; --brand: #CE2C90;
+      --header-h: 58px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: "Be Vietnam Pro", sans-serif; color: var(--ink);
+      background:
+        radial-gradient(900px 420px at 8% -8%, rgba(206, 44, 144, 0.12), transparent 55%),
+        radial-gradient(700px 380px at 92% 0%, rgba(74, 109, 136, 0.22), transparent 50%),
+        linear-gradient(165deg, var(--bg0), var(--bg1) 45%, #0e1620);
+      overflow: hidden;
+    }
+    a { color: var(--amber); }
+    .shell { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+    .topbar {
+      position: relative;
+      display: flex; align-items: center; gap: 0.65rem;
+      min-height: var(--header-h); padding: 0.45rem 0.85rem;
+      border-bottom: 1px solid var(--line);
+      background: #0a0e12;
+      z-index: 20;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 0.65rem;
+      text-decoration: none; color: #fff; min-width: 0; flex: none;
+    }
+    .brand .custom-logo { width: 40px; height: 40px; flex: none; display: block; }
+    .brand strong {
+      font-size: 1.1rem; letter-spacing: 0.08em; font-weight: 800;
+      color: #fff; white-space: nowrap;
+    }
+    .nav-slot {
+      position: relative;
+      display: flex; align-items: center; gap: 0.4rem;
+      flex: 1; min-width: 0;
+    }
+    .nav-slot[hidden] { display: none !important; }
+    .topbar-right { display: flex; align-items: center; gap: 0.45rem; flex: none; margin-left: auto; }
+    .chip {
+      font-family: "IBM Plex Mono", monospace; font-size: 0.7rem; font-weight: 600;
+      border: 1px solid var(--line); border-radius: 999px; padding: 0.24rem 0.5rem;
+      background: rgba(255,255,255,0.03); color: var(--muted); white-space: nowrap;
+      max-width: 22vw; overflow: hidden; text-overflow: ellipsis;
+    }
+    .chip[hidden] { display: none !important; }
+    .chip.live { color: var(--amber); border-color: rgba(232,163,23,0.4); }
+    .chip.ok { color: var(--ok); border-color: rgba(62,207,142,0.35); }
+    .chip.danger { color: var(--danger); border-color: rgba(255,107,107,0.35); }
+    .account { position: static; display: flex; align-items: center; }
+    .account-btn {
+      appearance: none; border: 0; background: transparent; color: #fff;
+      width: 40px; height: 40px; border-radius: 999px; cursor: pointer;
+      display: grid; place-items: center; padding: 0;
+    }
+    .account-btn:hover { background: rgba(255,255,255,0.06); }
+    .account-btn svg { width: 26px; height: 26px; display: block; }
+    .account-menu {
+      position: absolute; right: 0.85rem; top: 100%;
+      width: min(310px, calc(100vw - 1.2rem));
+      padding: 0.55rem;
+      border-radius: 0 0 16px 16px; border: 1px solid rgba(255,255,255,0.1);
+      border-top: 0;
+      background: linear-gradient(180deg, #1c2530 0%, #151c25 100%);
+      box-shadow: 0 18px 44px rgba(0,0,0,0.45);
+      z-index: 40;
+      animation: menuIn 0.18s ease;
+    }
+    @keyframes menuIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: none; }
+    }
+    .account-menu[hidden] { display: none !important; }
+    .account-menu a, .account-menu button {
+      width: 100%; appearance: none; border: 0; background: transparent;
+      color: #fff; font: inherit; font-weight: 600; font-size: 0.92rem;
+      display: flex; align-items: center; gap: 0.7rem;
+      padding: 0.7rem 0.8rem; border-radius: 10px; cursor: pointer;
+      text-decoration: none; text-align: left;
+      transition: background 0.15s ease;
+    }
+    .account-menu a:hover, .account-menu button:hover { background: rgba(255,255,255,0.07); }
+    .account-menu svg { width: 18px; height: 18px; flex: none; opacity: 0.9; color: #c5d0dc; }
+    .account-info {
+      padding: 0.85rem 0.9rem 0.8rem; color: var(--ink);
+      border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 0.35rem;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+    }
+    .account-info .label {
+      color: var(--muted); font-size: 0.72rem; font-weight: 600;
+      letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 0.55rem;
+    }
+    .account-info .row {
+      display: grid; grid-template-columns: 6.6rem 1fr; gap: 0.35rem;
+      font-size: 0.84rem; margin: 0.22rem 0; line-height: 1.35; word-break: break-word;
+    }
+    .account-info .row span { color: var(--muted); font-weight: 500; }
+    .account-info .row strong { font-weight: 700; color: #fff; }
+    .account-info .plan-box {
+      display: grid; gap: 0.2rem; margin-top: 0.65rem; padding: 0.5rem 0.65rem;
+      border-radius: 9px; border: 1px solid rgba(232,163,23,0.35);
+      background: rgba(232,163,23,0.08);
+      font-size: 0.8em; line-height: 1.4;
+      color: var(--amber); font-weight: 700;
+    }
+    .account-info .plan-box.free {
+      color: var(--muted);
+      border-color: rgba(238,243,248,0.12);
+      background: rgba(255,255,255,0.03);
+      font-weight: 600;
+    }
+    .account-info .plan-box .line {
+      display: grid; grid-template-columns: 5.6rem 1fr; gap: 0.3rem;
+    }
+    .account-info .plan-box .k { opacity: 0.9; font-weight: 600; }
+    .account-info .plan-box .v { font-weight: 700; }
+    .btn {
+      appearance: none; border: 0; cursor: pointer; text-decoration: none;
+      font: inherit; font-weight: 700; border-radius: 10px; padding: 0.55rem 0.9rem;
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--amber); color: #1a1203; }
+    .btn-primary:hover { background: var(--amber-2); }
+    .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    .btn-sm { padding: 0.4rem 0.7rem; font-size: 0.88rem; }
+    .btn[hidden], button[hidden], a[hidden] { display: none !important; }
+    .menu-toggle {
+      display: none; appearance: none; border: 1px solid var(--line);
+      background: rgba(0,0,0,0.22); color: var(--ink);
+      width: 40px; height: 40px; border-radius: 10px; cursor: pointer;
+      place-items: center; flex: none;
+    }
+    .menu-toggle svg { width: 22px; height: 22px; }
+    .tabs {
+      display: flex; gap: 0.3rem; align-items: center; flex: 1; min-width: 0;
+      padding: 0.2rem; border: 1px solid var(--line); border-radius: 12px;
+      background: rgba(0,0,0,0.22); overflow-x: auto;
+    }
+    .tab {
+      appearance: none; border: 0; background: transparent; color: var(--muted);
+      font: inherit; font-weight: 600; font-size: 0.9rem;
+      padding: 0.48rem 0.8rem; border-radius: 10px;
+      cursor: pointer; white-space: nowrap;
+    }
+    .tab:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
+    .tab.active { color: #1a1203; background: var(--amber); animation: tabIn 0.28s ease; }
+    .tab.soon { opacity: 0.72; }
+    .tab.soon .soon-tag { margin-left: 0.35rem; font-size: 0.68rem; font-weight: 700; opacity: 0.85; }
+    @keyframes tabIn { from { transform: translateY(3px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+    .mobile-shop-menu {
+      position: absolute; left: 0; top: calc(100% + 0.35rem);
+      min-width: min(92vw, 280px); z-index: 35;
+      border: 1px solid var(--line); border-radius: 14px;
+      background: #141c26; padding: 0.4rem; box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+    }
+    .mobile-shop-menu[hidden] { display: none !important; }
+    .mobile-shop-menu .tab {
+      display: flex; width: 100%; text-align: left; border-radius: 10px;
+    }
+    .workspace { position: relative; min-height: 0; background: #070b10; }
+    .soon-panel {
+      display: none; height: 100%; place-items: center; padding: 1.5rem; text-align: center;
+      color: var(--muted);
+      background: radial-gradient(520px 280px at 50% 30%, rgba(206,44,144,0.08), transparent 65%), #070b10;
+    }
+    .soon-panel.active { display: grid; }
+    .soon-panel h2 { margin: 0 0 0.45rem; color: var(--ink); font-size: 1.35rem; letter-spacing: -0.02em; }
+    .soon-panel p { margin: 0; max-width: 28ch; }
+    .workspace iframe { width: 100%; height: 100%; border: 0; background: #111; display: none; }
+    .workspace iframe.active { display: block; }
+    .gate, .paywall {
+      position: absolute; inset: 0; display: block; padding: 1.1rem 1rem 2.2rem;
+      background: radial-gradient(700px 360px at 50% 0%, rgba(206,44,144,0.1), transparent 55%), #070b10;
+      z-index: 5; overflow: auto; -webkit-overflow-scrolling: touch;
+    }
+    .gate[hidden], .paywall[hidden] { display: none !important; }
+    .landing { width: min(100%, 920px); margin: 0 auto; display: grid; gap: 1.35rem; }
+    .card {
+      width: 100%; border: 1px solid var(--line); border-radius: 18px;
+      padding: 1.45rem 1.25rem 1.25rem; background: rgba(18, 26, 34, 0.96); animation: rise 0.45s ease;
+    }
+    .card.wide { width: 100%; }
+    @keyframes rise { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .card h1 { margin: 0 0 0.45rem; font-size: clamp(1.45rem, 3.5vw, 2rem); letter-spacing: -0.03em; line-height: 1.15; }
+    .card h2 { margin: 0 0 0.4rem; font-size: clamp(1.2rem, 2.8vw, 1.55rem); letter-spacing: -0.02em; }
+    .card p { margin: 0; color: var(--muted); }
+    .card .lead { margin: 0 0 1rem; max-width: 48ch; }
+    .card .cta-row { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 1.15rem; }
+    .card .cta-stack { display: grid; gap: 0.55rem; margin-top: 1.15rem; }
+    .card .cta-stack > .btn-primary {
+      width: 100%; justify-content: center; padding: 0.85rem 1rem;
+    }
+    .card .cta-auth {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem;
+    }
+    .card .cta-auth .btn { justify-content: center; width: 100%; }
+    @media (min-width: 761px) {
+      .card .cta-stack {
+        grid-template-columns: 1.35fr 1fr 1fr;
+        align-items: stretch;
+      }
+      .card .cta-stack > .btn-primary {
+        width: auto; white-space: nowrap;
+      }
+      .card .cta-auth { display: contents; }
+      .card .cta-stack > .btn,
+      .card .cta-stack .btn {
+        width: 100%; min-height: 2.75rem;
+      }
+    }
+    .feature-grid {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.7rem;
+    }
+    .feature {
+      border: 1px solid var(--line); border-radius: 14px; padding: 0.95rem 0.9rem;
+      background: rgba(255,255,255,0.025);
+    }
+    .feature strong { display: block; color: var(--ink); margin-bottom: 0.25rem; font-size: 0.98rem; }
+    .feature p { margin: 0; font-size: 0.88rem; line-height: 1.45; }
+    .plans {
+      display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 0.45rem; margin-top: 0.2rem;
+    }
+    .plan {
+      border: 1px solid var(--line); border-radius: 12px; padding: 0.65rem 0.45rem 0.7rem;
+      background: rgba(255,255,255,0.02); text-align: left;
+      color: inherit; font: inherit; display: grid; gap: 0.1rem;
+      transition: border-color 0.15s ease, background 0.15s ease; min-width: 0;
+    }
+    .plan.featured, .plan.selected {
+      border-color: rgba(232,163,23,0.55); background: rgba(232,163,23,0.07);
+    }
+    .plan .name { font-weight: 700; display: block; margin-bottom: 0.1rem; font-size: 0.82rem; }
+    .plan .price { font-family: "IBM Plex Mono", monospace; color: var(--amber); font-size: 0.92rem; }
+    .plan .hint { color: var(--muted); font-size: 0.72rem; margin: 0 0 0.5rem; }
+    .plan .btn {
+      width: 100%; justify-content: center; margin-top: 0.1rem;
+      font-size: 0.74rem; padding: 0.4rem 0.3rem; white-space: nowrap;
+    }
+    .steps { display: grid; gap: 0.85rem; counter-reset: step; margin-top: 0.35rem; }
+    .step { display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: start; }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      width: 1.7rem; height: 1.7rem; border-radius: 999px; display: grid; place-items: center;
+      background: rgba(232,163,23,0.15); color: var(--amber); font-weight: 700; font-size: 0.85rem;
+    }
+    .step strong { color: var(--ink); }
+    .step p { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.92rem; }
+    @media (max-width: 980px) {
+      .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 560px) {
+      .feature-grid { grid-template-columns: 1fr; }
+      .plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .login-box { margin-top: 1rem; display: grid; gap: 0.55rem; }
+    .login-box label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.25rem; }
+    .login-box input {
+      width: 100%; font: inherit; color: var(--ink); background: #0a0f14;
+      border: 1px solid var(--line); border-radius: 10px; padding: 0.7rem 0.8rem;
+    }
+    .msg { margin-top: 0.65rem; font-size: 0.9rem; }
+    .msg.ok { color: var(--ok); }
+    .msg.bad { color: var(--danger); }
+    .pay-boxes {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+      margin-top: 0.95rem;
+    }
+    .pay-table {
+      min-width: 0; padding: 0.9rem 0.95rem;
+      border-radius: 12px; border: 1px solid var(--line);
+      background: rgba(0,0,0,0.25);
+      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+    .pay-table.is-active {
+      background: rgba(232,163,23,0.18);
+      border-color: rgba(232,163,23,0.6);
+      box-shadow: inset 0 0 0 1px rgba(232,163,23,0.15);
+    }
+    .pay-table.is-active .pay-row span,
+    .pay-table.is-active .pay-row strong { color: #f6d27a; }
+    .pay-table.is-flash { animation: payFlash 0.7s ease; }
+    .pay-table .pay-row {
+      display: grid; grid-template-columns: 8.6rem minmax(0, 1fr); gap: 0.35rem;
+      align-items: center; margin: 0.22rem 0; padding: 0.15rem 0;
+      font-size: 0.88rem; line-height: 1.4;
+    }
+    .pay-table .pay-row span { color: var(--muted); font-weight: 500; }
+    .pay-table .pay-row strong { color: var(--ink); font-weight: 700; word-break: break-word; }
+    @keyframes payFlash {
+      0% { background: rgba(232,163,23,0.5); }
+      100% { background: rgba(232,163,23,0.18); }
+    }
+    .huong-cta {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem;
+      margin-top: 0.9rem;
+    }
+    .huong-cta .btn { width: 100%; justify-content: center; min-height: 2.7rem; }
+    .site-copy {
+      margin: 0.35rem 0 0.6rem; text-align: center;
+      color: var(--muted); font-size: 0.86rem;
+    }
+    .site-copy a { color: var(--amber); font-weight: 700; text-decoration: none; }
+    .site-copy a:hover { text-decoration: underline; }
+    @media (max-width: 760px) {
+      .pay-boxes { grid-template-columns: 1fr; }
+      .pay-table .pay-row { grid-template-columns: 7.6rem minmax(0, 1fr); }
+    }
+    .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; word-break: break-all; }
+    .otp-step[hidden] { display: none !important; }
+    @media (max-width: 900px) {
+      .brand strong { font-size: 1rem; }
+      .tab { font-size: 0.82rem; padding: 0.42rem 0.65rem; }
+      .chip { max-width: 34vw; font-size: 0.65rem; }
+    }
+    @media (max-width: 760px) {
+      body { overflow: auto; }
+      .shell { min-height: 100dvh; height: auto; grid-template-rows: auto minmax(70vh, 1fr); }
+      .menu-toggle { display: grid; }
+      .tabs { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="GIA HUY">
+        <svg class="custom-logo" width="40" height="40" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280" fill="#CE2C90" role="img" aria-labelledby="logoTitle">
+          <title id="logoTitle">GH</title>
+          <path fill-rule="evenodd" d="M640 84 0 572h1280L640 84Zm0 126L166 572h948L640 210Z"></path>
+          <rect x="570" y="334" width="63" height="63"></rect>
+          <rect x="652" y="334" width="63" height="63"></rect>
+          <rect x="570" y="416" width="63" height="63"></rect>
+          <rect x="652" y="416" width="63" height="63"></rect>
+          <path d="M161 575h97v333.23A192 192 0 0 0 531 949.62V779h87v213.22A282 282 0 0 1 161 920.54V575Z"></path>
+          <rect x="406" y="779" width="125" height="86"></rect>
+          <rect x="693" y="575" width="93" height="491"></rect>
+          <rect x="1026" y="575" width="93" height="491"></rect>
+          <rect x="693" y="780" width="426" height="87"></rect>
+        </svg>
+        <strong>GIA HUY</strong>
+      </a>
+
+      <div class="nav-slot" id="nav-slot" hidden>
+        <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Mở menu shop" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <nav class="tabs" id="tabs" aria-label="Chọn tiện ích"></nav>
+        <div class="mobile-shop-menu" id="mobile-shop-menu" hidden></div>
+      </div>
+
+      <div class="topbar-right">
+        <span class="chip" id="status-chip" hidden>Đang kiểm tra…</span>
+        <div class="account">
+          <button type="button" class="account-btn" id="account-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Tài khoản">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+              <circle cx="12" cy="12" r="9.25"></circle>
+              <circle cx="12" cy="9.2" r="3.1"></circle>
+              <path d="M6.4 18.2c1.5-2.7 3.5-4 5.6-4s4.1 1.3 5.6 4"></path>
+            </svg>
+          </button>
+          <div class="account-menu" id="account-menu" role="menu" hidden>
+            <div id="account-guest">
+              <a href="./dang-nhap/" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 7h7v10h-7"/><path d="M12 12H4"/><path d="m7 9 3 3-3 3"/></svg>
+                Đăng nhập
+              </a>
+              <a href="./dang-ky/" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="8" r="3"/><path d="M4.5 18.2c1.3-2.5 3.1-3.7 5.5-3.7"/><path d="M17 8v6"/><path d="M14 11h6"/></svg>
+                Đăng ký
+              </a>
+            </div>
+            <div id="account-member" hidden>
+              <div class="account-info">
+                <div class="label">Thông tin thành viên</div>
+                <div class="row"><span>Họ và tên</span><strong id="acc-fullname">—</strong></div>
+                <div class="row"><span>Username</span><strong id="acc-name">—</strong></div>
+                <div class="row"><span>Email</span><strong id="acc-email">—</strong></div>
+                <div class="row"><span>Điện thoại</span><strong id="acc-phone">—</strong></div>
+                <div class="plan-box free" id="acc-plan-box">
+                  <div class="line"><span class="k">Tài khoản</span><span class="v" id="acc-tier">Free</span></div>
+                  <div class="line"><span class="k">Hạn dùng</span><span class="v" id="acc-expiry">—</span></div>
+                  <div class="line"><span class="k">Còn lại</span><span class="v" id="acc-left">—</span></div>
+                </div>
+              </div>
+              <a href="./thanh-vien/" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M8 15h3"/></svg>
+                Gói thành viên
+              </a>
+              <button type="button" id="btn-logout" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 7H7a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h3"/><path d="M14 12H5"/><path d="m16 9 3 3-3 3"/></svg>
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="workspace" id="workspace">
+      <div class="soon-panel" id="soon-panel" aria-live="polite">
+        <div>
+          <h2 id="soon-title">Sắp ra mắt</h2>
+          <p id="soon-blurb">Tiện ích này đang được bổ sung.</p>
+        </div>
+      </div>
+
+      <div class="gate" id="gate">
+        <div class="landing">
+          <div class="card" id="trial-card">
+            <h1 id="gate-title">Dùng thử — một lần</h1>
+            <p id="gate-lead">Mở các tiện ích shop thép trên cùng một trang. Hết giờ dùng thử thì đăng nhập thành viên (username + mật khẩu) để tiếp tục. Xuất PDF cần thành viên còn hạn.</p>
+            <div class="cta-stack">
+              <button type="button" class="btn btn-primary" id="btn-start-trial">Bắt đầu dùng thử</button>
+              <div class="cta-auth">
+                <a class="btn btn-ghost" href="./dang-nhap/">Đăng nhập</a>
+                <a class="btn btn-ghost" href="./dang-ky/">Đăng ký</a>
+              </div>
+            </div>
+            <p class="msg bad" id="gate-msg" hidden></p>
+          </div>
+
+          <section class="card" id="tien-ich">
+            <h2>Tiện ích shop thép</h2>
+            <p class="lead">Một gói thành viên mở khóa toàn bộ shop trên hub — xuất bản vẽ nhanh, đồng bộ quy trình móng → cột → dầm → sàn.</p>
+            <div class="feature-grid">
+              <article class="feature">
+                <strong>Shop thép móng</strong>
+                <p>Bố trí thép móng đơn, xuất PDF / DXF phục vụ thi công và nghiệm thu.</p>
+              </article>
+              <article class="feature">
+                <strong>Shop thép cột</strong>
+                <p>Chi tiết cột theo khổ A1, giúp thống nhất thép dọc, đai và nối.</p>
+              </article>
+              <article class="feature">
+                <strong>Shop thép dầm</strong>
+                <p>Bản vẽ dầm A2 rõ ràng cho xưởng gia công và đội thi công hiện trường.</p>
+              </article>
+              <article class="feature">
+                <strong>Shop thép sàn</strong>
+                <p>Bố trí thép sàn nhanh, giảm sai sót khi triển khai mặt bằng tầng.</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="card" id="goi">
+            <h2>Gói theo thời gian</h2>
+            <p class="lead">Một tài khoản username mở khóa toàn bộ tiện ích trên hub trong thời hạn còn hiệu lực.</p>
+            <div class="plans" id="home-plans"></div>
+          </section>
+
+          <section class="card" id="huong-dan">
+            <h2>Cách đăng ký</h2>
+            <div class="steps">
+              <div class="step">
+                <div>
+                  <strong>Tạo tài khoản</strong>
+                  <p>Đăng ký họ tên + username + email + SĐT + mật khẩu, xác nhận OTP email lần đầu.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <strong>Chọn gói và chuyển khoản</strong>
+                  <p id="pay-hint">Nội dung CK: <span class="mono" id="transfer-content">GH username</span></p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <strong>Admin cấp quyền theo username</strong>
+                  <p>Sau khi nhận tiền, admin gắn gói + ngày hết hạn cho username của bạn.</p>
+                </div>
+              </div>
+            </div>
+            <div class="pay-boxes">
+              <div class="pay-table" id="pay-table-plan">
+                <div class="pay-row" id="pay-plan-row">
+                  <span>Bạn đang chọn gói:</span><strong id="pay-plan-label">—</strong>
+                </div>
+                <div class="pay-row"><span>Số tiền:</span><strong id="pay-amount">—</strong></div>
+                <div class="pay-row"><span>Nội dung CK:</span><strong class="mono" id="pay-ck">GH username</strong></div>
+              </div>
+              <div class="pay-table" id="pay-table-bank">
+                <div class="pay-row"><span>Chuyển khoản:</span><strong id="pay-bank">—</strong></div>
+                <div class="pay-row"><span>Tên tài khoản:</span><strong id="pay-holder">—</strong></div>
+                <div class="pay-row"><span>Số tài khoản:</span><strong class="mono" id="pay-account">—</strong></div>
+              </div>
+            </div>
+            <div class="huong-cta">
+              <a class="btn btn-primary" href="./dang-ky/">Đăng ký ngay</a>
+              <a class="btn btn-ghost" href="./dang-nhap/">Đăng nhập</a>
+            </div>
+          </section>
+          <p class="site-copy">Copyright © by <a href="https://giahuy.net" target="_blank" rel="noopener noreferrer">GIAHUY</a></p>
+        </div>
+      </div>
+
+      <div class="paywall" id="paywall" hidden>
+        <div class="landing">
+          <div class="card">
+            <h1 id="paywall-title">Kích hoạt thành viên</h1>
+            <p id="paywall-lead">Chọn gói bên dưới rồi chuyển khoản. Admin cấp quyền theo username đã đăng ký.</p>
+            <div class="cta-stack">
+              <div class="cta-auth">
+                <a class="btn btn-primary" href="./dang-nhap/">Đăng nhập</a>
+                <a class="btn btn-ghost" href="./dang-ky/">Đăng ký</a>
+              </div>
+            </div>
+          </div>
+          <section class="card">
+            <h2>Gói theo thời gian</h2>
+            <p class="lead">Chọn gói bất kỳ để xem hướng dẫn đăng ký và nội dung chuyển khoản.</p>
+            <div class="plans" id="plans"></div>
+          </section>
+          <section class="card" id="huong-dan-pay">
+            <h2>Cách đăng ký</h2>
+            <div class="steps">
+              <div class="step">
+                <div>
+                  <strong>Đăng nhập / đăng ký</strong>
+                  <p>Dùng username + mật khẩu. OTP chỉ cần khi đăng ký lần đầu (xác nhận email).</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <strong>Chuyển khoản đúng nội dung</strong>
+                  <p>Nội dung CK: <span class="mono" id="transfer-content-pay">GH username</span></p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <strong>Chờ admin cấp gói</strong>
+                  <p>Sau khi nhận tiền, admin gắn hạn dùng theo username của bạn.</p>
+                </div>
+              </div>
+            </div>
+            <div class="pay-boxes">
+              <div class="pay-table" id="pay-table-plan-pay">
+                <div class="pay-row" id="pay-plan-row-pay">
+                  <span>Bạn đang chọn gói:</span><strong id="pay-plan-label-pay">—</strong>
+                </div>
+                <div class="pay-row"><span>Số tiền:</span><strong id="pay-amount-pay">—</strong></div>
+                <div class="pay-row"><span>Nội dung CK:</span><strong class="mono" id="pay-ck-pay">GH username</strong></div>
+              </div>
+              <div class="pay-table">
+                <div class="pay-row"><span>Chuyển khoản:</span><strong id="pay-bank-pay">—</strong></div>
+                <div class="pay-row"><span>Tên tài khoản:</span><strong id="pay-holder-pay">—</strong></div>
+                <div class="pay-row"><span>Số tài khoản:</span><strong class="mono" id="pay-account-pay">—</strong></div>
+              </div>
+            </div>
+          </section>
+          <p class="site-copy">Copyright © by <a href="https://giahuy.net" target="_blank" rel="noopener noreferrer">GIAHUY</a></p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="./assets/membership.js"></script>
+  <script>
+    (function () {
+      var APPS = [];
+      var PLANS = GiaHuyMembership.PLANS.slice();
+      var PLAN_PRICES = {};
+      var selectedPlan = null;
+      var trialMinutes = 30;
+      var currentApp = (function () {
+        try {
+          var q = new URLSearchParams(location.search).get("app");
+          if (q && /^(mong|cot|dam|san)$/.test(q)) return q;
+        } catch (e) {}
+        return "mong";
+      })();
+      var tickTimer = null;
+      var frames = {};
+
+      var els = {
+        tabs: document.getElementById("tabs"),
+        navSlot: document.getElementById("nav-slot") || document.querySelector(".nav-slot"),
+        mobileMenu: document.getElementById("mobile-shop-menu"),
+        menuToggle: document.getElementById("menu-toggle"),
+        workspace: document.getElementById("workspace"),
+        gate: document.getElementById("gate"),
+        paywall: document.getElementById("paywall"),
+        chip: document.getElementById("status-chip"),
+        btnLogout: document.getElementById("btn-logout"),
+        gateMsg: document.getElementById("gate-msg"),
+        gateTitle: document.getElementById("gate-title"),
+        gateLead: document.getElementById("gate-lead"),
+        btnStartTrial: document.getElementById("btn-start-trial"),
+        homePlans: document.getElementById("home-plans"),
+        plans: document.getElementById("plans"),
+        transferContent: document.getElementById("transfer-content"),
+        transferContentPay: document.getElementById("transfer-content-pay"),
+        payPlanTable: document.getElementById("pay-table-plan"),
+        payPlanTablePay: document.getElementById("pay-table-plan-pay"),
+        payPlanRow: document.getElementById("pay-plan-row"),
+        payPlanLabel: document.getElementById("pay-plan-label"),
+        payAmount: document.getElementById("pay-amount"),
+        payCk: document.getElementById("pay-ck"),
+        payBank: document.getElementById("pay-bank"),
+        payHolder: document.getElementById("pay-holder"),
+        payAccount: document.getElementById("pay-account"),
+        payPlanRowPay: document.getElementById("pay-plan-row-pay"),
+        payPlanLabelPay: document.getElementById("pay-plan-label-pay"),
+        payAmountPay: document.getElementById("pay-amount-pay"),
+        payCkPay: document.getElementById("pay-ck-pay"),
+        payBankPay: document.getElementById("pay-bank-pay"),
+        payHolderPay: document.getElementById("pay-holder-pay"),
+        payAccountPay: document.getElementById("pay-account-pay"),
+        paywallTitle: document.getElementById("paywall-title"),
+        paywallLead: document.getElementById("paywall-lead"),
+        accountBtn: document.getElementById("account-btn"),
+        accountMenu: document.getElementById("account-menu"),
+        accountGuest: document.getElementById("account-guest"),
+        accountMember: document.getElementById("account-member"),
+        accFullname: document.getElementById("acc-fullname"),
+        accName: document.getElementById("acc-name"),
+        accEmail: document.getElementById("acc-email"),
+        accPhone: document.getElementById("acc-phone"),
+        accPlanBox: document.getElementById("acc-plan-box"),
+        accTier: document.getElementById("acc-tier"),
+        accExpiry: document.getElementById("acc-expiry"),
+        accLeft: document.getElementById("acc-left"),
+      };
+
+      function money(n) {
+        return Number(n).toLocaleString("vi-VN") + "đ";
+      }
+      function showMsg(el, ok, text) {
+        el.hidden = !text;
+        el.className = "msg " + (ok ? "ok" : "bad");
+        el.textContent = text || "";
+      }
+      function isLoggedIn(access) {
+        return !!(access && (access.username || access.email));
+      }
+      function formatExpiryDate(member) {
+        if (!member || !member.active) return "—";
+        if (member.plan === "lifetime" || (member.daysLeft && member.daysLeft > 20000)) {
+          return "Vĩnh viễn";
+        }
+        try {
+          if (member.expiresAtMs) {
+            var dt = new Date(member.expiresAtMs);
+            var dd = String(dt.getDate()).padStart(2, "0");
+            var mm = String(dt.getMonth() + 1).padStart(2, "0");
+            return dd + "/" + mm + "/" + dt.getFullYear();
+          }
+        } catch (e) {}
+        return "—";
+      }
+      function formatDaysLeft(member) {
+        if (!member || !member.active) return "—";
+        if (member.plan === "lifetime" || (member.daysLeft && member.daysLeft > 20000)) {
+          return "Vĩnh viễn";
+        }
+        var d = member.daysLeft || 0;
+        return d + " ngày";
+      }
+
+      async function loadConfig() {
+        try {
+          var cfg = await GiaHuyMembership.loadPublicConfig();
+          if (cfg.apps && cfg.apps.length) APPS = cfg.apps;
+          if (cfg.plans && cfg.plans.length) {
+            PLANS = cfg.plans;
+            cfg.plans.forEach(function (p) { PLAN_PRICES[p.id] = p.price; });
+          }
+          if (cfg.trial_minutes) trialMinutes = cfg.trial_minutes;
+          window.__PAY__ = cfg.pay || {};
+        } catch (e) {}
+        if (!APPS.length) {
+          APPS = [
+            { id: "mong", name: "Shop thép móng", url: "./mong/", blurb: "PDF / DXF" },
+            { id: "cot", name: "Shop thép cột", url: "./cot/", blurb: "PDF A1" },
+            { id: "dam", name: "Shop thép dầm", url: "./dam/", blurb: "PDF A2" },
+            { id: "san", name: "Shop thép sàn", url: "./san/", blurb: "Shop thép sàn" },
+          ];
+        } else {
+          APPS = APPS.filter(function (app) { return app.id !== "vach"; }).map(function (app) {
+            var map = {
+              mong: "Shop thép móng",
+              cot: "Shop thép cột",
+              dam: "Shop thép dầm",
+              san: "Shop thép sàn",
+            };
+            if (map[app.id]) return Object.assign({}, app, { name: map[app.id] });
+            return app;
+          });
+        }
+        if (!Object.keys(PLAN_PRICES).length) {
+          PLAN_PRICES = { "3m": 249000, "6m": 449000, "1y": 799000, "2y": 1399000, "3y": 1899000, lifetime: 4999000 };
+        }
+        els.gateTitle.textContent = "Dùng thử " + trialMinutes + " phút — một lần";
+        els.gateLead.textContent =
+          "Mở các tiện ích shop thép trên cùng một trang. Hết " +
+          trialMinutes +
+          " phút thì đăng nhập thành viên (username + mật khẩu) để tiếp tục. Xuất PDF cần thành viên còn hạn.";
+      }
+
+      function highlightPlanRow(flash) {
+        [els.payPlanTable, els.payPlanTablePay].forEach(function (table) {
+          if (!table) return;
+          table.classList.add("is-active");
+          if (flash) {
+            table.classList.remove("is-flash");
+            void table.offsetWidth;
+            table.classList.add("is-flash");
+          }
+        });
+      }
+
+      function loadPayConfig(opts) {
+        var flash = !!(opts && opts.flash);
+        var c = window.__PAY__ || {};
+        var plan = selectedPlan || PLANS[0];
+        var price = PLAN_PRICES[(plan && plan.id) || ""] || 0;
+        var userHint =
+          (els.accName && els.accName.textContent !== "—" ? els.accName.textContent : "username");
+        var ck = "GH " + userHint;
+        var planLabel = (plan && plan.label) || "—";
+        var amount = money(price);
+        var bank = c.bank || "Ngân hàng BIDV";
+        var holder = c.holder || "NGUYEN THANH NHAT";
+        var account = c.account || "0362118138";
+
+        function fill(planEl, amountEl, ckEl, bankEl, holderEl, accountEl) {
+          if (planEl) planEl.textContent = planLabel;
+          if (amountEl) amountEl.textContent = amount;
+          if (ckEl) ckEl.textContent = ck;
+          if (bankEl) bankEl.textContent = bank;
+          if (holderEl) holderEl.textContent = holder;
+          if (accountEl) accountEl.textContent = account;
+        }
+        fill(els.payPlanLabel, els.payAmount, els.payCk, els.payBank, els.payHolder, els.payAccount);
+        fill(els.payPlanLabelPay, els.payAmountPay, els.payCkPay, els.payBankPay, els.payHolderPay, els.payAccountPay);
+        if (els.transferContent) els.transferContent.textContent = ck + " · " + amount;
+        if (els.transferContentPay) els.transferContentPay.textContent = ck + " · " + amount;
+        highlightPlanRow(flash);
+      }
+
+      function scrollToHuongDan(fromPaywall) {
+        var target = document.getElementById(fromPaywall ? "huong-dan-pay" : "huong-dan");
+        if (!target) return;
+        try {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch (e) {
+          target.scrollIntoView(true);
+        }
+      }
+
+      function planDaysHint(plan) {
+        if (!plan) return "";
+        if (plan.id === "lifetime" || (plan.days && plan.days > 20000)) return "Không hết hạn";
+        return (plan.days || 0) + " ngày";
+      }
+
+      function renderPlanCards(container, opts) {
+        if (!container) return;
+        var fromPaywall = !!(opts && opts.fromPaywall);
+        container.innerHTML = "";
+        PLANS.forEach(function (plan, idx) {
+          var art = document.createElement("article");
+          var sel = (selectedPlan && selectedPlan.id === plan.id) || (!selectedPlan && idx === 0);
+          if (sel) selectedPlan = plan;
+          art.className = "plan" + (sel ? " featured selected" : "");
+          art.innerHTML =
+            "<span class='name'>" + plan.label + "</span>" +
+            "<span class='price'>" + money(PLAN_PRICES[plan.id] || 0) + "</span>" +
+            "<p class='hint'>" + planDaysHint(plan) + "</p>" +
+            "<button type='button' class='btn " + (sel ? "btn-primary" : "btn-ghost") + "'>Chọn gói này</button>";
+          art.querySelector("button").addEventListener("click", function () {
+            selectedPlan = plan;
+            renderPlans();
+            loadPayConfig({ flash: true });
+            scrollToHuongDan(fromPaywall);
+          });
+          container.appendChild(art);
+        });
+      }
+
+      function renderPlans() {
+        renderPlanCards(els.homePlans, { fromPaywall: false });
+        renderPlanCards(els.plans, { fromPaywall: true });
+      }
+
+      function ensureFrames() {
+        APPS.forEach(function (app) {
+          if (app.comingSoon || frames[app.id]) return;
+          var iframe = document.createElement("iframe");
+          iframe.title = app.name;
+          iframe.loading = "lazy";
+          iframe.referrerPolicy = "no-referrer-when-downgrade";
+          iframe.allow = "download";
+          iframe.dataset.app = app.id;
+          els.workspace.appendChild(iframe);
+          frames[app.id] = iframe;
+        });
+      }
+
+      function makeTabButton(app, forMobile) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tab" + (app.id === currentApp ? " active" : "") + (app.comingSoon ? " soon" : "");
+        btn.innerHTML = app.comingSoon ? app.name + '<span class="soon-tag">sắp có</span>' : app.name;
+        btn.addEventListener("click", function () {
+          selectApp(app.id);
+          if (forMobile) closeMobileMenu();
+        });
+        return btn;
+      }
+
+      function renderTabs() {
+        els.tabs.innerHTML = "";
+        els.mobileMenu.innerHTML = "";
+        APPS.forEach(function (app) {
+          els.tabs.appendChild(makeTabButton(app, false));
+          els.mobileMenu.appendChild(makeTabButton(app, true));
+        });
+      }
+
+      function closeMobileMenu() {
+        els.mobileMenu.hidden = true;
+        els.menuToggle.setAttribute("aria-expanded", "false");
+      }
+
+      function selectApp(id) {
+        currentApp = id;
+        renderTabs();
+        var app = APPS.find(function (a) { return a.id === id; });
+        var soonPanel = document.getElementById("soon-panel");
+        Object.keys(frames).forEach(function (key) { frames[key].classList.toggle("active", false); });
+        if (app && app.comingSoon) {
+          if (soonPanel) soonPanel.classList.add("active");
+          document.getElementById("soon-title").textContent = app.name;
+          document.getElementById("soon-blurb").textContent = (app.blurb || "Sắp ra mắt") + " — sẽ bổ sung sau.";
+          return;
+        }
+        if (soonPanel) soonPanel.classList.remove("active");
+        ensureFrames();
+        Object.keys(frames).forEach(function (key) {
+          var frame = frames[key];
+          var on = key === id;
+          frame.classList.toggle("active", on);
+          if (on && app && !app.comingSoon) {
+            var src = app.url;
+            if (!src || src === "app/" || src === "./app/" || src === "app") {
+              src = "./" + app.id + "/";
+            }
+            if (frame.dataset.loadedSrc !== src) {
+              frame.src = src;
+              frame.dataset.loadedSrc = src;
+            }
+          }
+        });
+      }
+
+      function setAccountMenu(access) {
+        var loggedIn = isLoggedIn(access);
+        els.accountGuest.hidden = loggedIn;
+        els.accountMember.hidden = !loggedIn;
+        if (!loggedIn) return;
+        var m = access.member || {};
+        var isPro = access.mode === "member" && m.active;
+        els.accFullname.textContent = m.full_name || "—";
+        els.accName.textContent = access.username || m.username || "—";
+        els.accEmail.textContent = access.email || m.email || "—";
+        els.accPhone.textContent = m.phone || "—";
+        els.accTier.textContent = isPro ? "Pro" : "Free";
+        els.accExpiry.textContent = formatExpiryDate(m);
+        els.accLeft.textContent = formatDaysLeft(m);
+        els.accPlanBox.className = "plan-box" + (isPro ? "" : " free");
+      }
+
+      function setShopNavVisible(show) {
+        if (els.navSlot) els.navSlot.hidden = !show;
+        if (!show) {
+          if (els.mobileMenu) els.mobileMenu.hidden = true;
+          if (els.menuToggle) els.menuToggle.setAttribute("aria-expanded", "false");
+        }
+      }
+
+      function setChip(access) {
+        els.chip.className = "chip";
+        var uname = access.username || (access.member && access.member.username) || "";
+        // Tag shop trên header: ẩn với khách; hiện khi đã đăng nhập (hoặc đang dùng thử)
+        setShopNavVisible(isLoggedIn(access) || (access && access.mode === "trial"));
+        // Chip trạng thái: chỉ hiện khi dùng thử hoặc đã đăng nhập
+        var showChip = isLoggedIn(access) || (access && access.mode === "trial");
+        els.chip.hidden = !showChip;
+        if (!showChip) {
+          setAccountMenu(access);
+          return;
+        }
+        if (access.mode === "member") {
+          els.chip.classList.add("ok");
+          els.chip.textContent = "TV · " + uname + " · " + GiaHuyMembership.formatExpiry(access.member);
+        } else if (access.mode === "trial") {
+          els.chip.classList.add("live");
+          els.chip.textContent = "Dùng thử · " + GiaHuyMembership.formatTrialClock(access.trial.remainingSec);
+        } else if (access.mode === "trial_used") {
+          els.chip.classList.add("danger");
+          els.chip.textContent = isLoggedIn(access) ? "Đã đăng nhập · chưa có gói" : "Hết lượt dùng thử";
+        } else {
+          els.chip.classList.add("danger");
+          els.chip.textContent = isLoggedIn(access) ? "Đã đăng nhập · chờ cấp gói" : "Chưa mở khóa";
+        }
+        setAccountMenu(access);
+      }
+
+      function showGate(msg) {
+        els.gate.hidden = false;
+        els.paywall.hidden = true;
+        if (els.btnStartTrial) els.btnStartTrial.hidden = false;
+        showMsg(els.gateMsg, false, msg || "");
+        Object.keys(frames).forEach(function (k) { frames[k].classList.remove("active"); });
+        renderPlans();
+        loadPayConfig();
+      }
+
+      function showPaywall(kind) {
+        els.gate.hidden = true;
+        els.paywall.hidden = false;
+        Object.keys(frames).forEach(function (k) {
+          frames[k].classList.remove("active");
+          if (frames[k].src) frames[k].src = "about:blank";
+        });
+        if (kind === "trial_used") {
+          els.paywallTitle.textContent = "Đã hết dùng thử";
+          els.paywallLead.textContent =
+            "Đăng nhập bằng username + mật khẩu. Chọn gói bên dưới rồi chuyển khoản — admin cấp theo username.";
+        } else {
+          els.paywallTitle.textContent = "Kích hoạt thành viên";
+          els.paywallLead.textContent =
+            "Chọn gói và chuyển khoản. Admin cấp quyền theo username đã đăng ký.";
+        }
+        renderPlans();
+        loadPayConfig();
+      }
+
+      function showWorkspace() {
+        els.gate.hidden = true;
+        els.paywall.hidden = true;
+        ensureFrames();
+        selectApp(currentApp);
+      }
+
+      async function refresh() {
+        var access = await GiaHuyMembership.canUseApps();
+        setChip(access);
+        if (access.allowed) {
+          showWorkspace();
+          return access;
+        }
+        if (access.mode === "trial_used" || isLoggedIn(access)) showPaywall("trial_used");
+        else showGate("");
+        return access;
+      }
+
+      function startTicker() {
+        if (tickTimer) clearInterval(tickTimer);
+        tickTimer = setInterval(async function () {
+          var access = await GiaHuyMembership.canUseApps();
+          setChip(access);
+          if (!access.allowed) {
+            clearInterval(tickTimer);
+            tickTimer = null;
+            showPaywall(access.mode === "trial_used" ? "trial_used" : "manual");
+          }
+        }, 1000);
+      }
+
+      els.accountBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var open = els.accountMenu.hidden;
+        els.accountMenu.hidden = !open;
+        els.accountBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      document.addEventListener("click", function () {
+        els.accountMenu.hidden = true;
+        els.accountBtn.setAttribute("aria-expanded", "false");
+      });
+      els.accountMenu.addEventListener("click", function (e) { e.stopPropagation(); });
+
+      els.menuToggle.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var open = els.mobileMenu.hidden;
+        els.mobileMenu.hidden = !open;
+        els.menuToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      document.addEventListener("click", function () { closeMobileMenu(); });
+      els.mobileMenu.addEventListener("click", function (e) { e.stopPropagation(); });
+
+      document.getElementById("btn-start-trial").addEventListener("click", async function () {
+        var result = await GiaHuyMembership.startTrial();
+        if (!result.ok) {
+          showMsg(els.gateMsg, false, result.error);
+          showPaywall("trial_used");
+          return;
+        }
+        await refresh();
+        startTicker();
+      });
+
+      els.btnLogout.addEventListener("click", async function () {
+        await GiaHuyMembership.logout();
+        location.reload();
+      });
+
+      (async function init() {
+        await loadConfig();
+        ensureFrames();
+        renderTabs();
+        renderPlans();
+        var access = await refresh();
+        if (access.allowed) startTicker();
+
+        try {
+          var q = new URLSearchParams(location.search);
+          var em = q.get("email");
+          var tk = q.get("token");
+          if (em && tk) {
+            await GiaHuyMembership.registerVerify(em, "", tk);
+            access = await refresh();
+            if (access.allowed) startTicker();
+            history.replaceState({}, "", location.pathname);
+          }
+        } catch (e) {
+          if (e && e.message) showMsg(els.gateMsg, false, e.message);
+        }
+      })();
+    })();
+  </script>
+</body>
+</html>
