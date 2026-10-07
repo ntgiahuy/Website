@@ -35,6 +35,7 @@
     .brand .custom-logo { width: 40px; height: 40px; display: block; flex: none; }
     .brand strong { font-size: 1.12rem; letter-spacing: 0.08em; color: #fff; }
     .nav-links { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center; }
+    .nav-links .nav-row { display: contents; }
     .nav-links a {
       color: var(--muted); text-decoration: none; font-size: 0.84rem; font-weight: 600;
       padding: 0.42rem 0.72rem; border-radius: 999px; border: 1px solid transparent;
@@ -45,10 +46,10 @@
     }
     @media (max-width: 760px) {
       .nav {
-        align-items: flex-end; gap: 0.45rem; padding: 0.55rem 0;
+        align-items: flex-end; gap: 0.85rem; padding: 0.55rem 0;
       }
       .brand {
-        gap: 0.1rem; min-width: 0; align-items: flex-end; flex: 1 1 auto;
+        gap: 0.1rem; min-width: 0; align-items: flex-end; flex: 0 0 auto;
       }
       .brand .custom-logo { width: 45px; height: 45px; }
       .brand strong {
@@ -56,39 +57,42 @@
         line-height: 1; white-space: nowrap;
       }
       .nav-links {
-        display: grid;
-        grid-template-columns: max-content max-content;
-        grid-template-areas:
-          "hub goi"
-          "dk dn"
-          "st st";
-        column-gap: 0.55rem;
-        row-gap: 0;
-        justify-content: end;
-        justify-items: start;
-        align-content: end;
-        align-items: start;
-        text-align: left;
+        display: flex;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        align-items: flex-end;
+        justify-content: flex-end;
+        gap: 0.32rem;
         margin-left: auto;
-        flex: 0 0 auto;
-        max-width: 42%;
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: calc(100% - 10.75rem);
       }
-      .nav-links a:nth-child(1) { grid-area: hub; }
-      .nav-links a:nth-child(2) { grid-area: goi; }
-      .nav-links a:nth-child(3) { grid-area: dk; }
-      .nav-links a:nth-child(4) { grid-area: dn; }
-      .nav-links a,
-      .nav-links .brand-status {
-        display: block;
+      .nav-links .nav-row {
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 0.45rem;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .nav-links a {
+        display: inline-block;
         padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent;
-        font-size: 0.72rem; line-height: 1.2; text-align: left;
-        white-space: nowrap;
+        font-size: 0.7rem; line-height: 1.2; text-align: right;
+        white-space: nowrap; flex: none;
       }
       .nav-links a:hover { background: transparent; border-color: transparent; color: var(--ink); }
       .nav-links .brand-status {
-        grid-area: st;
-        font-size: 0.62rem; justify-self: start;
-        max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+        display: block;
+        padding: 0; margin: 0;
+        font-size: 0.62rem; line-height: 1.25;
+        text-align: right;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     }
     .hero {
@@ -185,10 +189,12 @@
         <strong>GIA HUY</strong>
       </a>
       <nav class="nav-links">
-        <a href="../">Hub shop</a>
-        <a href="#goi">Gói</a>
-        <a href="../dang-ky/">Đăng ký</a>
-        <a href="../dang-nhap/">Đăng nhập</a>
+        <div class="nav-row">
+          <a href="../">Hub shop</a>
+          <a href="#goi">Gói</a>
+          <a href="../dang-ky/">Đăng ký</a>
+          <a href="../dang-nhap/">Đăng nhập</a>
+        </div>
         <span class="brand-status" id="brand-status">Thành viên · username</span>
       </nav>
     </header>
