@@ -302,7 +302,71 @@ function drawBarSchedule(
   </g>`
 }
 
-/** Bảng thống kê đầy đủ. */
+type SchedRow = {
+  mark: string
+  group: BarGroup
+  n1: number
+  nTotal: number
+  totalM: number
+  kg: number
+}
+
+/** Số hiệu dạng 1a, 1b… (theo lớp/phương) giống shop dầm/móng. */
+function buildScheduleRows(inputs: PileCapInputs, groups: BarGroup[]): SchedRow[] {
+  const qty = Math.max(1, Math.round(inputs.qty))
+  const keyOrder: string[] = []
+  const byKey = new Map<string, BarGroup[]>()
+  for (const g of groups) {
+    const key = `${g.layer}|${g.direction}|${g.d}`
+    if (!byKey.has(key)) {
+      byKey.set(key, [])
+      keyOrder.push(key)
+    }
+    byKey.get(key)!.push(g)
+  }
+  const rows: SchedRow[] = []
+  keyOrder.forEach((key, ki) => {
+    const list = byKey.get(key)!
+    const major = ki + 1
+    list.forEach((g, ji) => {
+      const mark = list.length === 1 ? String(major) : `${major}${String.fromCharCode(97 + ji)}`
+      const nTotal = g.n1 * qty
+      const totalM = (g.length * nTotal) / 1000
+      const kg = totalM * kgPerMeter(g.d)
+      rows.push({ mark, group: g, n1: g.n1, nTotal, totalM, kg })
+    })
+  })
+  return rows
+}
+
+function drawBarShapeMini(g: BarGroup, x: number, y: number, maxW: number): string {
+  const hooked = g.shape === 'u' && g.segs.length === 3
+  const mid = hooked ? g.segs[1] : g.length
+  const scale = Math.min(0.055, (maxW - 36) / Math.max(mid, 1))
+  if (hooked) {
+    const [hl, clear, hr] = g.segs
+    const L = clear * scale
+    const hL = Math.min(16, Math.max(8, hl * scale * 0.35))
+    const hR = Math.min(16, Math.max(8, hr * scale * 0.35))
+    return `<g>
+      <path d="M ${x} ${y - hL} L ${x} ${y} L ${x + L} ${y} L ${x + L} ${y - hR}" fill="none" stroke="#111" stroke-width="1.4"/>
+      <text x="${x - 2}" y="${y - hL / 2}" font-size="7" text-anchor="end">${hl}</text>
+      <text x="${x + L / 2}" y="${y + 9}" font-size="7" text-anchor="middle">${clear}</text>
+      <text x="${x + L + 2}" y="${y - hR / 2}" font-size="7">${hr}</text>
+    </g>`
+  }
+  const L = g.length * scale
+  return `<g>
+    <line x1="${x}" y1="${y}" x2="${x + L}" y2="${y}" stroke="#111" stroke-width="1.4"/>
+    <text x="${x + L / 2}" y="${y - 4}" font-size="7" text-anchor="middle">${g.length}</text>
+  </g>`
+}
+
+/**
+ * Bảng thống kê giống shop dầm/móng:
+ * TÊN CẤU KIỆN (dọc = tên móng) | SỐ HIỆU | HÌNH DẠNG | Ø | DÀI 1 | C.KIỆN | SỐ THANH | TỔNG DÀI | KG
+ * + bảng TỔNG HỢP CỐT THÉP bên phải.
+ */
 function drawTable(
   inputs: PileCapInputs,
   result: PileCapCalcResult,
@@ -311,64 +375,156 @@ function drawTable(
   w: number,
   h: number,
 ): string {
-  const cols = [40, 70, 70, 55, 55, 70, 200, 260]
-  const headers = ['STT', 'Lớp', 'Phương', 'Ø', 'a', 'n₁', 'L (mm)', 'Đoạn']
-  const rowH = 22
-  const startY = oy + 44
-  let rows = ''
-  result.groups.forEach((g, i) => {
-    const y = startY + i * rowH
-    if (y > oy + h - 50) return
-    const vals = [
-      String(i + 1),
-      g.layer === 'bottom' ? 'dưới' : 'trên',
-      g.direction,
-      String(g.d),
-      String(g.spacing),
-      String(g.n1),
-      String(g.length),
-      g.segs.join(' + '),
-    ]
-    let x = ox + 8
-    const bg = i % 2 ? '#f7f7f7' : '#fff'
-    rows += `<rect x="${ox + 8}" y="${y}" width="${w - 16}" height="${rowH}" fill="${bg}"/>`
-    vals.forEach((v, ci) => {
-      rows += `<text x="${x + 4}" y="${y + 15}" font-size="10">${esc(v)}</text>`
-      x += cols[ci]
-    })
+  const qty = Math.max(1, Math.round(inputs.qty))
+  const rows = buildScheduleRows(inputs, result.groups)
+  const name = (inputs.name || 'MÓNG').trim()
+
+  // Column widths matching classic sheet
+  const cName = 28
+  const cMark = 36
+  const cShape = 150
+  const cDia = 28
+  const cLen = 52
+  const cQty = 28
+  const cN1 = 36
+  const cNtot = 40
+  const cTotM = 48
+  const cKg = 48
+  const schedW = cName + cMark + cShape + cDia + cLen + cQty + cN1 + cNtot + cTotM + cKg
+
+  const headerH = 32
+  const rowH = Math.min(20, Math.max(14, (h - 70) / Math.max(rows.length, 1)))
+  const maxRows = Math.max(1, Math.floor((h - 70) / rowH))
+  const shown = rows.slice(0, maxRows)
+  const gridH = headerH + shown.length * rowH
+  const ty0 = oy + 22
+
+  const colX = [ox]
+  ;[cName, cMark, cShape, cDia, cLen, cQty, cN1, cNtot, cTotM, cKg].reduce((x, cw) => {
+    colX.push(x + cw)
+    return x + cw
+  }, ox)
+
+  const mid = (i: number) => (colX[i] + colX[i + 1]) / 2
+
+  let grid = `<rect x="${ox}" y="${ty0}" width="${schedW}" height="${gridH}" fill="#fff" stroke="#111" stroke-width="1.1"/>`
+  for (let i = 1; i < colX.length - 1; i++) {
+    grid += `<line x1="${colX[i]}" y1="${ty0}" x2="${colX[i]}" y2="${ty0 + gridH}" stroke="#111" stroke-width="0.6"/>`
+  }
+  grid += `<line x1="${ox}" y1="${ty0 + headerH}" x2="${ox + schedW}" y2="${ty0 + headerH}" stroke="#111" stroke-width="0.9"/>`
+
+  // Header: TÊN CẤU KIỆN spans; SỐ THANH has subcols
+  const headers = [
+    { i: 0, t: 'TÊN CẤU KIỆN' },
+    { i: 1, t: 'SỐ HIỆU' },
+    { i: 2, t: 'HÌNH DẠNG & KÍCH THƯỚC (mm)' },
+    { i: 3, t: 'Ø' },
+    { i: 4, t: 'CHIỀU DÀI 1 THANH (mm)' },
+    { i: 5, t: 'C.KIỆN' },
+    { i: 6, t: 'SỐ THANH' },
+    { i: 8, t: 'TỔNG CHIỀU DÀI (m)' },
+    { i: 9, t: 'TỔNG TRỌNG LƯỢNG (kg)' },
+  ]
+  let head = ''
+  // merge header for SỐ THANH over cols 6-7
+  head += `<line x1="${colX[6]}" y1="${ty0 + headerH / 2}" x2="${colX[8]}" y2="${ty0 + headerH / 2}" stroke="#111" stroke-width="0.5"/>`
+  head += `<text x="${mid(6) + cN1 / 2}" y="${ty0 + 11}" font-size="7.5" font-weight="700" text-anchor="middle">SỐ THANH</text>`
+  head += `<text x="${mid(6)}" y="${ty0 + 26}" font-size="7" text-anchor="middle">MỘT CK</text>`
+  head += `<text x="${mid(7)}" y="${ty0 + 26}" font-size="7" text-anchor="middle">TOÀN BỘ</text>`
+  for (const { i, t } of headers) {
+    if (i === 6) continue
+    const fs = i === 2 || i === 4 || i === 8 || i === 9 ? 6.5 : 7.5
+    head += `<text x="${mid(i)}" y="${ty0 + headerH / 2 + 3}" font-size="${fs}" font-weight="700" text-anchor="middle">${esc(t)}</text>`
+  }
+
+  let body = ''
+  shown.forEach((r, i) => {
+    const y = ty0 + headerH + i * rowH
+    body += `<line x1="${colX[1]}" y1="${y + rowH}" x2="${ox + schedW}" y2="${y + rowH}" stroke="#333" stroke-width="0.35"/>`
+    body += `<text x="${mid(1)}" y="${y + rowH / 2 + 3}" font-size="8" font-weight="700" text-anchor="middle">${esc(r.mark)}</text>`
+    body += drawBarShapeMini(r.group, colX[2] + 14, y + rowH * 0.55, cShape - 8)
+    body += `<text x="${mid(3)}" y="${y + rowH / 2 + 3}" font-size="8" text-anchor="middle">${r.group.d}</text>`
+    body += `<text x="${mid(4)}" y="${y + rowH / 2 + 3}" font-size="8" text-anchor="middle">${r.group.length}</text>`
+    body += `<text x="${mid(5)}" y="${y + rowH / 2 + 3}" font-size="8" text-anchor="middle">${qty}</text>`
+    body += `<text x="${mid(6)}" y="${y + rowH / 2 + 3}" font-size="8" text-anchor="middle">${r.n1}</text>`
+    body += `<text x="${mid(7)}" y="${y + rowH / 2 + 3}" font-size="8" text-anchor="middle">${r.nTotal}</text>`
+    body += `<text x="${mid(8)}" y="${y + rowH / 2 + 3}" font-size="8" text-anchor="middle">${r.totalM.toFixed(2)}</text>`
+    body += `<text x="${mid(9)}" y="${y + rowH / 2 + 3}" font-size="8" text-anchor="middle">${r.kg.toFixed(2)}</text>`
   })
 
-  let hx = ox + 8
-  const head = headers
-    .map((t, i) => {
-      const s = `<text x="${hx + 4}" y="${startY - 6}" font-size="10" font-weight="700">${t}</text>`
-      hx += cols[i]
-      return s
-    })
-    .join('')
+  // Vertical foundation name in first column (replaces D1)
+  const nameY = ty0 + headerH + (shown.length * rowH) / 2
+  const nameCell = `
+    <text x="${mid(0)}" y="${nameY}" font-size="12" font-weight="800" text-anchor="middle"
+      dominant-baseline="middle" transform="rotate(-90 ${mid(0)} ${nameY})">${esc(name)}</text>`
 
-  const qty = Math.max(1, inputs.qty)
-  let totalKg = 0
-  for (const g of result.groups) {
-    totalKg += ((g.length * g.n1 * qty) / 1000) * kgPerMeter(g.d)
+  // —— Summary table (right) ——
+  const dias = result.byDia.slice().sort((a, b) => a.d - b.d)
+  const labW = 120
+  const colW = 56
+  const sumW = labW + Math.max(dias.length, 1) * colW
+  const sumRowH = 22
+  const sumH = 4 * sumRowH
+  const sx = ox + schedW + 16
+  const sy = ty0
+
+  let sum = `<text x="${sx + sumW / 2}" y="${oy + 14}" font-size="12" font-weight="800" text-anchor="middle">TỔNG HỢP CỐT THÉP</text>`
+  sum += `<rect x="${sx}" y="${sy}" width="${sumW}" height="${sumH}" fill="#fff" stroke="#111" stroke-width="1.1"/>`
+  sum += `<line x1="${sx + labW}" y1="${sy}" x2="${sx + labW}" y2="${sy + sumH}" stroke="#111" stroke-width="0.6"/>`
+  for (let i = 1; i < Math.max(dias.length, 1); i++) {
+    sum += `<line x1="${sx + labW + i * colW}" y1="${sy}" x2="${sx + labW + i * colW}" y2="${sy + sumH}" stroke="#111" stroke-width="0.5"/>`
   }
-  const byDia = result.byDia
-    .map((d) => `Ø${d.d}: ${d.kg} kg (${d.bars117} × 11.7m)`)
-    .join(' · ')
+  const labels = ['ĐƯỜNG KÍNH (mm)', 'CHIỀU DÀI (m)', 'TRỌNG LƯỢNG (kg)', 'SỐ THANH 11.7m']
+  labels.forEach((lb, i) => {
+    if (i > 0) sum += `<line x1="${sx}" y1="${sy + i * sumRowH}" x2="${sx + sumW}" y2="${sy + i * sumRowH}" stroke="#111" stroke-width="0.45"/>`
+    sum += `<text x="${sx + 6}" y="${sy + i * sumRowH + 15}" font-size="8">${esc(lb)}</text>`
+  })
+  let kgLe10 = 0
+  let kgLe18 = 0
+  let kgGt18 = 0
+  dias.forEach((d, i) => {
+    const cx = sx + labW + i * colW + colW / 2
+    sum += `<text x="${cx}" y="${sy + 15}" font-size="9" font-weight="700" text-anchor="middle">Ø${d.d}</text>`
+    sum += `<text x="${cx}" y="${sy + sumRowH + 15}" font-size="8.5" text-anchor="middle">${d.lengthM.toFixed(2)}</text>`
+    sum += `<text x="${cx}" y="${sy + 2 * sumRowH + 15}" font-size="8.5" text-anchor="middle">${d.kg.toFixed(2)}</text>`
+    const stock = d.d <= 10 ? '—' : String(d.bars117)
+    sum += `<text x="${cx}" y="${sy + 3 * sumRowH + 15}" font-size="8.5" text-anchor="middle">${stock}</text>`
+    if (d.d <= 10) kgLe10 += d.kg
+    if (d.d <= 18) kgLe18 += d.kg
+    if (d.d > 18) kgGt18 += d.kg
+  })
+  const fy = sy + sumH + 16
+  sum += `<text x="${sx}" y="${fy}" font-size="9" font-weight="700">NHÓM Ø≤10 (kg): ${kgLe10.toFixed(2)}</text>`
+  sum += `<text x="${sx}" y="${fy + 14}" font-size="9" font-weight="700">NHÓM 10&lt;Ø≤18 (kg): ${(kgLe18 - kgLe10).toFixed(2)}</text>`
+  sum += `<text x="${sx}" y="${fy + 28}" font-size="9" font-weight="700">NHÓM Ø&gt;18 (kg): ${kgGt18.toFixed(2)}</text>`
 
-  const shown = Math.min(result.groups.length, Math.floor((h - 90) / rowH))
-  const note =
-    result.groups.length > shown
-      ? `Hiển thị ${shown}/${result.groups.length} dòng`
-      : `${result.groups.length} dòng`
+  const more =
+    rows.length > shown.length
+      ? `<text x="${ox}" y="${ty0 + gridH + 12}" font-size="9" fill="#666">… còn ${rows.length - shown.length} dòng (đủ nhóm trong dữ liệu)</text>`
+      : ''
 
   return `<g id="schedule">
-    <text x="${ox + 8}" y="${oy + 18}" font-size="14" font-weight="700">BẢNG THỐNG KÊ CỐT THÉP ĐẾ</text>
-    <text x="${ox + 8}" y="${oy + 34}" font-size="10" fill="#555">SL cấu kiện = ${qty} · ${note} · BT ${result.concreteCap} m³ · VK ${result.formworkCap} m²</text>
-    <rect x="${ox}" y="${oy}" width="${w}" height="${h}" fill="none" stroke="#bbb"/>
-    ${head}${rows}
-    <text x="${ox + 8}" y="${oy + h - 14}" font-size="11" font-weight="600">Σ ≈ ${totalKg.toFixed(1)} kg · ${esc(byDia)}</text>
+    <text x="${ox + schedW / 2}" y="${oy + 14}" font-size="13" font-weight="800" text-anchor="middle">BẢNG THỐNG KÊ CỐT THÉP</text>
+    ${grid}${head}${body}${nameCell}
+    ${sum}${more}
   </g>`
+}
+
+/** Chỉ xuất 2 bảng thống kê (giống ảnh mẫu), tên cấu kiện = tên móng. */
+export function renderScheduleOnly(raw: PileCapInputs, result: PileCapCalcResult): string {
+  const inputs = normalizeInputs(raw)
+  const rows = buildScheduleRows(inputs, result.groups)
+  const rowH = 18
+  const headerH = 34
+  const schedH = 40 + headerH + rows.length * rowH + 20
+  const w = 1100
+  const h = Math.max(schedH, 220)
+  const inner = drawTable(inputs, result, 16, 8, w - 32, h - 16)
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <rect width="100%" height="100%" fill="#fff"/>
+  ${inner}
+</svg>`
 }
 
 /** Sheet A2 ngang đầy đủ 4 khối. */
@@ -381,13 +537,13 @@ export function renderShopSheet(raw: PileCapInputs, result: PileCapCalcResult): 
   // Layout:
   // [ Plan 55% ] [ Section AA 45% ]
   // [ Section BB 30% ] [ Bar boom 35% ] [ Table 35% ]  -- bottom row
-  const topH = 520
+  // Top: plan + AA. Bottom: BB nhỏ + bảng TK rộng (đúng format shop).
+  const topH = 480
   const botH = SHEET_H - titleH - margin * 2 - gap - topH
-  const planW = 900
+  const planW = 860
   const secAAW = SHEET_W - margin * 2 - gap - planW
-  const secBBW = 480
-  const boomW = 520
-  const tableW = SHEET_W - margin * 2 - gap * 2 - secBBW - boomW
+  const secBBW = 360
+  const tableW = SHEET_W - margin * 2 - gap - secBBW
 
   const plan = drawPlan(inputs, result, margin, titleH + margin, planW, topH)
   const secAA = drawSection(inputs, result, 'AA', margin + planW + gap, titleH + margin, secAAW, topH)
@@ -400,22 +556,14 @@ export function renderShopSheet(raw: PileCapInputs, result: PileCapCalcResult): 
     secBBW,
     botH,
   )
-  const boom = drawBarSchedule(
-    result.groups,
-    margin + secBBW + gap,
-    titleH + margin + topH + gap,
-    boomW,
-    botH,
-  )
   const table = drawTable(
     inputs,
     result,
-    margin + secBBW + gap + boomW + gap,
+    margin + secBBW + gap,
     titleH + margin + topH + gap,
     tableW,
     botH,
   )
-
   const uniqX = new Set(result.barsX.map((b) => b.lengthKey)).size
   const uniqY = new Set(result.barsY.map((b) => b.lengthKey)).size
 
@@ -429,7 +577,6 @@ export function renderShopSheet(raw: PileCapInputs, result: PileCapCalcResult): 
   ${plan}
   ${secAA}
   ${secBB}
-  ${boom}
   ${table}
 </svg>`
 }
