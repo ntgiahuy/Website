@@ -37,9 +37,10 @@ Gần đỉnh / cạnh nghiêng lục giác → chord ngắn hơn → thép ng�
 | `rebar.ts` | Station + thanh biến thiên X/Y |
 | `calc.ts` | `computePileCap()` — song song `compute()` móng đơn |
 | `svg.ts` / `PileCapPreview.tsx` | Mặt bằng SVG |
+| `view3d.ts` | Scene 3D + SVG isometric bố trí thép |
 | `sample.ts` | Mẫu `MC-3C` |
 | `AGENT-MONG-COC.md` | Prompt dán vào agent repo `mong` |
-| `demo/` | HTML/SVG sau khi chạy test |
+| `demo/` | HTML/SVG/JSON sau khi chạy test (`view3d.html`, `iso3d.svg`) |
 
 ## Chạy kiểm tra + demo
 

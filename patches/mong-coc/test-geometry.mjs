@@ -32,6 +32,7 @@ const { barsDirectionX, barsDirectionY } = await loadTs('rebar.ts')
 const { computePileCap, DEFAULT_PILE_CAP } = await loadTs('calc.ts')
 const { SAMPLE_HEX3 } = await loadTs('sample.ts')
 const { renderPileCapSvg } = await loadTs('svg.ts')
+const { buildPileCapScene3D, renderIsoSvg } = await loadTs('view3d.ts')
 
 // --- Hexagon 3 piles ---
 const { piles, outline, spacing } = hexagonOutline3(400, 3, 150)
@@ -100,10 +101,21 @@ const svg = renderPileCapSvg(SAMPLE_HEX3, res)
 assert(svg.includes('<svg'), 'svg renders')
 assert(svg.includes('lục giác'), 'svg title mentions lục giác')
 
+const scene3d = buildPileCapScene3D(SAMPLE_HEX3, res)
+assert(scene3d.bars.length === res.barsX.length + res.barsY.length, '3d bars match plan bars')
+assert(scene3d.capTop.length === 6, '3d cap has 6 top vertices')
+assert(scene3d.bars.some((b) => b.direction === 'X' && b.layer === 'bottom'), 'FaX on bottom layer')
+assert(scene3d.bars.some((b) => b.direction === 'Y' && b.layer === 'top'), 'FaY on top layer')
+const iso = renderIsoSvg(scene3d)
+assert(iso.includes('<svg'), 'iso svg renders')
+
 // Write demo artifact
 const outDir = path.join(__dirname, 'demo')
 fs.mkdirSync(outDir, { recursive: true })
 fs.writeFileSync(path.join(outDir, 'hex3.svg'), svg)
+fs.writeFileSync(path.join(outDir, 'scene3d.json'), JSON.stringify(scene3d, null, 2))
+fs.writeFileSync(path.join(outDir, 'iso3d.svg'), iso)
+console.log('Wrote demo/scene3d.json and demo/iso3d.svg')
 
 const scheduleRows = res.groups
   .map(

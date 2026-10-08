@@ -1,2 +1,5 @@
 node_modules/
 package-lock.json
+demo/vendor/
+demo/view3d-standalone.html
+demo/view3d-local.html

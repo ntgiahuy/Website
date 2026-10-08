@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3D bố trí thép đài móng cọc lục giác</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #1a1d23; color: #e8eaed; font-family: system-ui, sans-serif; }
+    #ui {
+      position: absolute; left: 12px; top: 12px; z-index: 2;
+      background: rgba(20,22,28,.82); border: 1px solid #333; border-radius: 10px;
+      padding: 12px 14px; max-width: 360px; backdrop-filter: blur(6px);
+    }
+    #ui h1 { margin: 0 0 6px; font-size: 15px; }
+    #ui p { margin: 0 0 8px; font-size: 12px; color: #aab; line-height: 1.4; }
+    #ui label { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 4px 0; cursor: pointer; }
+    #hud { position: absolute; right: 12px; bottom: 12px; font-size: 11px; color: #889; z-index: 2; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <h1 id="title">Đang tải scene…</h1>
+    <p id="subtitle"></p>
+    <label><input type="checkbox" id="showX" checked /> FaX (đỏ) lớp dưới</label>
+    <label><input type="checkbox" id="showY" checked /> FaY (xanh) lớp trên</label>
+    <label><input type="checkbox" id="showCap" checked /> Bê tông đài (trong suốt)</label>
+    <label><input type="checkbox" id="showPiles" checked /> Cọc</label>
+    <p style="margin-top:10px">Kéo chuột xoay · lăn zoom · Shift+kéo pan</p>
+  </div>
+  <div id="hud">Three.js · dữ liệu từ computePileCap</div>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three'
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+
+    const res = await fetch('./scene3d.json')
+    const sceneData = await res.json()
+    document.getElementById('title').textContent = sceneData.title
+    document.getElementById('subtitle').textContent = sceneData.subtitle
+
+    const MM = 0.001 // scene unit = meter
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
+    renderer.setSize(innerWidth, innerHeight)
+    renderer.setClearColor(0x1a1d23)
+    document.body.appendChild(renderer.domElement)
+
+    const scene = new THREE.Scene()
+    scene.fog = new THREE.Fog(0x1a1d23, 8, 28)
+
+    const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.05, 80)
+    camera.position.set(4.2, 3.2, 4.8)
+
+    const controls = new OrbitControls(camera, renderer.domElement)
+    controls.target.set(0, sceneData.hCap * MM * 0.35, 0)
+    controls.enableDamping = true
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55))
+    const dir = new THREE.DirectionalLight(0xffffff, 0.85)
+    dir.position.set(4, 8, 3)
+    scene.add(dir)
+    const fill = new THREE.DirectionalLight(0x88aaff, 0.25)
+    fill.position.set(-3, 2, -4)
+    scene.add(fill)
+
+    const root = new THREE.Group()
+    // Y-up in Three; our data is Z-up → map (x,y,z) → (x,z,-y)
+    function v(p) {
+      return new THREE.Vector3(p.x * MM, p.z * MM, -p.y * MM)
+    }
+
+    // Cap solid (extruded polygon approximation via top/bottom + sides)
+    const capGroup = new THREE.Group()
+    const topPts = sceneData.capTop.map(v)
+    const botPts = sceneData.capBottom.map(v)
+    const shape = new THREE.Shape()
+    shape.moveTo(sceneData.capTop[0].x * MM, -sceneData.capTop[0].y * MM)
+    for (let i = 1; i < sceneData.capTop.length; i++) {
+      shape.lineTo(sceneData.capTop[i].x * MM, -sceneData.capTop[i].y * MM)
+    }
+    shape.closePath()
+    const extrude = new THREE.ExtrudeGeometry(shape, {
+      depth: sceneData.hCap * MM,
+      bevelEnabled: false,
+    })
+    // Extrude along +Z in shape space; rotate to Y-up
+    extrude.rotateX(-Math.PI / 2)
+    const capMat = new THREE.MeshPhysicalMaterial({
+      color: 0x8a9bab,
+      transparent: true,
+      opacity: 0.22,
+      roughness: 0.85,
+      metalness: 0.05,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    const capMesh = new THREE.Mesh(extrude, capMat)
+    capGroup.add(capMesh)
+    const capEdge = new THREE.LineSegments(
+      new THREE.EdgesGeometry(extrude),
+      new THREE.LineBasicMaterial({ color: 0xb0bec5 }),
+    )
+    capGroup.add(capEdge)
+    root.add(capGroup)
+
+    // Piles
+    const pileGroup = new THREE.Group()
+    for (const pile of sceneData.piles) {
+      const h = 0.7
+      const geo = new THREE.CylinderGeometry(pile.dia * MM / 2, pile.dia * MM / 2, h, 28)
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x7f8c8d,
+        transparent: true,
+        opacity: 0.35,
+        wireframe: false,
+      })
+      const mesh = new THREE.Mesh(geo, mat)
+      mesh.position.set(pile.x * MM, -h / 2, -pile.y * MM)
+      pileGroup.add(mesh)
+      const wire = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geo),
+        new THREE.LineBasicMaterial({ color: 0xaab }),
+      )
+      wire.position.copy(mesh.position)
+      pileGroup.add(wire)
+    }
+    root.add(pileGroup)
+
+    // Column
+    {
+      const { x, y, w, d, h } = sceneData.column
+      const geo = new THREE.BoxGeometry(w * MM, h * MM, d * MM)
+      const mat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, transparent: true, opacity: 0.55 })
+      const mesh = new THREE.Mesh(geo, mat)
+      mesh.position.set(x * MM, sceneData.hCap * MM + h * MM / 2, -y * MM)
+      root.add(mesh)
+    }
+
+    // Rebar
+    const xGroup = new THREE.Group()
+    const yGroup = new THREE.Group()
+    function addBar(bar, group, color) {
+      const a = v(bar.a)
+      const b = v(bar.b)
+      const dir = new THREE.Vector3().subVectors(b, a)
+      const len = dir.length()
+      if (len < 1e-6) return
+      const geo = new THREE.CylinderGeometry(bar.d * MM / 2, bar.d * MM / 2, len, 8)
+      const mat = new THREE.MeshStandardMaterial({ color, metalness: 0.35, roughness: 0.4 })
+      const mesh = new THREE.Mesh(geo, mat)
+      mesh.position.copy(a).add(b).multiplyScalar(0.5)
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize())
+      group.add(mesh)
+    }
+    for (const bar of sceneData.bars) {
+      if (bar.direction === 'X') addBar(bar, xGroup, 0xc0392b)
+      else addBar(bar, yGroup, 0x1f4e79)
+    }
+    root.add(xGroup)
+    root.add(yGroup)
+
+    // Ground grid
+    const grid = new THREE.GridHelper(8, 16, 0x334, 0x222)
+    grid.position.y = -0.7
+    root.add(grid)
+
+    scene.add(root)
+
+    document.getElementById('showX').onchange = (e) => { xGroup.visible = e.target.checked }
+    document.getElementById('showY').onchange = (e) => { yGroup.visible = e.target.checked }
+    document.getElementById('showCap').onchange = (e) => { capGroup.visible = e.target.checked }
+    document.getElementById('showPiles').onchange = (e) => { pileGroup.visible = e.target.checked }
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight
+      camera.updateProjectionMatrix()
+      renderer.setSize(innerWidth, innerHeight)
+    })
+
+    function tick() {
+      controls.update()
+      renderer.render(scene, camera)
+      requestAnimationFrame(tick)
+    }
+    tick()
+
+    // expose for screenshot scripts
+    window.__pileCap3d = { renderer, scene, camera, sceneData }
+  </script>
+</body>
+</html>
