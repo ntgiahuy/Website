@@ -1,11 +1,10 @@
 /**
- * Tính toán shop thép đài móng cọc — song song pipeline `compute()` của móng đơn.
- * Điểm khác: nhóm thép theo từng chiều dài biến thiên (không một lenMesh cố định).
+ * Tính shop thép đài móng cọc — 4 dạng đài, 2 lớp thép độc lập.
  */
 
-import { buildGeometry, polygonArea } from './geometry'
+import { buildGeometry, polygonArea, shapeLabel } from './geometry'
 import { barsDirectionX, barsDirectionY, groupByLength, roundTo } from './rebar'
-import type { BarGroup, PileCapCalcResult, PileCapInputs } from './types'
+import type { BarGroup, PileCapCalcResult, PileCapInputs, VariableBar } from './types'
 
 export const DIAMETERS = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 28, 32]
 
@@ -13,19 +12,25 @@ export const DEFAULT_PILE_CAP: PileCapInputs = {
   pileCount: 3,
   pileDia: 400,
   alpha: 3,
+  alphaX: 3,
+  alphaY: 3,
   edgeClear: 150,
   hCap: 800,
   xCol: 400,
   yCol: 400,
   coverBase: 50,
+  bottomLayerX: true,
   dFaX: 16,
   aFaX: 150,
   dFaY: 16,
   aFaY: 150,
-  bottomLayerX: true,
-  hooked: true,
-  hookLeft: 100,
-  hookRight: 100,
+  hookedBottom: true,
+  hookBottomLeft: 100,
+  hookBottomRight: 100,
+  hookedTop: true,
+  hookTopLeft: 150,
+  hookTopRight: 150,
+  minClearLen: 200,
   name: 'MC1',
   qty: 1,
   axisXName: '1',
@@ -43,32 +48,76 @@ function round(n: number, digits = 2): number {
   return Math.round(n * p) / p
 }
 
+/** Chuẩn hoá input (αX/αY, móc 2 lớp) — tương thích field cũ nếu có. */
+export function normalizeInputs(raw: Partial<PileCapInputs> & Record<string, unknown>): PileCapInputs {
+  const old = raw as {
+    hooked?: boolean
+    hookLeft?: number
+    hookRight?: number
+  }
+  const merged: PileCapInputs = { ...DEFAULT_PILE_CAP, ...(raw as Partial<PileCapInputs>) }
+
+  if (!Number.isFinite(merged.alphaX) || merged.alphaX <= 0) merged.alphaX = merged.alpha
+  if (!Number.isFinite(merged.alphaY) || merged.alphaY <= 0) merged.alphaY = merged.alpha
+
+  // Field cũ (một cặp móc) → áp cho cả hai lớp khi chưa khai báo field mới.
+  if (typeof old.hooked === 'boolean') {
+    if (!('hookedBottom' in raw)) merged.hookedBottom = old.hooked
+    if (!('hookedTop' in raw)) merged.hookedTop = old.hooked
+  }
+  if (typeof old.hookLeft === 'number') {
+    if (!('hookBottomLeft' in raw)) merged.hookBottomLeft = old.hookLeft
+    if (!('hookTopLeft' in raw)) merged.hookTopLeft = old.hookLeft
+  }
+  if (typeof old.hookRight === 'number') {
+    if (!('hookBottomRight' in raw)) merged.hookBottomRight = old.hookRight
+    if (!('hookTopRight' in raw)) merged.hookTopRight = old.hookRight
+  }
+
+  merged.hookedBottom = !!merged.hookedBottom
+  merged.hookedTop = !!merged.hookedTop
+  merged.hookBottomLeft = Math.max(0, merged.hookBottomLeft)
+  merged.hookBottomRight = Math.max(0, merged.hookBottomRight)
+  merged.hookTopLeft = Math.max(0, merged.hookTopLeft)
+  merged.hookTopRight = Math.max(0, merged.hookTopRight)
+  merged.minClearLen = Math.max(0, merged.minClearLen ?? 0)
+  return merged
+}
+
 function validate(i: PileCapInputs): string[] {
   const errors: string[] = []
   if (![2, 3, 4, 5].includes(i.pileCount)) errors.push('Số cọc phải là 2, 3, 4 hoặc 5.')
   if (!(i.pileDia > 0)) errors.push('Đường kính cọc phải > 0.')
   if (!(i.alpha >= 2 && i.alpha <= 4)) errors.push('α thường lấy 2–3 (cho phép 2–4).')
+  if (!(i.alphaX >= 2 && i.alphaX <= 4)) errors.push('αX không hợp lệ.')
+  if (!(i.alphaY >= 2 && i.alphaY <= 4)) errors.push('αY không hợp lệ.')
   if (!(i.edgeClear >= 50)) errors.push('Phần nhô mép cọc (edgeClear) nên ≥ 50 mm.')
   if (!(i.hCap > 0)) errors.push('Chiều cao đài phải > 0.')
   if (!(i.xCol > 0 && i.yCol > 0)) errors.push('Kích thước cột phải > 0.')
   if (!(i.coverBase > 0)) errors.push('Lớp bảo vệ phải > 0.')
   if (!(i.aFaX > 0 && i.aFaY > 0)) errors.push('Khoảng thép a phải > 0.')
+  if (!(i.dFaX > 0 && i.dFaY > 0)) errors.push('Đường kính thép phải > 0.')
   if (!(i.qty >= 1)) errors.push('Số lượng cấu kiện ≥ 1.')
-  if (i.hooked) {
-    if (i.hookLeft < 0 || i.hookRight < 0) errors.push('Chiều dài móc không hợp lệ.')
+  if (i.hookedBottom && (i.hookBottomLeft < 0 || i.hookBottomRight < 0)) {
+    errors.push('Móc lớp dưới không hợp lệ.')
+  }
+  if (i.hookedTop && (i.hookTopLeft < 0 || i.hookTopRight < 0)) {
+    errors.push('Móc lớp trên không hợp lệ.')
   }
   return errors
 }
 
 function groupsFromBars(
-  direction: 'X' | 'Y',
-  bars: ReturnType<typeof barsDirectionX>,
+  bars: VariableBar[],
   d: number,
   spacing: number,
   hooked: boolean,
   hookLeft: number,
   hookRight: number,
 ): BarGroup[] {
+  if (bars.length === 0) return []
+  const direction = bars[0].direction
+  const layer = bars[0].layer
   const map = groupByLength(bars)
   const hookL = hooked ? Math.max(0, hookLeft) : 0
   const hookR = hooked ? Math.max(0, hookRight) : 0
@@ -77,11 +126,11 @@ function groupsFromBars(
   for (const [lengthKey, list] of [...map.entries()].sort((a, b) => b[0] - a[0])) {
     const clearLen = roundTo(list[0].clearLen, 10)
     const length = lengthKey
-    const segs = hooked
-      ? [roundTo(hookL, 10), clearLen, roundTo(hookR, 10)]
-      : [length]
+    const segs = hooked ? [roundTo(hookL, 10), clearLen, roundTo(hookR, 10)] : [length]
+    const layerTag = layer === 'bottom' ? 'dưới' : 'trên'
     groups.push({
       direction,
+      layer,
       d,
       spacing,
       length,
@@ -89,49 +138,81 @@ function groupsFromBars(
       n1: list.length,
       shape: hooked ? 'u' : 'straight',
       segs,
-      label: `Fa${direction} Ø${d}a${spacing} L=${length}`,
+      label: `Fa${direction}/${layerTag} Ø${d}a${spacing} L=${length}`,
       bars: list,
     })
   }
   return groups
 }
 
-export function computePileCap(i: PileCapInputs): PileCapCalcResult {
+export function computePileCap(raw: PileCapInputs | Partial<PileCapInputs>): PileCapCalcResult {
+  const i = normalizeInputs(raw as PileCapInputs)
   const errors = validate(i)
   const geometry = buildGeometry(i)
 
-  if (geometry.outline.length < 3) {
-    errors.push('Không tạo được biên đài.')
-  }
+  if (geometry.outline.length < 3) errors.push('Không tạo được biên đài.')
   if (i.coverBase * 2 >= Math.min(geometry.bbox.width, geometry.bbox.height)) {
     errors.push('Lớp bảo vệ quá lớn so với kích thước đài.')
   }
 
-  const meshOpt = {
+  const botDir: 'X' | 'Y' = i.bottomLayerX ? 'X' : 'Y'
+  const topDir: 'X' | 'Y' = i.bottomLayerX ? 'Y' : 'X'
+
+  const optBottom = {
     cover: i.coverBase,
-    spacing: 0,
-    hooked: i.hooked,
-    hookLeft: i.hookLeft,
-    hookRight: i.hookRight,
+    hooked: i.hookedBottom,
+    hookLeft: i.hookBottomLeft,
+    hookRight: i.hookBottomRight,
+    layer: 'bottom' as const,
+    minClearLen: i.minClearLen,
+  }
+  const optTop = {
+    cover: i.coverBase,
+    hooked: i.hookedTop,
+    hookLeft: i.hookTopLeft,
+    hookRight: i.hookTopRight,
+    layer: 'top' as const,
+    minClearLen: i.minClearLen,
   }
 
-  const barsX = barsDirectionX(geometry.outline, { ...meshOpt, spacing: i.aFaX })
-  const barsY = barsDirectionY(geometry.outline, { ...meshOpt, spacing: i.aFaY })
+  const make = (dir: 'X' | 'Y', layer: 'bottom' | 'top') => {
+    const opt = layer === 'bottom' ? optBottom : optTop
+    const spacing = dir === 'X' ? i.aFaX : i.aFaY
+    if (dir === 'X') return barsDirectionX(geometry.outline, { ...opt, spacing, direction: 'X' })
+    return barsDirectionY(geometry.outline, { ...opt, spacing, direction: 'Y' })
+  }
 
-  if (barsX.length < 2) errors.push('Phương X: không đủ thanh sau khi cắt biên lục giác/đài.')
-  if (barsY.length < 2) errors.push('Phương Y: không đủ thanh sau khi cắt biên lục giác/đài.')
+  const barsBottom = make(botDir, 'bottom')
+  const barsTop = make(topDir, 'top')
+  const barsX = botDir === 'X' ? barsBottom : barsTop
+  const barsY = botDir === 'Y' ? barsBottom : barsTop
 
-  // Kiểm tra thép biến thiên thật sự trên đài 3 cọc.
+  if (barsX.length < 2) errors.push(`Phương X (${shapeLabel(i.pileCount)}): không đủ thanh.`)
+  if (barsY.length < 2) errors.push(`Phương Y (${shapeLabel(i.pileCount)}): không đủ thanh.`)
+
   if (i.pileCount === 3) {
     const uniqX = new Set(barsX.map((b) => b.lengthKey)).size
     const uniqY = new Set(barsY.map((b) => b.lengthKey)).size
-    if (uniqX < 2) errors.push('Phương X: kỳ vọng nhiều chiều dài trên lục giác (kiểm tra α, ∅, a).')
-    if (uniqY < 2) errors.push('Phương Y: kỳ vọng nhiều chiều dài trên lục giác (kiểm tra α, ∅, a).')
+    if (uniqX < 2) errors.push('Phương X lục giác: kỳ vọng nhiều chiều dài.')
+    if (uniqY < 2) errors.push('Phương Y lục giác: kỳ vọng nhiều chiều dài.')
   }
 
-  const groupsX = groupsFromBars('X', barsX, i.dFaX, i.aFaX, i.hooked, i.hookLeft, i.hookRight)
-  const groupsY = groupsFromBars('Y', barsY, i.dFaY, i.aFaY, i.hooked, i.hookLeft, i.hookRight)
-  const groups = i.bottomLayerX ? [...groupsX, ...groupsY] : [...groupsY, ...groupsX]
+  const dBot = botDir === 'X' ? i.dFaX : i.dFaY
+  const aBot = botDir === 'X' ? i.aFaX : i.aFaY
+  const dTop = topDir === 'X' ? i.dFaX : i.dFaY
+  const aTop = topDir === 'X' ? i.aFaX : i.aFaY
+
+  const groups = [
+    ...groupsFromBars(
+      barsBottom,
+      dBot,
+      aBot,
+      i.hookedBottom,
+      i.hookBottomLeft,
+      i.hookBottomRight,
+    ),
+    ...groupsFromBars(barsTop, dTop, aTop, i.hookedTop, i.hookTopLeft, i.hookTopRight),
+  ]
 
   const qty = Math.max(1, Math.round(i.qty))
   const byMap = new Map<number, { d: number; kg: number; lengthM: number; bars117: number }>()
@@ -156,7 +237,6 @@ export function computePileCap(i: PileCapInputs): PileCapCalcResult {
   const areaM2 = areaMm2 / 1e6
   const h = i.hCap / 1000
   const concreteCap = round(areaM2 * h, 3)
-  // Chu vi × chiều cao (gần đúng ván khuôn thành đài).
   let perim = 0
   for (let k = 0; k < geometry.outline.length; k++) {
     const a = geometry.outline[k]
@@ -170,6 +250,8 @@ export function computePileCap(i: PileCapInputs): PileCapCalcResult {
     geometry,
     barsX,
     barsY,
+    barsBottom,
+    barsTop,
     groups,
     byDia,
     concreteCap,

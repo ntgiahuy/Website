@@ -5,6 +5,10 @@
 
 import type { PileCapCalcResult, PileCapInputs, Point, VariableBar } from './types'
 
+function almostSquare(i: PileCapInputs): boolean {
+  return Math.abs(i.alphaX - i.alphaY) < 1e-6
+}
+
 export type Pt3 = { x: number; y: number; z: number }
 
 export type Bar3D = {
@@ -38,33 +42,27 @@ function layerZ(hCap: number, cover: number, dBar: number, isBottom: boolean): n
   return hCap - cover - dBar / 2
 }
 
-function barsTo3D(
-  bars: VariableBar[],
-  direction: 'X' | 'Y',
-  d: number,
-  z: number,
-  layer: 'bottom' | 'top',
-): Bar3D[] {
+function barsTo3D(bars: VariableBar[], d: number, z: number): Bar3D[] {
   return bars.map((b) => {
-    if (direction === 'X') {
+    if (b.direction === 'X') {
       return {
-        direction,
+        direction: 'X',
         a: { x: b.start, y: b.station, z },
         b: { x: b.end, y: b.station, z },
         d,
         length: b.length,
         clearLen: b.clearLen,
-        layer,
+        layer: b.layer,
       }
     }
     return {
-      direction,
+      direction: 'Y',
       a: { x: b.station, y: b.start, z },
       b: { x: b.station, y: b.end, z },
       d,
       length: b.length,
       clearLen: b.clearLen,
-      layer,
+      layer: b.layer,
     }
   })
 }
@@ -81,18 +79,12 @@ export function buildPileCapScene3D(inputs: PileCapInputs, result: PileCapCalcRe
   const zLower = Math.min(zBotX, zBotY)
   const zUpper = zLower + Math.max(inputs.dFaX, inputs.dFaY)
 
-  let bars: Bar3D[] = []
-  if (inputs.bottomLayerX) {
-    bars = [
-      ...barsTo3D(result.barsX, 'X', inputs.dFaX, zLower, 'bottom'),
-      ...barsTo3D(result.barsY, 'Y', inputs.dFaY, zUpper, 'top'),
-    ]
-  } else {
-    bars = [
-      ...barsTo3D(result.barsY, 'Y', inputs.dFaY, zLower, 'bottom'),
-      ...barsTo3D(result.barsX, 'X', inputs.dFaX, zUpper, 'top'),
-    ]
-  }
+  const dBot = inputs.bottomLayerX ? inputs.dFaX : inputs.dFaY
+  const dTop = inputs.bottomLayerX ? inputs.dFaY : inputs.dFaX
+  const bars: Bar3D[] = [
+    ...barsTo3D(result.barsBottom, dBot, zLower),
+    ...barsTo3D(result.barsTop, dTop, zUpper),
+  ]
 
   const toTop = (p: Point): Pt3 => ({ x: p.x, y: p.y, z: h })
   const toBot = (p: Point): Pt3 => ({ x: p.x, y: p.y, z: 0 })
@@ -114,10 +106,18 @@ export function buildPileCapScene3D(inputs: PileCapInputs, result: PileCapCalcRe
 
   const uniqX = new Set(result.barsX.map((b) => b.lengthKey)).size
   const uniqY = new Set(result.barsY.map((b) => b.lengthKey)).size
+  const shape =
+    inputs.pileCount === 3
+      ? 'lục giác'
+      : inputs.pileCount === 2
+        ? 'chữ nhật'
+        : almostSquare(inputs)
+          ? 'vuông'
+          : 'chữ nhật'
 
   return {
-    title: `${inputs.name} — đài ${inputs.pileCount} cọc 3D`,
-    subtitle: `Thép biến thiên X ${uniqX} cỡ · Y ${uniqY} cỡ · H=${h} · ∅${inputs.pileDia} α=${inputs.alpha}`,
+    title: `${inputs.name} — đài ${inputs.pileCount} cọc (${shape}) 3D`,
+    subtitle: `X ${uniqX} cỡ · Y ${uniqY} cỡ · H=${h} · ∅${inputs.pileDia} αX=${inputs.alphaX} αY=${inputs.alphaY} · móc dưới≠trên`,
     capTop: g.outline.map(toTop),
     capBottom: g.outline.map(toBot),
     hCap: h,

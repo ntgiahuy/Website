@@ -1,71 +1,44 @@
-# Shop drawing thép móng cọc (đài lục giác)
+# Shop drawing thép móng cọc — 4 dạng đài
 
-Patch lõi để **mở rộng app móng đơn** [`ntgiahuy/mong`](https://github.com/ntgiahuy/mong): đài móng cọc 2/3/4/5 cọc, trọng tâm **đài 3 cọc hình lục giác** với **thép đế biến thiên cả phương X và Y**.
+Patch mở rộng app móng đơn [`ntgiahuy/mong`](https://github.com/ntgiahuy/mong) theo sơ đồ khuyến nghị:
 
-## Vì sao khác móng đơn?
+| Hình | Số cọc | Dạng đài | Thép X/Y |
+|------|--------|----------|----------|
+| 1 | 2 | Chữ nhật `(α+1)∅ × (∅+300)` | Đều |
+| 2 | 3 | **Lục giác** đáy `(α+1)∅+300`, đỉnh `∅+300`, 60° | **Biến thiên** |
+| 3 | 4 | Vuông (`αX=αY`) hoặc chữ nhật (`αX≠αY`) | Đều |
+| 4 | 5 | Vuông/chữ nhật + cọc giữa, cạnh `√(2α+1)·∅+300` | Đều |
 
-| | Móng đơn (`mong`) | Móng cọc 3 cọc (patch này) |
-|--|--|--|
-| Biên đế | Hình chữ nhật `xMong × yMong` | Lục giác (tam giác đều cắt góc) |
-| Thép FaX / FaY | Một `lenMeshX` / `lenMeshY` cho mọi thanh | Mỗi station cắt **chord** với biên → nhiều chiều dài |
-| Bảng thống kê | 1 dòng / phương | Nhiều dòng / phương (gộp theo `lengthKey`) |
+## Hai lớp thép độc lập
 
-Công thức sơ đồ điển hình (α, ∅):
+- Phương X / Y: `dFaX`, `aFaX`, `dFaY`, `aFaY`
+- `bottomLayerX`: lớp dưới là X (lớp trên = phương còn lại)
+- **Móc lớp dưới** (`hookedBottom`, `hookBottomLeft/Right`) **có thể khác** lớp trên (`hookedTop`, `hookTopLeft/Right`)
+- `minClearLen`: lọc thanh mép quá ngắn (mặc định 200 mm trên mẫu lục giác)
 
-- Khoảng tim cọc: `s = α × pileDia` (α thường 2 hoặc 3)
-- Đài 3 cọc: 3 cọc tam giác đều 60°, biên lục giác — đoạn phẳng ngoài mỗi cọc `∅ + 2·edgeClear` (mặc định +300 mm)
-- Đài 2/4/5: chữ nhật / vuông theo cùng bảng kích thước khuyến nghị
-
-## Thuật toán thép biến thiên
-
-1. `buildGeometry()` → `outline[]` (CCW) + tim cọc + bbox  
-2. Station lưới như móng đơn (`cover` + `a`), trên bbox  
-3. Với mỗi station:
-   - Phương **X** (thanh ngang): `horizontalChord(outline, y, cover)` → `(start, end)`
-   - Phương **Y** (thanh dọc): `verticalChord(outline, x, cover)` → `(start, end)`
-4. `length = (end − start) + hookLeft + hookRight`  
-5. Gộp `lengthKey` (làm tròn 10 mm) → nhóm bảng thống kê  
-
-Gần đỉnh / cạnh nghiêng lục giác → chord ngắn hơn → thép ngắn hơn (đúng shop drawing).
-
-## File
-
-| File | Vai trò |
-|------|---------|
-| `types.ts` | `PileCapInputs`, `VariableBar`, `BarGroup`, … |
-| `geometry.ts` | Lục giác 3 cọc, chữ nhật 2/4/5, cắt chord |
-| `rebar.ts` | Station + thanh biến thiên X/Y |
-| `calc.ts` | `computePileCap()` — song song `compute()` móng đơn |
-| `svg.ts` / `PileCapPreview.tsx` | Mặt bằng SVG |
-| `view3d.ts` | Scene 3D + SVG isometric bố trí thép |
-| `sample.ts` | Mẫu `MC-3C` |
-| `AGENT-MONG-COC.md` | Prompt dán vào agent repo `mong` |
-| `demo/` | HTML/SVG/JSON sau khi chạy test (`view3d.html`, `iso3d.svg`) |
-
-## Chạy kiểm tra + demo
+## Chạy demo
 
 ```bash
 cd patches/mong-coc
 npm install
 npm test
-# → demo/index.html , demo/hex3.svg , demo/iso3d.svg , demo/scene3d.json
+# → demo/index.html (catalog 4 hình)
 
-# Xoay mô hình 3D (Three.js):
 cd demo && python3 -m http.server 8765
-# mở http://127.0.0.1:8765/view3d.html
+# view3d.html — xoay mô hình 3D
 ```
 
-## Tích hợp vào `mong`
+## File chính
 
-Xem [`AGENT-MONG-COC.md`](./AGENT-MONG-COC.md). Tóm tắt:
+| File | Vai trò |
+|------|---------|
+| `types.ts` | Input 2 lớp móc + αX/αY |
+| `geometry.ts` | 4 dạng đài theo sơ đồ |
+| `rebar.ts` / `calc.ts` | Cắt chord + thống kê theo lớp |
+| `view3d.ts` / `svg.ts` | 3D + mặt bằng |
+| `sample.ts` | MC-2C … MC-5C |
+| `AGENT-MONG-COC.md` | Prompt agent repo `mong` |
 
-1. Copy các file `types` / `geometry` / `rebar` / `calc` / preview vào `src/lib/pile-cap/` (hoặc tương đương).
-2. Thêm tab / chế độ **Móng cọc** cạnh form móng đơn — không phá pipeline PDF/DXF hiện có.
-3. Shop drawing: vẽ `outline` đa giác + cọc tròn; bảng thép lặp theo `groups[]` thay vì một dòng FaX/FaY.
-4. Giữ `GiaHuyMembership.requireActive({ app: "mong" })` khi xuất PDF/DXF.
+## Tích hợp `mong`
 
-## Giới hạn
-
-- Chưa thay thế kiểm tra kết cấu / strut-and-tie / TCVN — chỉ shop thép + hình học biên.
-- Đài 3 cọc: biên theo offset phẳng ngoài từng cọc (6 đỉnh); kích thước tổng thể cùng bậc với bảng (α+1)∅+300.
-- Chưa có PDF A2 / DXF đầy đủ trong patch — agent `mong` nối vào `pdf.ts` / `dxf.ts` sẵn có.
+Xem [`AGENT-MONG-COC.md`](./AGENT-MONG-COC.md): form chọn số cọc 2/3/4/5, nhập αX/αY, Ø/a/móc từng lớp, shop + PDF/DXF.

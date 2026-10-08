@@ -1,7 +1,6 @@
 /**
- * Kiểm tra hình học lục giác + thép biến thiên (chạy bằng Node).
- * Usage: node --experimental-strip-types test-geometry.mjs
- * (file này tự chứa logic tối thiểu — không phụ thuộc bundler)
+ * Kiểm tra 4 dạng đài + 2 lớp thép độc lập.
+ * Usage: npm test
  */
 
 import { pathToFileURL } from 'node:url'
@@ -12,8 +11,7 @@ import fs from 'node:fs'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 async function loadTs(rel) {
-  const url = pathToFileURL(path.join(__dirname, rel)).href
-  return import(url)
+  return import(pathToFileURL(path.join(__dirname, rel)).href)
 }
 
 let failed = 0
@@ -26,126 +24,160 @@ function assert(cond, msg) {
   }
 }
 
-const { buildGeometry, hexagonOutline3, horizontalChord, verticalChord, bboxOf } =
-  await loadTs('geometry.ts')
-const { barsDirectionX, barsDirectionY } = await loadTs('rebar.ts')
-const { computePileCap, DEFAULT_PILE_CAP } = await loadTs('calc.ts')
-const { SAMPLE_HEX3 } = await loadTs('sample.ts')
+const { buildGeometry, hexagonOutline3, horizontalChord, bboxOf } = await loadTs('geometry.ts')
+const { computePileCap, DEFAULT_PILE_CAP, normalizeInputs } = await loadTs('calc.ts')
+const { SAMPLE_2, SAMPLE_HEX3, SAMPLE_4_SQUARE, SAMPLE_4_RECT, SAMPLE_5, ALL_SAMPLES } =
+  await loadTs('sample.ts')
 const { renderPileCapSvg } = await loadTs('svg.ts')
 const { buildPileCapScene3D, renderIsoSvg } = await loadTs('view3d.ts')
 
-// --- Hexagon 3 piles ---
-const { piles, outline, spacing } = hexagonOutline3(400, 3, 150)
-assert(piles.length === 3, '3 pile centers')
-assert(outline.length === 6, `hexagon has 6 vertices (got ${outline.length})`)
-assert(Math.abs(spacing - 1200) < 0.1, 's = α·D = 1200')
+// --- Hexagon textbook dims ---
+const hex = hexagonOutline3(400, 3, 150)
+assert(hex.outline.length === 6, `hex 6 verts (got ${hex.outline.length})`)
+// Cạnh đáy / đỉnh theo sơ đồ (bbox rộng hơn vì cạnh nghiêng).
+const botEdge = hex.outline.filter((p) => Math.abs(p.y - Math.min(...hex.outline.map((q) => q.y))) < 1)
+const topEdge = hex.outline.filter((p) => Math.abs(p.y - Math.max(...hex.outline.map((q) => q.y))) < 1)
+const botW = Math.max(...botEdge.map((p) => p.x)) - Math.min(...botEdge.map((p) => p.x))
+const topW = Math.max(...topEdge.map((p) => p.x)) - Math.min(...topEdge.map((p) => p.x))
+assert(Math.abs(botW - 1900) < 1, `hex bottom edge (α+1)D+300 = 1900 (got ${botW.toFixed(1)})`)
+assert(Math.abs(topW - 700) < 1, `hex top edge D+300 = 700 (got ${topW.toFixed(1)})`)
+assert(hex.piles.length === 3, '3 piles')
 
-const box = bboxOf(outline)
-// Đáy tham chiếu ≈ (α+1)D+300 = 1900 — cho phép sai số do cấu trúc flat hướng tâm
-assert(box.width > 1600 && box.width < 2300, `bbox width plausible (${box.width.toFixed(1)})`)
-assert(box.height > 1400 && box.height < 2200, `bbox height plausible (${box.height.toFixed(1)})`)
+// --- Hình 1: 2 cọc chữ nhật ---
+const g2 = buildGeometry(SAMPLE_2)
+assert(g2.pileCount === 2 && g2.piles.length === 2, '2-pile count')
+assert(g2.shape === 'rectangle', '2-pile rectangle')
+assert(Math.abs(g2.bbox.width - 1600) < 1, `2-pile W=(α+1)D=1600 (got ${g2.bbox.width})`)
+assert(Math.abs(g2.bbox.height - 700) < 1, `2-pile H=D+300=700 (got ${g2.bbox.height})`)
+const r2 = computePileCap(SAMPLE_2)
+assert(r2.errors.length === 0, `2-pile no errors: ${r2.errors.join('; ')}`)
+assert(new Set(r2.barsX.map((b) => b.lengthKey)).size === 1, '2-pile X uniform')
+assert(new Set(r2.barsY.map((b) => b.lengthKey)).size === 1, '2-pile Y uniform')
+assert(r2.barsBottom[0]?.layer === 'bottom', 'bottom layer tagged')
+assert(r2.barsTop[0]?.layer === 'top', 'top layer tagged')
 
-// Chord giữa đài phải dài hơn chord gần đỉnh
-const midY = (box.minY + box.maxY) / 2
-const nearTop = box.maxY - 80
-const cMid = horizontalChord(outline, midY, 50)
-const cTop = horizontalChord(outline, nearTop, 50)
-assert(!!cMid && !!cTop, 'horizontal chords exist')
-assert(cMid.end - cMid.start > cTop.end - cTop.start, 'X-bars shorter near top of hexagon')
+// --- Hình 2: 3 cọc lục giác biến thiên + móc khác lớp ---
+const r3 = computePileCap(SAMPLE_HEX3)
+assert(r3.geometry.shape === 'hexagon', '3-pile hexagon')
+assert(r3.geometry.piles.length === 3, '3 piles')
+const u3x = new Set(r3.barsX.map((b) => b.lengthKey)).size
+const u3y = new Set(r3.barsY.map((b) => b.lengthKey)).size
+assert(u3x >= 2, `3-pile variable X (${u3x})`)
+assert(u3y >= 2, `3-pile variable Y (${u3y})`)
+assert(SAMPLE_HEX3.hookBottomLeft !== SAMPLE_HEX3.hookTopLeft, 'hooks bottom≠top in sample')
+// Bottom layer uses bottom hooks in length
+const botL = r3.barsBottom[0]
+const topL = r3.barsTop[0]
+assert(botL && topL, 'both layers have bars')
+assert(
+  Math.abs(botL.length - botL.clearLen - 200) < 1,
+  `bottom hooks 100+100 in length (L-clear=${botL.length - botL.clearLen})`,
+)
+assert(
+  Math.abs(topL.length - topL.clearLen - 300) < 1,
+  `top hooks 150+150 in length (L-clear=${topL.length - topL.clearLen})`,
+)
+assert(!r3.errors.some((e) => e.includes('không đủ')), `3-pile hard ok: ${r3.errors.join('; ')}`)
 
-const midX = 0
-const sideX = box.minX + 120
-const vMid = verticalChord(outline, midX, 50)
-const vSide = verticalChord(outline, sideX, 50)
-assert(!!vMid, 'vertical chord at center')
-if (vSide) {
-  assert(vMid.end - vMid.start > vSide.end - vSide.start, 'Y-bars shorter near slanted edge')
-}
+// Chord shorter near top
+const midY = (r3.geometry.bbox.minY + r3.geometry.bbox.maxY) / 2
+const nearTop = r3.geometry.bbox.maxY - 100
+const { horizontalChord: hChord } = await loadTs('geometry.ts')
+const cMid = hChord(r3.geometry.outline, midY, 50)
+const cTop = hChord(r3.geometry.outline, nearTop, 50)
+assert(cMid && cTop && cMid.end - cMid.start > cTop.end - cTop.start, 'X shorter near top')
 
-const barsX = barsDirectionX(outline, {
-  cover: 50,
-  spacing: 150,
+// --- Hình 3: 4 cọc vuông ---
+const r4 = computePileCap(SAMPLE_4_SQUARE)
+assert(r4.geometry.piles.length === 4, '4 piles')
+assert(Math.abs(r4.geometry.bbox.width - r4.geometry.bbox.height) < 1, '4-pile square')
+assert(Math.abs(r4.geometry.bbox.width - 1900) < 1, `4-pile side (α+1)D+300=1900 (got ${r4.geometry.bbox.width})`)
+assert(new Set(r4.barsX.map((b) => b.lengthKey)).size === 1, '4-sq X uniform')
+assert(new Set(r4.barsY.map((b) => b.lengthKey)).size === 1, '4-sq Y uniform')
+assert(r4.errors.length === 0, `4-sq errors: ${r4.errors.join('; ')}`)
+
+// --- Hình 3b: 4 cọc chữ nhật ---
+const r4r = computePileCap(SAMPLE_4_RECT)
+assert(r4r.geometry.bbox.width !== r4r.geometry.bbox.height, '4-pile rectangle W≠H')
+assert(r4r.errors.length === 0, `4-rect errors: ${r4r.errors.join('; ')}`)
+
+// --- Hình 4: 5 cọc ---
+const r5 = computePileCap(SAMPLE_5)
+assert(r5.geometry.piles.length === 5, '5 piles')
+const expected5 = Math.sqrt(2 * 3 + 1) * 400 + 300
+assert(Math.abs(r5.geometry.bbox.width - expected5) < 1, `5-pile side √(2α+1)D+300=${expected5.toFixed(1)} (got ${r5.geometry.bbox.width.toFixed(1)})`)
+assert(r5.errors.length === 0, `5-pile errors: ${r5.errors.join('; ')}`)
+
+// normalize old fields (không kèm field móc mới)
+const migrated = normalizeInputs({
+  pileCount: 3,
+  pileDia: 400,
+  alpha: 3,
   hooked: true,
-  hookLeft: 100,
-  hookRight: 100,
+  hookLeft: 90,
+  hookRight: 110,
 })
-const barsY = barsDirectionY(outline, {
-  cover: 50,
-  spacing: 150,
-  hooked: true,
-  hookLeft: 100,
-  hookRight: 100,
-})
-const uniqX = new Set(barsX.map((b) => b.lengthKey)).size
-const uniqY = new Set(barsY.map((b) => b.lengthKey)).size
-assert(barsX.length >= 4, `enough X bars (${barsX.length})`)
-assert(barsY.length >= 4, `enough Y bars (${barsY.length})`)
-assert(uniqX >= 2, `variable X lengths (${uniqX} groups)`)
-assert(uniqY >= 2, `variable Y lengths (${uniqY} groups)`)
+assert(migrated.hookBottomLeft === 90 && migrated.hookTopRight === 110, 'migrate old hooks')
 
-// --- computePileCap ---
-const res = computePileCap(SAMPLE_HEX3)
-assert(res.errors.filter((e) => !e.includes('kỳ vọng')).length === 0, `no hard errors: ${res.errors.join('; ')}`)
-assert(res.geometry.pileCount === 3, 'geometry pileCount 3')
-assert(res.groups.length >= 4, `schedule groups from variable bars (${res.groups.length})`)
-assert(res.concreteCap > 0, `concrete ${res.concreteCap}`)
+// 3D scene
+const scene = buildPileCapScene3D(SAMPLE_HEX3, r3)
+assert(scene.bars.length === r3.barsBottom.length + r3.barsTop.length, '3d bar count')
+assert(renderIsoSvg(scene).includes('<svg'), 'iso svg')
 
-// Rectangle 4-pile: lengths should be uniform (1 group each dir)
-const rect = computePileCap({ ...DEFAULT_PILE_CAP, pileCount: 4, hooked: false })
-const gx = new Set(rect.barsX.map((b) => b.lengthKey)).size
-const gy = new Set(rect.barsY.map((b) => b.lengthKey)).size
-assert(gx === 1, `rect4 uniform X (got ${gx})`)
-assert(gy === 1, `rect4 uniform Y (got ${gy})`)
-
-const svg = renderPileCapSvg(SAMPLE_HEX3, res)
-assert(svg.includes('<svg'), 'svg renders')
-assert(svg.includes('lục giác'), 'svg title mentions lục giác')
-
-const scene3d = buildPileCapScene3D(SAMPLE_HEX3, res)
-assert(scene3d.bars.length === res.barsX.length + res.barsY.length, '3d bars match plan bars')
-assert(scene3d.capTop.length === 6, '3d cap has 6 top vertices')
-assert(scene3d.bars.some((b) => b.direction === 'X' && b.layer === 'bottom'), 'FaX on bottom layer')
-assert(scene3d.bars.some((b) => b.direction === 'Y' && b.layer === 'top'), 'FaY on top layer')
-const iso = renderIsoSvg(scene3d)
-assert(iso.includes('<svg'), 'iso svg renders')
-
-// Write demo artifact
+// --- Write demo catalog ---
 const outDir = path.join(__dirname, 'demo')
 fs.mkdirSync(outDir, { recursive: true })
-fs.writeFileSync(path.join(outDir, 'hex3.svg'), svg)
-fs.writeFileSync(path.join(outDir, 'scene3d.json'), JSON.stringify(scene3d, null, 2))
-fs.writeFileSync(path.join(outDir, 'iso3d.svg'), iso)
-console.log('Wrote demo/scene3d.json and demo/iso3d.svg')
 
-const scheduleRows = res.groups
-  .map(
-    (g) =>
-      `<tr><td>${g.direction}</td><td>${g.label}</td><td>${g.n1}</td><td>${g.length}</td><td>${g.segs.join(' + ')}</td></tr>`,
-  )
-  .join('\n')
+const cards = []
+for (const sample of ALL_SAMPLES) {
+  const res = computePileCap(sample)
+  const svg = renderPileCapSvg(sample, res, 520, 460)
+  const file = `${sample.name.toLowerCase()}.svg`
+  fs.writeFileSync(path.join(outDir, file), svg)
+  if (sample.pileCount === 3) {
+    fs.writeFileSync(path.join(outDir, 'hex3.svg'), svg)
+    fs.writeFileSync(path.join(outDir, 'scene3d.json'), JSON.stringify(buildPileCapScene3D(sample, res), null, 2))
+    fs.writeFileSync(path.join(outDir, 'iso3d.svg'), renderIsoSvg(buildPileCapScene3D(sample, res)))
+  }
+  const rows = res.groups
+    .slice(0, 8)
+    .map(
+      (g) =>
+        `<tr><td>${g.layer}</td><td>${g.direction}</td><td>${g.n1}</td><td>${g.length}</td><td>${g.segs.join(' + ')}</td></tr>`,
+    )
+    .join('')
+  cards.push(`<section class="card">
+  <h2>${sample.name} — ${res.geometry.dimNote}</h2>
+  ${svg}
+  <table><thead><tr><th>Lớp</th><th>Phương</th><th>n₁</th><th>L</th><th>Đoạn</th></tr></thead>
+  <tbody>${rows}${res.groups.length > 8 ? `<tr><td colspan="5">… +${res.groups.length - 8} nhóm</td></tr>` : ''}</tbody></table>
+  <p>BT ${res.concreteCap} m³ · VK ${res.formworkCap} m² · X ${new Set(res.barsX.map(b=>b.lengthKey)).size} cỡ · Y ${new Set(res.barsY.map(b=>b.lengthKey)).size} cỡ</p>
+</section>`)
+}
 
 const html = `<!DOCTYPE html>
-<html lang="vi"><head><meta charset="utf-8"/><title>Demo đài móng cọc lục giác</title>
+<html lang="vi"><head><meta charset="utf-8"/>
+<title>4 dạng đài móng cọc — shop thép 2 lớp</title>
 <style>
-  body{font-family:system-ui,sans-serif;margin:24px;background:#fff;color:#222}
-  table{border-collapse:collapse;margin-top:16px}
-  th,td{border:1px solid #ccc;padding:6px 10px;font-size:13px}
-  th{background:#f0f0f0}
-  .note{max-width:720px;line-height:1.5;color:#444}
+body{font-family:system-ui,sans-serif;margin:24px;background:#fafafa;color:#222}
+.card{background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;margin:20px 0}
+table{border-collapse:collapse;margin-top:10px;font-size:12px}
+th,td{border:1px solid #ccc;padding:4px 8px}
+th{background:#f0f0f0}
+.note{max-width:900px;line-height:1.5;color:#444}
+a{color:#1f4e79}
 </style></head><body>
-<h1>Shop thép móng cọc — đài 3 cọc lục giác</h1>
-<p class="note">Thép phương X và Y cắt theo biên lục giác → mỗi station một chiều dài (biến thiên).
-Khác móng đơn hình chữ nhật (một <code>lenMeshX</code> / <code>lenMeshY</code>).</p>
-${svg}
-<h2>Bảng nhóm thép đế (gộp theo L)</h2>
-<table>
-<thead><tr><th>Phương</th><th>Nhãn</th><th>n₁</th><th>L (mm)</th><th>Đoạn</th></tr></thead>
-<tbody>${scheduleRows}</tbody>
-</table>
-<p>BT đài: ${res.concreteCap} m³ · VK: ${res.formworkCap} m²</p>
+<h1>Shop thép móng cọc — 4 hình theo sơ đồ khuyến nghị</h1>
+<p class="note">
+Hình 1: 2 cọc chữ nhật · Hình 2: 3 cọc lục giác (thép biến thiên) ·
+Hình 3: 4 cọc vuông/chữ nhật · Hình 4: 5 cọc vuông/chữ nhật.<br/>
+Hai lớp thép: Ø, khoảng a, đầu móc lớp dưới có thể khác lớp trên.<br/>
+<a href="./view3d.html">Mô hình 3D Three.js</a> · <a href="./iso3d.svg">Isometric SVG</a>
+</p>
+${cards.join('\n')}
 </body></html>`
 fs.writeFileSync(path.join(outDir, 'index.html'), html)
-console.log('Wrote demo/index.html and demo/hex3.svg')
+console.log('Wrote demo catalog for', ALL_SAMPLES.length, 'shapes')
 
 if (failed) {
   console.error(`\n${failed} failure(s)`)

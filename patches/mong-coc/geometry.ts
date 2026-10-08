@@ -1,6 +1,9 @@
 /**
- * Hình học đài móng cọc theo sơ đồ điển hình (α, ∅, +300 mm).
- * Đài 3 cọc → lục giác (tam giác đều cắt góc); 2/4/5 → chữ nhật/vuông.
+ * Hình học 4 dạng đài móng cọc theo sơ đồ khuyến nghị:
+ *  1) 2 cọc — chữ nhật: (α+1)∅ × (∅+300), s=α∅
+ *  2) 3 cọc — lục giác: đáy (α+1)∅+300, đỉnh ∅+300, 60°
+ *  3) 4 cọc — vuông/chữ nhật: cạnh (α+1)∅+300, s=α∅
+ *  4) 5 cọc — vuông/chữ nhật + cọc giữa: cạnh √(2α+1)·∅+300
  */
 
 import type { PileCapGeometry, PileCapInputs, PileCount, Point } from './types'
@@ -21,7 +24,6 @@ export function polygonArea(poly: Point[]): number {
   return a / 2
 }
 
-/** Đảm bảo outline theo chiều CCW. */
 export function ensureCcw(poly: Point[]): Point[] {
   if (polygonArea(poly) >= 0) return poly.slice()
   return poly.slice().reverse()
@@ -52,25 +54,25 @@ export function rectOutline(width: number, height: number, cx = 0, cy = 0): Poin
   ]
 }
 
-/**
- * Giao đoạn thẳng vô hạn theo phương ngang (y = const) với cạnh đa giác.
- * Trả về các hoành độ x đã sắp xếp.
- */
+function dedupeSorted(vals: number[], eps = 0.05): number[] {
+  if (vals.length === 0) return vals
+  const out = [vals[0]]
+  for (let i = 1; i < vals.length; i++) {
+    if (Math.abs(vals[i] - out[out.length - 1]) > eps) out.push(vals[i])
+  }
+  return out
+}
+
 export function intersectHorizontal(poly: Point[], y: number): number[] {
   const xs: number[] = []
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i]
     const b = poly[(i + 1) % poly.length]
     const dy = b.y - a.y
-    if (Math.abs(dy) < EPS) {
-      // Cạnh ngang: bỏ qua (không tạo chord ổn định); đỉnh sẽ bắt ở cạnh nghiêng.
-      continue
-    }
+    if (Math.abs(dy) < EPS) continue
     const t = (y - a.y) / dy
     if (t < -EPS || t > 1 + EPS) continue
     const x = a.x + t * (b.x - a.x)
-    // Chỉ nhận khi y nằm trong khoảng mở của cạnh theo quy ước half-open
-    // để tránh đếm đôi tại đỉnh: cạnh "sở hữu" đầu dưới.
     const yLo = Math.min(a.y, b.y)
     const yHi = Math.max(a.y, b.y)
     if (y < yLo - EPS || y > yHi + EPS) continue
@@ -101,19 +103,6 @@ export function intersectVertical(poly: Point[], x: number): number[] {
   return dedupeSorted(ys)
 }
 
-function dedupeSorted(vals: number[], eps = 0.05): number[] {
-  if (vals.length === 0) return vals
-  const out = [vals[0]]
-  for (let i = 1; i < vals.length; i++) {
-    if (Math.abs(vals[i] - out[out.length - 1]) > eps) out.push(vals[i])
-  }
-  return out
-}
-
-/**
- * Chord bên trong đa giác dọc theo đường ngang y (sau lớp BV: thu hẹp cover).
- * Trả về [xStart, xEnd] hoặc null nếu không cắt được đoạn đủ dài.
- */
 export function horizontalChord(
   poly: Point[],
   y: number,
@@ -121,7 +110,6 @@ export function horizontalChord(
 ): { start: number; end: number } | null {
   const xs = intersectHorizontal(poly, y)
   if (xs.length < 2) return null
-  // Lấy cặp ngoài cùng (đài đặc, một vùng).
   const start = xs[0] + cover
   const end = xs[xs.length - 1] - cover
   if (end - start < 1) return null
@@ -141,41 +129,27 @@ export function verticalChord(
   return { start, end }
 }
 
-/** Hai đầu đoạn phẳng ngoài mỗi cọc (vuông góc tia từ tâm). */
-function pileFlatEnds(pile: Point, outwardR: number, flatLen: number): [Point, Point] {
-  const len = Math.hypot(pile.x, pile.y)
-  if (len < EPS) {
-    return [
-      { x: -flatLen / 2, y: -outwardR },
-      { x: flatLen / 2, y: -outwardR },
-    ]
-  }
-  const ux = pile.x / len
-  const uy = pile.y / len
-  const cx = pile.x + ux * outwardR
-  const cy = pile.y + uy * outwardR
-  const px = -uy
-  const py = ux
-  return [
-    { x: cx - (px * flatLen) / 2, y: cy - (py * flatLen) / 2 },
-    { x: cx + (px * flatLen) / 2, y: cy + (py * flatLen) / 2 },
-  ]
-}
-
-function angleOf(p: Point): number {
-  return Math.atan2(p.y, p.x)
+function resolvedAlphas(i: Pick<PileCapInputs, 'alpha' | 'alphaX' | 'alphaY'>): {
+  ax: number
+  ay: number
+} {
+  const ax = Number.isFinite(i.alphaX) && i.alphaX > 0 ? i.alphaX : i.alpha
+  const ay = Number.isFinite(i.alphaY) && i.alphaY > 0 ? i.alphaY : i.alpha
+  return { ax, ay }
 }
 
 /**
- * Lục giác đài 3 cọc: 3 đoạn ngắn (D+2·clear) ngoài mỗi cọc,
- * nối với 3 cạnh dài song song cạnh tam giác tim cọc.
- * Khớp sơ đồ: đáy (α+1)D+300, đỉnh D+300, góc 60°.
+ * Lục giác đài 3 cọc khớp sơ đồ:
+ * - Đáy dài Wbot = (α+1)∅ + 2·clear
+ * - Đỉnh ngắn Wtop = ∅ + 2·clear
+ * - Cạnh nghiêng 60° (tam giác đều cắt góc đều)
+ * - 3 cọc tại đỉnh tam giác đều cạnh s = α∅
  */
 export function hexagonOutline3(
   pileDia: number,
   alpha: number,
   edgeClear: number,
-): { piles: Point[]; outline: Point[]; spacing: number } {
+): { piles: Point[]; outline: Point[]; spacing: number; dimNote: string } {
   const s = alpha * pileDia
   const H = (Math.sqrt(3) / 2) * s
   const piles: Point[] = [
@@ -183,150 +157,194 @@ export function hexagonOutline3(
     { x: s / 2, y: -H / 3 },
     { x: 0, y: (2 * H) / 3 },
   ]
-  const R = pileDia / 2 + edgeClear
-  const flatLen = pileDia + 2 * edgeClear
 
-  // 6 đỉnh = 2 đầu × 3 flat, sắp theo góc quanh gốc.
-  const ends: Point[] = []
-  for (const p of piles) {
-    const [a, b] = pileFlatEnds(p, R, flatLen)
-    ends.push(a, b)
-  }
-  ends.sort((u, v) => angleOf(u) - angleOf(v))
+  const Wbot = (alpha + 1) * pileDia + 2 * edgeClear
+  const Wtop = pileDia + 2 * edgeClear
+  // Cắt góc đều: short flat = Wtop, long side = Wbot
+  // Tam giác ngoài cạnh S = Wbot + 2*Wtop (vì flat ngắn = đoạn cắt a trên mỗi cạnh)
+  const aCut = Wtop
+  const S = Wbot + 2 * aCut
+  const Ht = (Math.sqrt(3) / 2) * S
+  // Đỉnh tam giác ngoài, centroid tại 0
+  const A = { x: 0, y: (2 * Ht) / 3 } // top
+  const B = { x: S / 2, y: -Ht / 3 } // BR
+  const C = { x: -S / 2, y: -Ht / 3 } // BL
 
-  // Loại gần trùng sau sắp góc.
-  const outline: Point[] = []
-  for (const p of ends) {
-    const last = outline[outline.length - 1]
-    if (!last || Math.hypot(p.x - last.x, p.y - last.y) > 0.5) outline.push(p)
-  }
-  if (outline.length >= 2) {
-    const f = outline[0]
-    const l = outline[outline.length - 1]
-    if (Math.hypot(f.x - l.x, f.y - l.y) < 0.5) outline.pop()
+  const along = (from: Point, to: Point, dist: number): Point => {
+    const dx = to.x - from.x
+    const dy = to.y - from.y
+    const len = Math.hypot(dx, dy)
+    return { x: from.x + (dx / len) * dist, y: from.y + (dy / len) * dist }
   }
 
-  return { piles, outline: ensureCcw(outline), spacing: s }
+  // Hexagon CCW: bottom long → BR short → top short → BL short
+  const outline = ensureCcw([
+    along(C, B, aCut), // bottom-left of long side
+    along(B, C, aCut), // bottom-right of long side
+    along(B, A, aCut), // lower end of BR short / start of right long
+    along(A, B, aCut), // right end of top short
+    along(A, C, aCut), // left end of top short
+    along(C, A, aCut), // upper end of BL short
+  ])
+
+  return {
+    piles,
+    outline,
+    spacing: s,
+    dimNote: `3 cọc lục giác: đáy ${(alpha + 1)}∅+${2 * edgeClear}, đỉnh ∅+${2 * edgeClear}, s=${alpha}∅, 60°`,
+  }
 }
 
-export function pilesForCount(
-  count: PileCount,
+export function layout2(
   pileDia: number,
   alpha: number,
-): { piles: Point[]; spacing: number; outlineW: number; outlineH: number } {
+  edgeClear: number,
+): { piles: Point[]; outline: Point[]; spacingX: number; spacingY: number; dimNote: string } {
   const s = alpha * pileDia
-  const clear = 150 // dùng trong công thức cạnh điển hình; edgeClear thật truyền ở buildGeometry
-
-  if (count === 2) {
-    const piles = [
-      { x: -s / 2, y: 0 },
-      { x: s / 2, y: 0 },
-    ]
-    // (α+1)∅  ×  (∅+300)
-    return {
-      piles,
-      spacing: s,
-      outlineW: (alpha + 1) * pileDia,
-      outlineH: pileDia + 2 * clear,
-    }
-  }
-
-  if (count === 4) {
-    const piles = [
-      { x: -s / 2, y: -s / 2 },
-      { x: s / 2, y: -s / 2 },
-      { x: s / 2, y: s / 2 },
-      { x: -s / 2, y: s / 2 },
-    ]
-    const side = (alpha + 1) * pileDia + 2 * clear
-    return { piles, spacing: s, outlineW: side, outlineH: side }
-  }
-
-  if (count === 5) {
-    const piles = [
-      { x: -s / 2, y: -s / 2 },
-      { x: s / 2, y: -s / 2 },
-      { x: s / 2, y: s / 2 },
-      { x: -s / 2, y: s / 2 },
-      { x: 0, y: 0 },
-    ]
-    // √(2α+1)·∅ + 300
-    const side = Math.sqrt(2 * alpha + 1) * pileDia + 2 * clear
-    return { piles, spacing: s, outlineW: side, outlineH: side }
-  }
-
-  // count === 3 — kích thước tham chiếu; outline thật từ hexagonOutline3
-  const H = (Math.sqrt(3) / 2) * s
+  const w = (alpha + 1) * pileDia
+  const h = pileDia + 2 * edgeClear
   const piles = [
-    { x: -s / 2, y: -H / 3 },
-    { x: s / 2, y: -H / 3 },
-    { x: 0, y: (2 * H) / 3 },
+    { x: -s / 2, y: 0 },
+    { x: s / 2, y: 0 },
   ]
   return {
     piles,
-    spacing: s,
-    outlineW: (alpha + 1) * pileDia + 2 * clear,
-    outlineH: H + pileDia + 2 * clear,
+    outline: ensureCcw(rectOutline(w, h)),
+    spacingX: s,
+    spacingY: 0,
+    dimNote: `2 cọc chữ nhật: ${(alpha + 1)}∅ × (∅+${2 * edgeClear}), s=${alpha}∅`,
   }
 }
 
-export function buildGeometry(i: Pick<
-  PileCapInputs,
-  'pileCount' | 'pileDia' | 'alpha' | 'edgeClear' | 'xCol' | 'yCol'
->): PileCapGeometry {
-  const { pileCount, pileDia, alpha, edgeClear, xCol, yCol } = i
+export function layout4(
+  pileDia: number,
+  alphaX: number,
+  alphaY: number,
+  edgeClear: number,
+): { piles: Point[]; outline: Point[]; spacingX: number; spacingY: number; dimNote: string } {
+  const sx = alphaX * pileDia
+  const sy = alphaY * pileDia
+  const w = (alphaX + 1) * pileDia + 2 * edgeClear
+  const h = (alphaY + 1) * pileDia + 2 * edgeClear
+  const piles = [
+    { x: -sx / 2, y: -sy / 2 },
+    { x: sx / 2, y: -sy / 2 },
+    { x: sx / 2, y: sy / 2 },
+    { x: -sx / 2, y: sy / 2 },
+  ]
+  const shape = almostEqual(w, h) ? 'vuông' : 'chữ nhật'
+  return {
+    piles,
+    outline: ensureCcw(rectOutline(w, h)),
+    spacingX: sx,
+    spacingY: sy,
+    dimNote: `4 cọc ${shape}: ${(alphaX + 1)}∅+${2 * edgeClear} × ${(alphaY + 1)}∅+${2 * edgeClear}, sX=${alphaX}∅, sY=${alphaY}∅`,
+  }
+}
+
+export function layout5(
+  pileDia: number,
+  alphaX: number,
+  alphaY: number,
+  edgeClear: number,
+): { piles: Point[]; outline: Point[]; spacingX: number; spacingY: number; dimNote: string } {
+  // Sơ đồ: cạnh ngoài = √(2α+1)·∅ + 300
+  const w = Math.sqrt(2 * alphaX + 1) * pileDia + 2 * edgeClear
+  const h = Math.sqrt(2 * alphaY + 1) * pileDia + 2 * edgeClear
+  // Tim cọc góc: cách mép = ∅/2 + clear → khoảng cách giữa 2 cọc góc
+  const sx = Math.max(0, w - pileDia - 2 * edgeClear)
+  const sy = Math.max(0, h - pileDia - 2 * edgeClear)
+  const piles = [
+    { x: -sx / 2, y: -sy / 2 },
+    { x: sx / 2, y: -sy / 2 },
+    { x: sx / 2, y: sy / 2 },
+    { x: -sx / 2, y: sy / 2 },
+    { x: 0, y: 0 },
+  ]
+  const shape = almostEqual(w, h) ? 'vuông' : 'chữ nhật'
+  return {
+    piles,
+    outline: ensureCcw(rectOutline(w, h)),
+    spacingX: sx,
+    spacingY: sy,
+    dimNote: `5 cọc ${shape}: √(2α+1)·∅+${2 * edgeClear}, cọc giữa + 4 góc`,
+  }
+}
+
+export function buildGeometry(
+  i: Pick<
+    PileCapInputs,
+    'pileCount' | 'pileDia' | 'alpha' | 'alphaX' | 'alphaY' | 'edgeClear' | 'xCol' | 'yCol'
+  >,
+): PileCapGeometry {
+  const { pileCount, pileDia, edgeClear, xCol, yCol } = i
+  const { ax, ay } = resolvedAlphas(i)
+  const alpha = i.alpha
 
   if (pileCount === 3) {
-    const { piles, outline, spacing } = hexagonOutline3(pileDia, alpha, edgeClear)
-    const bbox = bboxOf(outline)
+    const { piles, outline, spacing, dimNote } = hexagonOutline3(pileDia, ax, edgeClear)
     return {
       pileCount,
       pileDia,
       alpha,
-      spacing,
+      alphaX: ax,
+      alphaY: ay,
+      spacingX: spacing,
+      spacingY: spacing,
       edgeClear,
+      shape: 'hexagon',
       piles,
       outline,
-      bbox,
+      bbox: bboxOf(outline),
       columnCenter: { x: 0, y: 0 },
       xCol,
       yCol,
+      dimNote,
     }
   }
 
-  const layout = pilesForCount(pileCount, pileDia, alpha)
-  // Cạnh dùng edgeClear thật (không cố định 150 trong pilesForCount cho outline).
-  let w = layout.outlineW
-  let h = layout.outlineH
-  if (pileCount === 2) {
-    w = (alpha + 1) * pileDia
-    h = pileDia + 2 * edgeClear
-  } else if (pileCount === 4) {
-    w = h = (alpha + 1) * pileDia + 2 * edgeClear
-  } else if (pileCount === 5) {
-    w = h = Math.sqrt(2 * alpha + 1) * pileDia + 2 * edgeClear
-  }
-  const outline = ensureCcw(rectOutline(w, h))
+  let layout: ReturnType<typeof layout2>
+  if (pileCount === 2) layout = layout2(pileDia, ax, edgeClear)
+  else if (pileCount === 4) layout = layout4(pileDia, ax, ay, edgeClear)
+  else layout = layout5(pileDia, ax, ay, edgeClear)
+
   return {
     pileCount,
     pileDia,
     alpha,
-    spacing: layout.spacing,
+    alphaX: ax,
+    alphaY: ay,
+    spacingX: layout.spacingX,
+    spacingY: layout.spacingY,
     edgeClear,
+    shape: 'rectangle',
     piles: layout.piles,
-    outline,
-    bbox: bboxOf(outline),
+    outline: layout.outline,
+    bbox: bboxOf(layout.outline),
     columnCenter: { x: 0, y: 0 },
     xCol,
     yCol,
+    dimNote: layout.dimNote,
   }
 }
 
-/** Chuỗi path SVG từ outline (đơn vị mm). */
 export function outlineToSvgPath(outline: Point[]): string {
   if (outline.length === 0) return ''
   const [p0, ...rest] = outline
   let d = `M ${p0.x} ${p0.y}`
   for (const p of rest) d += ` L ${p.x} ${p.y}`
   return `${d} Z`
+}
+
+export function shapeLabel(count: PileCount): string {
+  switch (count) {
+    case 2:
+      return '2 cọc · chữ nhật'
+    case 3:
+      return '3 cọc · lục giác'
+    case 4:
+      return '4 cọc · vuông/chữ nhật'
+    case 5:
+      return '5 cọc · vuông/chữ nhật'
+  }
 }

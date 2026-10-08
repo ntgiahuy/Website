@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="460" viewBox="0 0 520 460">
+  <rect width="100%" height="100%" fill="#fafafa"/>
+  <text x="80" y="28" font-size="14" font-weight="700" fill="#222">MC-2C — 2 cọc (chữ nhật) · ∅400 · αX=3 αY=3</text>
+  <text x="80" y="48" font-size="11" fill="#555">X 1 cỡ · Y 1 cỡ · móc dưới 100+100 / trên 120+120</text>
+  <path d="M 80 380 L 440 380 L 440 222.5 L 80 222.5 Z" fill="rgba(93,109,126,0.08)" stroke="#5d6d7e" stroke-width="2"/>
+  <circle cx="125" cy="301.25" r="45" fill="none" stroke="#7f8c8d" stroke-width="1.5" stroke-dasharray="6 4"/><circle cx="395" cy="301.25" r="45" fill="none" stroke="#7f8c8d" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <rect x="215" y="256.25" width="90" height="90" fill="none" stroke="#2c3e50" stroke-width="2"/>
+  <line x1="91.25" y1="368.75" x2="91.25" y2="233.75" stroke="#1f4e79" stroke-width="1.25"/><line x1="136.25" y1="368.75" x2="136.25" y2="233.75" stroke="#1f4e79" stroke-width="1.25"/><line x1="181.25" y1="368.75" x2="181.25" y2="233.75" stroke="#1f4e79" stroke-width="1.25"/><line x1="226.25" y1="368.75" x2="226.25" y2="233.75" stroke="#1f4e79" stroke-width="1.25"/><line x1="271.25" y1="368.75" x2="271.25" y2="233.75" stroke="#1f4e79" stroke-width="1.25"/><line x1="316.25" y1="368.75" x2="316.25" y2="233.75" stroke="#1f4e79" stroke-width="1.25"/><line x1="361.25" y1="368.75" x2="361.25" y2="233.75" stroke="#1f4e79" stroke-width="1.25"/><line x1="406.25" y1="368.75" x2="406.25" y2="233.75" stroke="#1f4e79" stroke-width="1.25"/>
+  <line x1="91.25" y1="368.75" x2="428.75" y2="368.75" stroke="#c0392b" stroke-width="1.25"/><line x1="91.25" y1="335" x2="428.75" y2="335" stroke="#c0392b" stroke-width="1.25"/><line x1="91.25" y1="301.25" x2="428.75" y2="301.25" stroke="#c0392b" stroke-width="1.25"/><line x1="91.25" y1="267.5" x2="428.75" y2="267.5" stroke="#c0392b" stroke-width="1.25"/><line x1="91.25" y1="233.75" x2="428.75" y2="233.75" stroke="#c0392b" stroke-width="1.25"/>
+</svg>

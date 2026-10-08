@@ -50,13 +50,21 @@ export function renderPileCapSvg(
 
   const uniqX = new Set(barsX.map((b) => b.lengthKey)).size
   const uniqY = new Set(barsY.map((b) => b.lengthKey)).size
-  const shapeNote = inputs.pileCount === 3 ? ' (lục giác)' : ''
+  const shapeNote =
+    inputs.pileCount === 3
+      ? 'lục giác'
+      : inputs.pileCount === 2
+        ? 'chữ nhật'
+        : Math.abs(inputs.alphaX - inputs.alphaY) < 1e-6
+          ? 'vuông'
+          : 'chữ nhật'
+  const hookNote = `móc dưới ${inputs.hookedBottom ? `${inputs.hookBottomLeft}+${inputs.hookBottomRight}` : '—'} / trên ${inputs.hookedTop ? `${inputs.hookTopLeft}+${inputs.hookTopRight}` : '—'}`
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <rect width="100%" height="100%" fill="#fafafa"/>
-  <text x="${pad}" y="28" font-size="14" font-weight="700" fill="#222">${inputs.name} — đài ${inputs.pileCount} cọc${shapeNote} · ∅${inputs.pileDia} · α=${inputs.alpha}</text>
-  <text x="${pad}" y="48" font-size="11" fill="#555">Thép biến thiên: X ${uniqX} cỡ dài · Y ${uniqY} cỡ dài</text>
+  <text x="${pad}" y="28" font-size="14" font-weight="700" fill="#222">${inputs.name} — ${inputs.pileCount} cọc (${shapeNote}) · ∅${inputs.pileDia} · αX=${inputs.alphaX} αY=${inputs.alphaY}</text>
+  <text x="${pad}" y="48" font-size="11" fill="#555">X ${uniqX} cỡ · Y ${uniqY} cỡ · ${hookNote}</text>
   <path d="${pathD}" fill="rgba(93,109,126,0.08)" stroke="${CONCRETE}" stroke-width="2"/>
   ${pileCircles}
   <rect x="${tx(geometry.columnCenter.x - geometry.xCol / 2)}" y="${ty(geometry.columnCenter.y + geometry.yCol / 2)}" width="${geometry.xCol * scale}" height="${geometry.yCol * scale}" fill="none" stroke="${COL}" stroke-width="2"/>
