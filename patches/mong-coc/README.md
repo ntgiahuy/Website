@@ -46,9 +46,13 @@ Gần đỉnh / cạnh nghiêng lục giác → chord ngắn hơn → thép ng�
 
 ```bash
 cd patches/mong-coc
-npm install --no-save tsx
-npx tsx test-geometry.mjs
-# → demo/index.html , demo/hex3.svg
+npm install
+npm test
+# → demo/index.html , demo/hex3.svg , demo/iso3d.svg , demo/scene3d.json
+
+# Xoay mô hình 3D (Three.js):
+cd demo && python3 -m http.server 8765
+# mở http://127.0.0.1:8765/view3d.html
 ```
 
 ## Tích hợp vào `mong`
