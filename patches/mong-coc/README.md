@@ -23,6 +23,7 @@ cd patches/mong-coc
 npm install
 npm test
 # → demo/index.html (catalog 4 hình)
+# → demo/shop-mc-3c.svg (mặt bằng + mặt cắt + nổ thép + bảng TK)
 
 cd demo && python3 -m http.server 8765
 # view3d.html — xoay mô hình 3D

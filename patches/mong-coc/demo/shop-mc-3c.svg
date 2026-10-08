@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="1188" viewBox="0 0 1680 1188">
+  <rect width="100%" height="100%" fill="#fff"/>
+  <rect x="8" y="8" width="1664" height="1172" fill="none" stroke="#222" stroke-width="2"/>
+  <text x="24" y="36" font-size="20" font-weight="800" fill="#111">SHOP DRAWING THÉP ĐÀI MÓNG CỌC — MC-3C</text>
+  <text x="24" y="54" font-size="12" fill="#444">3 cọc · lục giác · ∅400 · αX=3 αY=3 · H=900 · FaX Ø16a150 · FaY Ø16a150 · X 15 cỡ · Y 12 cỡ · SL=4</text>
+  <text x="1656" y="36" font-size="12" text-anchor="end" fill="#666">GIAHUY.NET · demo mong-coc</text>
+  <g id="plan">
+    <text x="32" y="94" font-size="14" font-weight="700">MẶT BẰNG ĐÀI — MC-3C</text>
+    <text x="32" y="112" font-size="11" fill="#555">3 cọc · lục giác · 3 cọc lục giác: đáy 4∅+300, đỉnh ∅+300, s=3∅, 60°</text>
+    <rect x="24" y="76" width="900" height="520" fill="none" stroke="#bbb"/>
+    <path d="M 137.82385003729945 540 L 451.7247502397821 540 L 509.54860027708156 439.84615384615387 L 352.5981501758402 168 L 236.95045010124133 168 L 80 439.84615384615387 Z" fill="rgba(90,100,110,0.06)" stroke="#444" stroke-width="2"/>
+    <circle cx="195.6477000745989" cy="439.84615384615387" r="33.04220002131397" fill="none" stroke="#666" stroke-width="1.4" stroke-dasharray="5 3"/>
+         <circle cx="195.6477000745989" cy="439.84615384615387" r="2" fill="#666"/><circle cx="393.90090020248266" cy="439.84615384615387" r="33.04220002131397" fill="none" stroke="#666" stroke-width="1.4" stroke-dasharray="5 3"/>
+         <circle cx="393.90090020248266" cy="439.84615384615387" r="2" fill="#666"/><circle cx="294.77430013854075" cy="268.1538461538462" r="33.04220002131397" fill="none" stroke="#666" stroke-width="1.4" stroke-dasharray="5 3"/>
+         <circle cx="294.77430013854075" cy="268.1538461538462" r="2" fill="#666"/><rect x="261.7321001172268" y="341.3126345887421"
+    width="66.08440004262793" height="82.60550005328491" fill="none" stroke="#111" stroke-width="2"/><line x1="113.04220002131396" y1="488.81637307159457" x2="113.04220002131396" y2="390.8759346207131" stroke="#1f4e79" stroke-width="1.15"/><line x1="137.82385003729945" y1="531.7394499946715" x2="137.82385003729945" y2="347.9528576976362" stroke="#1f4e79" stroke-width="1.15"/><line x1="162.6055000532849" y1="531.7394499946715" x2="162.6055000532849" y2="305.0297807745593" stroke="#1f4e79" stroke-width="1.15"/><line x1="187.38715006927038" y1="531.7394499946715" x2="187.38715006927038" y2="262.10670385148234" stroke="#1f4e79" stroke-width="1.15"/><line x1="212.16880008525587" y1="531.7394499946715" x2="212.16880008525587" y2="219.18362692840537" stroke="#1f4e79" stroke-width="1.15"/><line x1="236.95045010124133" y1="531.7394499946715" x2="236.95045010124133" y2="176.26055000532853" stroke="#1f4e79" stroke-width="1.15"/><line x1="261.7321001172268" y1="531.7394499946715" x2="261.7321001172268" y2="176.26055000532853" stroke="#1f4e79" stroke-width="1.15"/><line x1="286.5137501332123" y1="531.7394499946715" x2="286.5137501332123" y2="176.26055000532853" stroke="#1f4e79" stroke-width="1.15"/><line x1="311.2954001491978" y1="531.7394499946715" x2="311.2954001491978" y2="176.26055000532853" stroke="#1f4e79" stroke-width="1.15"/><line x1="336.07705016518327" y1="531.7394499946715" x2="336.07705016518327" y2="176.26055000532853" stroke="#1f4e79" stroke-width="1.15"/><line x1="360.85870018116873" y1="531.7394499946715" x2="360.85870018116873" y2="190.5682423130208" stroke="#1f4e79" stroke-width="1.15"/><line x1="385.6403501971542" y1="531.7394499946715" x2="385.6403501971542" y2="233.49131923609775" stroke="#1f4e79" stroke-width="1.15"/><line x1="410.42200021313965" y1="531.7394499946715" x2="410.42200021313965" y2="276.41439615917466" stroke="#1f4e79" stroke-width="1.15"/><line x1="435.2036502291251" y1="531.7394499946715" x2="435.2036502291251" y2="319.3374730822516" stroke="#1f4e79" stroke-width="1.15"/><line x1="459.98530024511064" y1="517.4317576869792" x2="459.98530024511064" y2="362.26055000532847" stroke="#1f4e79" stroke-width="1.15"/><line x1="484.7669502610961" y1="474.5086807639023" x2="484.7669502610961" y2="405.18362692840543" stroke="#1f4e79" stroke-width="1.15"/><line x1="141.31516927339715" y1="531.7394499946715" x2="448.2334310036844" y2="531.7394499946715" stroke="#c0392b" stroke-width="1.15"/><line x1="127.00747696570485" y1="506.957799978686" x2="462.54112331137674" y2="506.957799978686" stroke="#c0392b" stroke-width="1.15"/><line x1="112.69978465801256" y1="482.17614996270055" x2="476.848815619069" y2="482.17614996270055" stroke="#c0392b" stroke-width="1.15"/><line x1="98.39209235032021" y1="457.3944999467151" x2="491.1565079267613" y2="457.3944999467151" stroke="#c0392b" stroke-width="1.15"/><line x1="92.43669996802906" y1="432.6128499307296" x2="497.11190030905254" y2="432.6128499307296" stroke="#c0392b" stroke-width="1.15"/><line x1="106.7443922757214" y1="407.83119991474416" x2="482.80420800136017" y2="407.83119991474416" stroke="#c0392b" stroke-width="1.15"/><line x1="121.05208458341369" y1="383.04954989875864" x2="468.4965156936679" y2="383.04954989875864" stroke="#c0392b" stroke-width="1.15"/><line x1="135.35977689110598" y1="358.2678998827732" x2="454.1888233859756" y2="358.2678998827732" stroke="#c0392b" stroke-width="1.15"/><line x1="149.66746919879827" y1="333.4862498667877" x2="439.88113107828326" y2="333.4862498667877" stroke="#c0392b" stroke-width="1.15"/><line x1="163.97516150649062" y1="308.7045998508022" x2="425.573438770591" y2="308.7045998508022" stroke="#c0392b" stroke-width="1.15"/><line x1="178.28285381418291" y1="283.92294983481673" x2="411.2657464628987" y2="283.92294983481673" stroke="#c0392b" stroke-width="1.15"/><line x1="192.5905461218752" y1="259.14129981883127" x2="396.95805415520636" y2="259.14129981883127" stroke="#c0392b" stroke-width="1.15"/><line x1="206.89823842956753" y1="234.3596498028458" x2="382.65036184751403" y2="234.3596498028458" stroke="#c0392b" stroke-width="1.15"/><line x1="221.20593073725982" y1="209.57799978686035" x2="368.3426695398217" y2="209.57799978686035" stroke="#c0392b" stroke-width="1.15"/><line x1="235.51362304495214" y1="184.79634977087488" x2="354.03497723212945" y2="184.79634977087488" stroke="#c0392b" stroke-width="1.15"/>
+    <line x1="72" y1="382.61538461538464" x2="517.5486002770815" y2="382.61538461538464" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="8 4"/>
+    <text x="523.5486002770815" y="378.61538461538464" font-size="12" fill="#c0392b" font-weight="700">A</text>
+    <text x="523.5486002770815" y="396.61538461538464" font-size="12" fill="#c0392b" font-weight="700">A</text>
+    <line x1="294.77430013854075" y1="160" x2="294.77430013854075" y2="548" stroke="#1f4e79" stroke-width="1.2" stroke-dasharray="8 4"/>
+    <text x="300.77430013854075" y="156" font-size="12" fill="#1f4e79" font-weight="700">B</text>
+    <text x="280.77430013854075" y="156" font-size="12" fill="#1f4e79" font-weight="700">B</text><g class="dim">
+    <line x1="80" y1="562" x2="509.54860027708156" y2="562" stroke="#222"/>
+    <line x1="80" y1="558" x2="80" y2="566" stroke="#222"/>
+    <line x1="509.54860027708156" y1="558" x2="509.54860027708156" y2="566" stroke="#222"/>
+    <text x="294.77430013854075" y="558" text-anchor="middle" font-size="11" fill="#222">2600</text>
+  </g><g class="dim">
+    <line x1="537.5486002770815" y1="168" x2="537.5486002770815" y2="540" stroke="#222"/>
+    <line x1="533.5486002770815" y1="168" x2="541.5486002770815" y2="168" stroke="#222"/>
+    <line x1="533.5486002770815" y1="540" x2="541.5486002770815" y2="540" stroke="#222"/>
+    <text x="549.5486002770815" y="354" font-size="11" fill="#222" text-anchor="middle"
+      dominant-baseline="middle" transform="rotate(-90 549.5486002770815 354)">2252</text>
+  </g>
+    <g font-size="11">
+      <line x1="36" y1="568" x2="64" y2="568" stroke="#c0392b" stroke-width="2"/>
+      <text x="70" y="572" fill="#c0392b">FaX</text>
+      <line x1="114" y1="568" x2="142" y2="568" stroke="#1f4e79" stroke-width="2"/>
+      <text x="148" y="572" fill="#1f4e79">FaY</text>
+    </g>
+  </g>
+  <g id="section-AA">
+    <text x="946" y="94" font-size="14" font-weight="700">MẶT CẮT A-A</text>
+    <text x="946" y="110" font-size="10" fill="#555">Cắt ngang · nét = FaX · chấm = FaY · móc dưới 100+100 · móc trên 150+150</text>
+    <rect x="938" y="76" width="718" height="520" fill="none" stroke="#bbb"/>
+    <rect x="988" y="204" width="628" height="217.3846153846154"
+    fill="rgba(140,150,160,0.12)" stroke="#333" stroke-width="1.6"/><rect x="1253.6923076923076" y="119.46153846153847" width="96.61538461538461" height="84.53846153846153"
+    fill="rgba(44,62,80,0.12)" stroke="#111" stroke-width="1.5"/><rect x="1108.7692307692307" y="421.38461538461536" width="96.61538461538461" height="132.8461538461538" fill="none" stroke="#666" stroke-width="1.2" stroke-dasharray="4 3"/><rect x="1398.6153846153845" y="421.38461538461536" width="96.61538461538461" height="132.8461538461538" fill="none" stroke="#666" stroke-width="1.2" stroke-dasharray="4 3"/><line x1="1077.6427698259406" y1="407.37538461538463" x2="1526.3572301740594" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1056.7249254576088" y1="407.37538461538463" x2="1547.2750745423912" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1035.807081089277" y1="407.37538461538463" x2="1568.192918910723" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1014.8892367209452" y1="407.37538461538463" x2="1589.110763279055" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1006.1824538012328" y1="407.37538461538463" x2="1597.817546198767" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1027.1002981695647" y1="407.37538461538463" x2="1576.8997018304353" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1048.0181425378964" y1="407.37538461538463" x2="1555.9818574621036" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1068.9359869062282" y1="407.37538461538463" x2="1535.0640130937718" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1089.85383127456" y1="407.37538461538463" x2="1514.14616872544" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1110.771675642892" y1="407.37538461538463" x2="1493.228324357108" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1131.6895200112237" y1="407.37538461538463" x2="1472.3104799887763" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1152.6073643795555" y1="407.37538461538463" x2="1451.3926356204445" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1173.5252087478875" y1="407.37538461538463" x2="1430.4747912521125" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1194.4430531162193" y1="407.37538461538463" x2="1409.5569468837807" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><line x1="1215.360897484551" y1="407.37538461538463" x2="1388.639102515449" y2="407.37538461538463" stroke="#c0392b" stroke-width="2" stroke-linecap="round"/><circle cx="1036.3076923076924" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1072.5384615384614" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1108.7692307692307" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1145" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1181.2307692307693" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1217.4615384615386" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1253.6923076923076" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1289.923076923077" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1326.1538461538462" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1362.3846153846152" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1398.6153846153845" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1434.8461538461538" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1471.076923076923" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1507.3076923076924" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1543.5384615384614" cy="403.51076923076926" r="2.2" fill="#1f4e79"/><circle cx="1579.7692307692307" cy="403.51076923076926" r="2.2" fill="#1f4e79"/>
+    <g class="dim">
+    <line x1="988" y1="439.38461538461536" x2="1616" y2="439.38461538461536" stroke="#222"/>
+    <line x1="988" y1="435.38461538461536" x2="988" y2="443.38461538461536" stroke="#222"/>
+    <line x1="1616" y1="435.38461538461536" x2="1616" y2="443.38461538461536" stroke="#222"/>
+    <text x="1302" y="435.38461538461536" text-anchor="middle" font-size="11" fill="#222">2600</text>
+  </g>
+    <g class="dim">
+    <line x1="1638" y1="204" x2="1638" y2="421.38461538461536" stroke="#222"/>
+    <line x1="1634" y1="204" x2="1642" y2="204" stroke="#222"/>
+    <line x1="1634" y1="421.38461538461536" x2="1642" y2="421.38461538461536" stroke="#222"/>
+    <text x="1650" y="312.6923076923077" font-size="11" fill="#222" text-anchor="middle"
+      dominant-baseline="middle" transform="rotate(-90 1650 312.6923076923077)">900</text>
+  </g>
+    <text x="992" y="198" font-size="10" fill="#333">H=900</text>
+    
+  </g>
+  <g id="section-BB">
+    <text x="32" y="628" font-size="14" font-weight="700">MẶT CẮT B-B</text>
+    <text x="32" y="644" font-size="10" fill="#555">Cắt dọc · nét = FaY · chấm = FaX · móc dưới 100+100 · móc trên 150+150</text>
+    <rect x="24" y="610" width="480" height="554" fill="none" stroke="#bbb"/>
+    <rect x="74" y="738" width="390" height="155.88457268119896"
+    fill="rgba(140,150,160,0.12)" stroke="#333" stroke-width="1.6"/><rect x="195.69872981077805" y="677.3782217350893" width="86.60254037844386" height="60.6217782649107"
+    fill="rgba(44,62,80,0.12)" stroke="#111" stroke-width="1.5"/><rect x="324.3589838486225" y="893.884572681199" width="69.2820323027551" height="95.26279441628822" fill="none" stroke="#666" stroke-width="1.2" stroke-dasharray="4 3"/><line x1="127.6602540378444" y1="881.0673967051893" x2="230.3397459621556" y2="881.0673967051893" stroke="#1f4e79" stroke-width="2" stroke-linecap="round"/><line x1="82.66025403784438" y1="881.0673967051893" x2="320.3397459621556" y2="881.0673967051893" stroke="#1f4e79" stroke-width="2" stroke-linecap="round"/><line x1="82.66025403784438" y1="881.0673967051893" x2="410.33974596215563" y2="881.0673967051893" stroke="#1f4e79" stroke-width="2" stroke-linecap="round"/><line x1="82.66025403784438" y1="881.0673967051893" x2="455.3397459621556" y2="881.0673967051893" stroke="#1f4e79" stroke-width="2" stroke-linecap="round"/><line x1="82.66025403784438" y1="881.0673967051893" x2="455.3397459621556" y2="881.0673967051893" stroke="#1f4e79" stroke-width="2" stroke-linecap="round"/><line x1="82.66025403784438" y1="881.0673967051893" x2="440.33974596215563" y2="881.0673967051893" stroke="#1f4e79" stroke-width="2" stroke-linecap="round"/><line x1="82.66025403784438" y1="881.0673967051893" x2="350.33974596215563" y2="881.0673967051893" stroke="#1f4e79" stroke-width="2" stroke-linecap="round"/><line x1="97.6602540378444" y1="881.0673967051893" x2="260.3397459621556" y2="881.0673967051893" stroke="#1f4e79" stroke-width="2" stroke-linecap="round"/><line x1="142.66025403784437" y1="881.0673967051893" x2="215.3397459621556" y2="881.0673967051893" stroke="#1f4e79" stroke-width="2" stroke-linecap="round"/><circle cx="82.66025403784438" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="108.64101615137756" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="134.6217782649107" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="160.60254037844385" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="186.583302491977" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="212.5640646055102" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="238.54482671904336" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="264.52558883257655" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="290.5063509461097" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="316.4871130596428" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="342.46787517317597" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="368.44863728670913" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="394.4293994002423" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="420.41016151377545" cy="883.8386779972994" r="2.2" fill="#c0392b"/><circle cx="446.3909236273086" cy="883.8386779972994" r="2.2" fill="#c0392b"/>
+    <g class="dim">
+    <line x1="74" y1="911.884572681199" x2="464" y2="911.884572681199" stroke="#222"/>
+    <line x1="74" y1="907.884572681199" x2="74" y2="915.884572681199" stroke="#222"/>
+    <line x1="464" y1="907.884572681199" x2="464" y2="915.884572681199" stroke="#222"/>
+    <text x="269" y="907.884572681199" text-anchor="middle" font-size="11" fill="#222">2252</text>
+  </g>
+    <g class="dim">
+    <line x1="486" y1="738" x2="486" y2="893.884572681199" stroke="#222"/>
+    <line x1="482" y1="738" x2="490" y2="738" stroke="#222"/>
+    <line x1="482" y1="893.884572681199" x2="490" y2="893.884572681199" stroke="#222"/>
+    <text x="498" y="815.9422863405995" font-size="11" fill="#222" text-anchor="middle"
+      dominant-baseline="middle" transform="rotate(-90 498 815.9422863405995)">900</text>
+  </g>
+    <text x="78" y="732" font-size="10" fill="#333">H=900</text>
+    
+  </g>
+  <g id="bar-boom">
+    <text x="526" y="628" font-size="14" font-weight="700">NỔ THÉP ĐẾ (theo nhóm L)</text>
+    <text x="526" y="644" font-size="10" fill="#555">U = móc + đoạn thẳng + móc · lớp dưới/trên tách móc</text>
+    <rect x="518" y="610" width="520" height="554" fill="none" stroke="#bbb"/>
+    <g>
+      <text x="532" y="670" font-size="12" font-weight="700">1</text>
+      <text x="554" y="670" font-size="11">FaX/dưới Ø16a150 L=2650</text>
+      <text x="1026" y="670" font-size="11" text-anchor="end">n₁=1</text>
+      <path d="M 588 673.72 L 588 681.72 L 784 681.72 L 784 673.72"
+        fill="none" stroke="#222" stroke-width="2"/>
+        <text x="584" y="677.72" font-size="9" text-anchor="end">100</text>
+        <text x="686" y="693.72" font-size="9" text-anchor="middle">2450</text>
+        <text x="788" y="677.72" font-size="9">100</text>
+    </g><g>
+      <text x="532" y="720.4" font-size="12" font-weight="700">2</text>
+      <text x="554" y="720.4" font-size="11">FaX/dưới Ø16a150 L=2580</text>
+      <text x="1026" y="720.4" font-size="11" text-anchor="end">n₁=1</text>
+      <path d="M 588 724.12 L 588 732.12 L 778.4 732.12 L 778.4 724.12"
+        fill="none" stroke="#222" stroke-width="2"/>
+        <text x="584" y="728.12" font-size="9" text-anchor="end">100</text>
+        <text x="683.2" y="744.12" font-size="9" text-anchor="middle">2380</text>
+        <text x="782.4" y="728.12" font-size="9">100</text>
+    </g><g>
+      <text x="532" y="770.8" font-size="12" font-weight="700">3</text>
+      <text x="554" y="770.8" font-size="11">FaX/dưới Ø16a150 L=2480</text>
+      <text x="1026" y="770.8" font-size="11" text-anchor="end">n₁=1</text>
+      <path d="M 588 774.52 L 588 782.52 L 770.4 782.52 L 770.4 774.52"
+        fill="none" stroke="#222" stroke-width="2"/>
+        <text x="584" y="778.52" font-size="9" text-anchor="end">100</text>
+        <text x="679.2" y="794.52" font-size="9" text-anchor="middle">2280</text>
+        <text x="774.4" y="778.52" font-size="9">100</text>
+    </g><g>
+      <text x="532" y="821.2" font-size="12" font-weight="700">4</text>
+      <text x="554" y="821.2" font-size="11">FaX/dưới Ø16a150 L=2400</text>
+      <text x="1026" y="821.2" font-size="11" text-anchor="end">n₁=1</text>
+      <path d="M 588 824.9200000000001 L 588 832.9200000000001 L 764 832.9200000000001 L 764 824.9200000000001"
+        fill="none" stroke="#222" stroke-width="2"/>
+        <text x="584" y="828.9200000000001" font-size="9" text-anchor="end">100</text>
+        <text x="676" y="844.9200000000001" font-size="9" text-anchor="middle">2200</text>
+        <text x="768" y="828.9200000000001" font-size="9">100</text>
+    </g><g>
+      <text x="532" y="871.6" font-size="12" font-weight="700">5</text>
+      <text x="554" y="871.6" font-size="11">FaX/dưới Ø16a150 L=2300</text>
+      <text x="1026" y="871.6" font-size="11" text-anchor="end">n₁=1</text>
+      <path d="M 588 875.32 L 588 883.32 L 756 883.32 L 756 875.32"
+        fill="none" stroke="#222" stroke-width="2"/>
+        <text x="584" y="879.32" font-size="9" text-anchor="end">100</text>
+        <text x="672" y="895.32" font-size="9" text-anchor="middle">2100</text>
+        <text x="760" y="879.32" font-size="9">100</text>
+    </g><g>
+      <text x="532" y="922" font-size="12" font-weight="700">6</text>
+      <text x="554" y="922" font-size="11">FaX/dưới Ø16a150 L=2230</text>
+      <text x="1026" y="922" font-size="11" text-anchor="end">n₁=1</text>
+      <path d="M 588 925.72 L 588 933.72 L 750.4 933.72 L 750.4 925.72"
+        fill="none" stroke="#222" stroke-width="2"/>
+        <text x="584" y="929.72" font-size="9" text-anchor="end">100</text>
+        <text x="669.2" y="945.72" font-size="9" text-anchor="middle">2030</text>
+        <text x="754.4" y="929.72" font-size="9">100</text>
+    </g><g>
+      <text x="532" y="972.4" font-size="12" font-weight="700">7</text>
+      <text x="554" y="972.4" font-size="11">FaX/dưới Ø16a150 L=2130</text>
+      <text x="1026" y="972.4" font-size="11" text-anchor="end">n₁=1</text>
+      <path d="M 588 976.12 L 588 984.12 L 742.4 984.12 L 742.4 976.12"
+        fill="none" stroke="#222" stroke-width="2"/>
+        <text x="584" y="980.12" font-size="9" text-anchor="end">100</text>
+        <text x="665.2" y="996.12" font-size="9" text-anchor="middle">1930</text>
+        <text x="746.4" y="980.12" font-size="9">100</text>
+    </g><g>
+      <text x="532" y="1022.8" font-size="12" font-weight="700">8</text>
+      <text x="554" y="1022.8" font-size="11">FaX/dưới Ø16a150 L=2060</text>
+      <text x="1026" y="1022.8" font-size="11" text-anchor="end">n₁=1</text>
+      <path d="M 588 1026.52 L 588 1034.52 L 736.8 1034.52 L 736.8 1026.52"
+        fill="none" stroke="#222" stroke-width="2"/>
+        <text x="584" y="1030.52" font-size="9" text-anchor="end">100</text>
+        <text x="662.4" y="1046.52" font-size="9" text-anchor="middle">1860</text>
+        <text x="740.8" y="1030.52" font-size="9">100</text>
+    </g><g>
+      <text x="532" y="1073.2" font-size="12" font-weight="700">9</text>
+      <text x="554" y="1073.2" font-size="11">FaX/dưới Ø16a150 L=1960</text>
+      <text x="1026" y="1073.2" font-size="11" text-anchor="end">n₁=1</text>
+      <path d="M 588 1076.92 L 588 1084.92 L 728.8 1084.92 L 728.8 1076.92"
+        fill="none" stroke="#222" stroke-width="2"/>
+        <text x="584" y="1080.92" font-size="9" text-anchor="end">100</text>
+        <text x="658.4" y="1096.92" font-size="9" text-anchor="middle">1760</text>
+        <text x="732.8" y="1080.92" font-size="9">100</text>
+    </g><g>
+      <text x="532" y="1123.6" font-size="12" font-weight="700">10</text>
+      <text x="554" y="1123.6" font-size="11">FaX/dưới Ø16a150 L=1780</text>
+      <text x="1026" y="1123.6" font-size="11" text-anchor="end">n₁=1</text>
+      <path d="M 588 1127.32 L 588 1135.32 L 714.4 1135.32 L 714.4 1127.32"
+        fill="none" stroke="#222" stroke-width="2"/>
+        <text x="584" y="1131.32" font-size="9" text-anchor="end">100</text>
+        <text x="651.2" y="1147.32" font-size="9" text-anchor="middle">1580</text>
+        <text x="718.4" y="1131.32" font-size="9">100</text>
+    </g><text x="532" y="1154" font-size="11" fill="#666">… còn 17 nhóm (xem bảng thống kê)</text>
+  </g>
+  <g id="schedule">
+    <text x="1060" y="628" font-size="14" font-weight="700">BẢNG THỐNG KÊ CỐT THÉP ĐẾ</text>
+    <text x="1060" y="644" font-size="10" fill="#555">SL cấu kiện = 4 · Hiển thị 21/27 dòng · BT 3.671 m³ · VK 7.02 m²</text>
+    <rect x="1052" y="610" width="604" height="554" fill="none" stroke="#bbb"/>
+    <text x="1064" y="648" font-size="10" font-weight="700">STT</text><text x="1104" y="648" font-size="10" font-weight="700">Lớp</text><text x="1174" y="648" font-size="10" font-weight="700">Phương</text><text x="1244" y="648" font-size="10" font-weight="700">Ø</text><text x="1299" y="648" font-size="10" font-weight="700">a</text><text x="1354" y="648" font-size="10" font-weight="700">n₁</text><text x="1424" y="648" font-size="10" font-weight="700">L (mm)</text><text x="1624" y="648" font-size="10" font-weight="700">Đoạn</text><rect x="1060" y="654" width="588" height="22" fill="#fff"/><text x="1064" y="669" font-size="10">1</text><text x="1104" y="669" font-size="10">dưới</text><text x="1174" y="669" font-size="10">X</text><text x="1244" y="669" font-size="10">16</text><text x="1299" y="669" font-size="10">150</text><text x="1354" y="669" font-size="10">1</text><text x="1424" y="669" font-size="10">2650</text><text x="1624" y="669" font-size="10">100 + 2450 + 100</text><rect x="1060" y="676" width="588" height="22" fill="#f7f7f7"/><text x="1064" y="691" font-size="10">2</text><text x="1104" y="691" font-size="10">dưới</text><text x="1174" y="691" font-size="10">X</text><text x="1244" y="691" font-size="10">16</text><text x="1299" y="691" font-size="10">150</text><text x="1354" y="691" font-size="10">1</text><text x="1424" y="691" font-size="10">2580</text><text x="1624" y="691" font-size="10">100 + 2380 + 100</text><rect x="1060" y="698" width="588" height="22" fill="#fff"/><text x="1064" y="713" font-size="10">3</text><text x="1104" y="713" font-size="10">dưới</text><text x="1174" y="713" font-size="10">X</text><text x="1244" y="713" font-size="10">16</text><text x="1299" y="713" font-size="10">150</text><text x="1354" y="713" font-size="10">1</text><text x="1424" y="713" font-size="10">2480</text><text x="1624" y="713" font-size="10">100 + 2280 + 100</text><rect x="1060" y="720" width="588" height="22" fill="#f7f7f7"/><text x="1064" y="735" font-size="10">4</text><text x="1104" y="735" font-size="10">dưới</text><text x="1174" y="735" font-size="10">X</text><text x="1244" y="735" font-size="10">16</text><text x="1299" y="735" font-size="10">150</text><text x="1354" y="735" font-size="10">1</text><text x="1424" y="735" font-size="10">2400</text><text x="1624" y="735" font-size="10">100 + 2200 + 100</text><rect x="1060" y="742" width="588" height="22" fill="#fff"/><text x="1064" y="757" font-size="10">5</text><text x="1104" y="757" font-size="10">dưới</text><text x="1174" y="757" font-size="10">X</text><text x="1244" y="757" font-size="10">16</text><text x="1299" y="757" font-size="10">150</text><text x="1354" y="757" font-size="10">1</text><text x="1424" y="757" font-size="10">2300</text><text x="1624" y="757" font-size="10">100 + 2100 + 100</text><rect x="1060" y="764" width="588" height="22" fill="#f7f7f7"/><text x="1064" y="779" font-size="10">6</text><text x="1104" y="779" font-size="10">dưới</text><text x="1174" y="779" font-size="10">X</text><text x="1244" y="779" font-size="10">16</text><text x="1299" y="779" font-size="10">150</text><text x="1354" y="779" font-size="10">1</text><text x="1424" y="779" font-size="10">2230</text><text x="1624" y="779" font-size="10">100 + 2030 + 100</text><rect x="1060" y="786" width="588" height="22" fill="#fff"/><text x="1064" y="801" font-size="10">7</text><text x="1104" y="801" font-size="10">dưới</text><text x="1174" y="801" font-size="10">X</text><text x="1244" y="801" font-size="10">16</text><text x="1299" y="801" font-size="10">150</text><text x="1354" y="801" font-size="10">1</text><text x="1424" y="801" font-size="10">2130</text><text x="1624" y="801" font-size="10">100 + 1930 + 100</text><rect x="1060" y="808" width="588" height="22" fill="#f7f7f7"/><text x="1064" y="823" font-size="10">8</text><text x="1104" y="823" font-size="10">dưới</text><text x="1174" y="823" font-size="10">X</text><text x="1244" y="823" font-size="10">16</text><text x="1299" y="823" font-size="10">150</text><text x="1354" y="823" font-size="10">1</text><text x="1424" y="823" font-size="10">2060</text><text x="1624" y="823" font-size="10">100 + 1860 + 100</text><rect x="1060" y="830" width="588" height="22" fill="#fff"/><text x="1064" y="845" font-size="10">9</text><text x="1104" y="845" font-size="10">dưới</text><text x="1174" y="845" font-size="10">X</text><text x="1244" y="845" font-size="10">16</text><text x="1299" y="845" font-size="10">150</text><text x="1354" y="845" font-size="10">1</text><text x="1424" y="845" font-size="10">1960</text><text x="1624" y="845" font-size="10">100 + 1760 + 100</text><rect x="1060" y="852" width="588" height="22" fill="#f7f7f7"/><text x="1064" y="867" font-size="10">10</text><text x="1104" y="867" font-size="10">dưới</text><text x="1174" y="867" font-size="10">X</text><text x="1244" y="867" font-size="10">16</text><text x="1299" y="867" font-size="10">150</text><text x="1354" y="867" font-size="10">1</text><text x="1424" y="867" font-size="10">1780</text><text x="1624" y="867" font-size="10">100 + 1580 + 100</text><rect x="1060" y="874" width="588" height="22" fill="#fff"/><text x="1064" y="889" font-size="10">11</text><text x="1104" y="889" font-size="10">dưới</text><text x="1174" y="889" font-size="10">X</text><text x="1244" y="889" font-size="10">16</text><text x="1299" y="889" font-size="10">150</text><text x="1354" y="889" font-size="10">1</text><text x="1424" y="889" font-size="10">1610</text><text x="1624" y="889" font-size="10">100 + 1410 + 100</text><rect x="1060" y="896" width="588" height="22" fill="#f7f7f7"/><text x="1064" y="911" font-size="10">12</text><text x="1104" y="911" font-size="10">dưới</text><text x="1174" y="911" font-size="10">X</text><text x="1244" y="911" font-size="10">16</text><text x="1299" y="911" font-size="10">150</text><text x="1354" y="911" font-size="10">1</text><text x="1424" y="911" font-size="10">1440</text><text x="1624" y="911" font-size="10">100 + 1240 + 100</text><rect x="1060" y="918" width="588" height="22" fill="#fff"/><text x="1064" y="933" font-size="10">13</text><text x="1104" y="933" font-size="10">dưới</text><text x="1174" y="933" font-size="10">X</text><text x="1244" y="933" font-size="10">16</text><text x="1299" y="933" font-size="10">150</text><text x="1354" y="933" font-size="10">1</text><text x="1424" y="933" font-size="10">1260</text><text x="1624" y="933" font-size="10">100 + 1060 + 100</text><rect x="1060" y="940" width="588" height="22" fill="#f7f7f7"/><text x="1064" y="955" font-size="10">14</text><text x="1104" y="955" font-size="10">dưới</text><text x="1174" y="955" font-size="10">X</text><text x="1244" y="955" font-size="10">16</text><text x="1299" y="955" font-size="10">150</text><text x="1354" y="955" font-size="10">1</text><text x="1424" y="955" font-size="10">1090</text><text x="1624" y="955" font-size="10">100 + 890 + 100</text><rect x="1060" y="962" width="588" height="22" fill="#fff"/><text x="1064" y="977" font-size="10">15</text><text x="1104" y="977" font-size="10">dưới</text><text x="1174" y="977" font-size="10">X</text><text x="1244" y="977" font-size="10">16</text><text x="1299" y="977" font-size="10">150</text><text x="1354" y="977" font-size="10">1</text><text x="1424" y="977" font-size="10">920</text><text x="1624" y="977" font-size="10">100 + 720 + 100</text><rect x="1060" y="984" width="588" height="22" fill="#f7f7f7"/><text x="1064" y="999" font-size="10">16</text><text x="1104" y="999" font-size="10">trên</text><text x="1174" y="999" font-size="10">Y</text><text x="1244" y="999" font-size="10">16</text><text x="1299" y="999" font-size="10">150</text><text x="1354" y="999" font-size="10">5</text><text x="1424" y="999" font-size="10">2450</text><text x="1624" y="999" font-size="10">150 + 2150 + 150</text><rect x="1060" y="1006" width="588" height="22" fill="#fff"/><text x="1064" y="1021" font-size="10">17</text><text x="1104" y="1021" font-size="10">trên</text><text x="1174" y="1021" font-size="10">Y</text><text x="1244" y="1021" font-size="10">16</text><text x="1299" y="1021" font-size="10">150</text><text x="1354" y="1021" font-size="10">1</text><text x="1424" y="1021" font-size="10">2370</text><text x="1624" y="1021" font-size="10">150 + 2070 + 150</text><rect x="1060" y="1028" width="588" height="22" fill="#f7f7f7"/><text x="1064" y="1043" font-size="10">18</text><text x="1104" y="1043" font-size="10">trên</text><text x="1174" y="1043" font-size="10">Y</text><text x="1244" y="1043" font-size="10">16</text><text x="1299" y="1043" font-size="10">150</text><text x="1354" y="1043" font-size="10">1</text><text x="1424" y="1043" font-size="10">2190</text><text x="1624" y="1043" font-size="10">150 + 1890 + 150</text><rect x="1060" y="1050" width="588" height="22" fill="#fff"/><text x="1064" y="1065" font-size="10">19</text><text x="1104" y="1065" font-size="10">trên</text><text x="1174" y="1065" font-size="10">Y</text><text x="1244" y="1065" font-size="10">16</text><text x="1299" y="1065" font-size="10">150</text><text x="1354" y="1065" font-size="10">1</text><text x="1424" y="1065" font-size="10">2110</text><text x="1624" y="1065" font-size="10">150 + 1810 + 150</text><rect x="1060" y="1072" width="588" height="22" fill="#f7f7f7"/><text x="1064" y="1087" font-size="10">20</text><text x="1104" y="1087" font-size="10">trên</text><text x="1174" y="1087" font-size="10">Y</text><text x="1244" y="1087" font-size="10">16</text><text x="1299" y="1087" font-size="10">150</text><text x="1354" y="1087" font-size="10">1</text><text x="1424" y="1087" font-size="10">1930</text><text x="1624" y="1087" font-size="10">150 + 1630 + 150</text><rect x="1060" y="1094" width="588" height="22" fill="#fff"/><text x="1064" y="1109" font-size="10">21</text><text x="1104" y="1109" font-size="10">trên</text><text x="1174" y="1109" font-size="10">Y</text><text x="1244" y="1109" font-size="10">16</text><text x="1299" y="1109" font-size="10">150</text><text x="1354" y="1109" font-size="10">1</text><text x="1424" y="1109" font-size="10">1850</text><text x="1624" y="1109" font-size="10">150 + 1550 + 150</text>
+    <text x="1060" y="1150" font-size="11" font-weight="600">Σ ≈ 373.2 kg · Ø16: 373.18 kg (21 × 11.7m)</text>
+  </g>
+</svg>

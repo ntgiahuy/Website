@@ -30,6 +30,7 @@ const { SAMPLE_2, SAMPLE_HEX3, SAMPLE_4_SQUARE, SAMPLE_4_RECT, SAMPLE_5, ALL_SAM
   await loadTs('sample.ts')
 const { renderPileCapSvg } = await loadTs('svg.ts')
 const { buildPileCapScene3D, renderIsoSvg } = await loadTs('view3d.ts')
+const { renderShopSheet } = await loadTs('shop-sheet.ts')
 
 // --- Hexagon textbook dims ---
 const hex = hexagonOutline3(400, 3, 150)
@@ -177,7 +178,25 @@ Hai lớp thép: Ø, khoảng a, đầu móc lớp dưới có thể khác lớp
 ${cards.join('\n')}
 </body></html>`
 fs.writeFileSync(path.join(outDir, 'index.html'), html)
-console.log('Wrote demo catalog for', ALL_SAMPLES.length, 'shapes')
+
+// Full shop sheet for hexagonal 3-pile (primary demo)
+const shopSvg = renderShopSheet(SAMPLE_HEX3, r3)
+assert(shopSvg.includes('MẶT BẰNG'), 'shop has plan')
+assert(shopSvg.includes('MẶT CẮT A-A'), 'shop has section AA')
+assert(shopSvg.includes('MẶT CẮT B-B'), 'shop has section BB')
+assert(shopSvg.includes('NỔ THÉP'), 'shop has bar boom')
+assert(shopSvg.includes('BẢNG THỐNG KÊ'), 'shop has schedule')
+fs.writeFileSync(path.join(outDir, 'shop-mc-3c.svg'), shopSvg)
+
+// Also sheets for 2/4/5
+for (const sample of [SAMPLE_2, SAMPLE_4_SQUARE, SAMPLE_5]) {
+  const res = computePileCap(sample)
+  fs.writeFileSync(
+    path.join(outDir, `shop-${sample.name.toLowerCase()}.svg`),
+    renderShopSheet(sample, res),
+  )
+}
+console.log('Wrote demo catalog + shop sheets')
 
 if (failed) {
   console.error(`\n${failed} failure(s)`)
