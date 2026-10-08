@@ -1,0 +1,12 @@
+{
+  "name": "mong-coc-patch",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx test-geometry.mjs",
+    "demo": "tsx test-geometry.mjs"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}

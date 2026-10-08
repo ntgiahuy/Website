@@ -25,3 +25,10 @@ Repo phục vụ file tĩnh tại **https://ntgiahuy.github.io/home/** (GitHub P
 Sửa STK trong `thanh-vien/pay-config.json`. Sửa giá trong `thanh-vien/plans.json`. **Private key** chỉ giữ trên máy (Admin → Import).
 
 **Repo `cot` / `mong` / `dam` đang Public:** nên đổi sang **Private** — xem [thanh-vien/BAO-MAT.md](thanh-vien/BAO-MAT.md). Worker mẫu: `workers/license-verify/`.
+
+## Patches shop drawing
+
+| Thư mục | App nguồn | Ghi chú |
+|---------|-----------|---------|
+| [`patches/san`](patches/san/) | [`ntgiahuy/san`](https://github.com/ntgiahuy/san) | Shop thép sàn |
+| [`patches/mong-coc`](patches/mong-coc/) | mở rộng [`ntgiahuy/mong`](https://github.com/ntgiahuy/mong) | Đài móng cọc lục giác — thép X/Y biến thiên; prompt agent: `AGENT-MONG-COC.md` |
