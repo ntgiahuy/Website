@@ -1447,7 +1447,7 @@ function buildPdfScheduleRows(ctx: Ctx): Array<ScheduleRow & { stt: number | str
     project,
     project.info.cover || 50,
   );
-  // STT bảng = mark Excel (1a,1b… biến thiên L / cắt nối); mặt bằng dùng planMark
+  // STT bảng TK PDF = mark (1a,1b… biến thiên L / cắt nối); mặt bằng dùng planMark
   return rows
     .map((row) => ({
       ...row,

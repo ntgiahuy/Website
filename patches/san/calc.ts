@@ -63,7 +63,7 @@ export function parseBeamSize(size: string): { b: number; h: number } {
 
 export interface ScheduleRow {
   /**
-   * Số hiệu thống kê / Excel: 1a, 1b, 1c… (biến thiên L hoặc cắt nối).
+   * Số hiệu bảng thống kê PDF: 1a, 1b, 1c… (biến thiên L hoặc cắt nối).
    */
   mark: string;
   /**
@@ -542,7 +542,7 @@ const VARY_MARK_RE = /^VARY:(bottom|structural|top):(.+):([a-z_])$/i;
 
 /**
  * Gán số hiệu thống nhất:
- * - Biến thiên L (dầm lệch…): cùng họ → 1a/1b/1c (Excel); planMark = "1" (minh họa)
+ * - Biến thiên L (dầm lệch…): cùng họ → 1a/1b/1c (bảng TK PDF); planMark = "1" (minh họa)
  * - Họ nối ≥ 2 đoạn (>11,7 m) → 1a/1b trên cả thống kê và mặt bằng
  * - Thanh đơn → chỉ số (1, 2, 3…)
  */
@@ -918,7 +918,7 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
       continue;
     }
 
-    // Mỗi dải ô: 1 họ số hiệu; L biến thiên (dầm lệch/ô thủng/sàn thấp cắt) → 1a/1b/1c (Excel).
+    // Mỗi dải ô: 1 họ số hiệu; L biến thiên (dầm lệch/ô thủng/sàn thấp cắt) → 1a/1b/1c (PDF TK).
     const stripGroups = groupTypicalRebarByBayStrip(
       project,
       zoneBars,
@@ -970,7 +970,7 @@ export function computeModel(project: SlabProject): ComputedSlabModel {
       });
     }
   }
-  // Luôn gán số hiệu: biến thiên L → 1a/1b (Excel) + planMark "1"; cắt tối ưu → 1a/1b cả hai
+  // Luôn gán số hiệu: biến thiên L → 1a/1b (PDF TK) + planMark "1"; cắt tối ưu → 1a/1b cả hai
   const withMarks = assignUnifiedScheduleMarks(schedule);
   const merged = mergeScheduleRows(withMarks);
   /** 1a, 1b, 1c… rồi 2a, 2b… — cùng mark thì L lớn trước. */
@@ -1119,87 +1119,6 @@ export function normalizeProject(raw: SlabProject): SlabProject {
     clampPlanSizeMm(Number(raw.planHeight) || withAxes.planHeight),
   );
   return { ...sized, sections: ensureSectionCuts(sized) };
-}
-
-/** Dòng xuất Excel (CSV) — dùng mark 1a/1b/1c, không dùng planMark. */
-export function scheduleToExcelCsv(
-  schedule: ScheduleRow[],
-  projectName = "Sàn",
-): string {
-  const header = [
-    "Tên CK",
-    "Lớp",
-    "STT",
-    "Phương",
-    "Ø",
-    "a",
-    "Dài 1 (mm)",
-    "Móc trái",
-    "Móc phải",
-    "SL/CK",
-    "Số CK",
-    "Tổng SL",
-    "Tổng dài (m)",
-    "Khối lượng (kg)",
-    "Ghi chú",
-  ];
-  const layerLabel = (L: RebarLayer) =>
-    L === "top" ? "Lớp trên" : L === "structural" ? "Cấu tạo" : "Lớp dưới";
-  const esc = (v: string | number) => {
-    const s = String(v ?? "");
-    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-    return s;
-  };
-  const lines = [
-    header.join(","),
-    ...[...schedule]
-      .sort(
-        (a, b) =>
-          compareScheduleMarks(a.mark, b.mark) ||
-          b.barLength - a.barLength ||
-          a.direction.localeCompare(b.direction),
-      )
-      .map((r) =>
-        [
-          projectName,
-          layerLabel(r.layer),
-          r.mark,
-          r.direction,
-          r.dia,
-          r.spacing,
-          Math.round(r.barLength),
-          Math.round(r.leftHook),
-          Math.round(r.rightHook),
-          r.qtyEach,
-          r.qtyMembers,
-          r.qtyTotal,
-          Number(r.totalM.toFixed(3)),
-          Number(r.weight.toFixed(2)),
-          r.note,
-        ]
-          .map(esc)
-          .join(","),
-      ),
-  ];
-  // BOM để Excel nhận UTF-8
-  return `\uFEFF${lines.join("\r\n")}\r\n`;
-}
-
-export function downloadScheduleExcel(
-  schedule: ScheduleRow[],
-  projectName: string,
-  filename?: string,
-) {
-  const csv = scheduleToExcelCsv(schedule, projectName);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download =
-    filename ||
-    `ThongKeThepSan_${String(projectName || "San").replace(/\s+/g, "_")}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 export { STOCK_M };

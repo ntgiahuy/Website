@@ -1,8 +1,6 @@
-# Patch: Biến thiên L dầm lệch → Excel 1a/1b/1c
+# Patch: Biến thiên L dầm lệch → PDF thống kê 1a/1b/1c
 
 Khi dầm biên / dầm quanh ô thủng / sàn thấp **cắt thép** lệch (Dịch đầu ≠ Dịch cuối), thanh thép X/Y qua dầm có chiều dài khác nhau.
 
-- **Xuất Excel / bảng thống kê**: tách `1a`, `1b`, `1c…` theo bậc chiều dài (≤ 3).
+- **Xuất PDF — bảng thống kê**: tách `1a`, `1b`, `1c…` theo bậc chiều dài (≤ 3).
 - **Hình minh họa / PDF mặt bằng**: vẫn chỉ số hiệu họ `1` (`planMark`).
-
-Nút **Xuất Excel** trên thanh công cụ (file CSV mở bằng Excel).

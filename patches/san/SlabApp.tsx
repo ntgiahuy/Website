@@ -16,7 +16,6 @@ import {
   ChevronRight,
   Download,
   FilePlus,
-  FileSpreadsheet,
   FolderOpen,
   Minus,
   Plus,
@@ -31,7 +30,6 @@ import { Select } from "@/components/ui/select";
 import { SlabPreview } from "@/components/slab/SlabPreview";
 import {
   computeModel,
-  downloadScheduleExcel,
   effectiveZones,
   parseBeamSize,
 } from "@/lib/calc";
@@ -1131,29 +1129,6 @@ export function SlabApp() {
     }
   }
 
-  async function exportExcel() {
-    setBusy(true);
-    setError(null);
-    setStatus(null);
-    try {
-      const ok = await ensureMemberForExport("Xuất Excel");
-      if (!ok) {
-        setBusy(false);
-        return;
-      }
-      const exportProject = projectRef.current;
-      const m = computeModel(exportProject);
-      downloadScheduleExcel(m.schedule, exportProject.info.name);
-      setStatus(
-        `Đã xuất Excel thống kê (${m.schedule.length} dòng — biến thiên L: 1a/1b/1c).`,
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Xuất Excel thất bại.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function saveProjectToDisk() {
     const text = serializeProjectFile(project);
     try {
@@ -1483,15 +1458,6 @@ export function SlabApp() {
             </Button>
             <Button size="sm" disabled={busy} onClick={() => void exportPdf()}>
               <Download /> {busy ? "Đang xuất…" : "Xuất PDF"}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={busy}
-              onClick={() => void exportExcel()}
-              title="Thống kê Excel: biến thiên L theo dầm lệch → 1a, 1b, 1c"
-            >
-              <FileSpreadsheet /> Xuất Excel
             </Button>
           </div>
           {(status || error) && (
