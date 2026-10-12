@@ -419,6 +419,22 @@ function verify_otp(string $email, string $code = '', string $token = ''): array
   return register_verify($email, $code, $token);
 }
 
+/** Cộng số ngày vào unix timestamp, tránh tràn INT 32-bit / MySQL INT. */
+function timestamp_add_days(int $base, int $days): int {
+  $days = max(0, min($days, 365000));
+  // Dùng float để không tràn phép nhân trên PHP 32-bit
+  $add = (int) min((float) $days * 86400.0, (float) (PHP_INT_MAX - max(0, $base)));
+  if ($add < 0) {
+    return PHP_INT_MAX;
+  }
+  $sum = $base + $add;
+  // MySQL INT cũ max 2147483647 — vẫn an toàn với BIGINT mới
+  if ($sum < $base) {
+    return PHP_INT_MAX;
+  }
+  return $sum;
+}
+
 function grant_member(string $username, string $planId, ?int $days = null, string $note = ''): array {
   $username = normalize_username($username);
   if (!valid_username($username)) {
@@ -446,14 +462,23 @@ function grant_member(string $username, string $planId, ?int $days = null, strin
   if ((int) $row['expires_at'] > $now) {
     $base = (int) $row['expires_at'];
   }
-  $expires = $base + ($useDays * 86400);
   if ($planId === 'lifetime') {
-    $expires = $now + (36500 * 86400);
+    // Vĩnh viễn: neo từ "now", không cộng dồn hạn cũ
+    $expires = timestamp_add_days($now, 36500);
+  } else {
+    $expires = timestamp_add_days($base, $useDays);
   }
 
-  db()->prepare(
-    'UPDATE members SET plan = ?, expires_at = ?, note = ?, updated_at = ? WHERE username = ?'
-  )->execute([$planId, $expires, $note, $now, $username]);
+  try {
+    db()->prepare(
+      'UPDATE members SET plan = ?, expires_at = ?, note = ?, updated_at = ? WHERE username = ?'
+    )->execute([$planId, $expires, $note, $now, $username]);
+  } catch (Throwable $e) {
+    return [
+      'ok' => false,
+      'error' => 'Không lưu được hạn thành viên (cột expires_at cần BIGINT). Chi tiết: ' . $e->getMessage(),
+    ];
+  }
 
   return ['ok' => true, 'member' => member_public(member_row_by_username($username))];
 }

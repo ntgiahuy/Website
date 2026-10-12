@@ -44,7 +44,11 @@ if ($method === 'POST') {
     ? (int) $body['days']
     : null;
   $note = trim((string) ($body['note'] ?? ''));
-  $result = grant_member($username, $plan, $days, $note);
+  try {
+    $result = grant_member($username, $plan, $days, $note);
+  } catch (Throwable $e) {
+    json_out(['ok' => false, 'error' => 'Lỗi cấp gói: ' . $e->getMessage()], 500);
+  }
   json_out($result, !empty($result['ok']) ? 200 : 400);
 }
 

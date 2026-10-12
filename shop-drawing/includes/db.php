@@ -210,7 +210,7 @@ CREATE TABLE IF NOT EXISTS members (
   phone VARCHAR(32) NOT NULL DEFAULT '',
   email_verified TINYINT NOT NULL DEFAULT 0,
   plan VARCHAR(64) NOT NULL DEFAULT '',
-  expires_at INT NOT NULL,
+  expires_at BIGINT NOT NULL,
   note TEXT NOT NULL,
   created_at INT NOT NULL,
   updated_at INT NOT NULL,
@@ -277,6 +277,16 @@ SQL);
   }
   if (!db_mysql_has_column($pdo, 'members', 'full_name')) {
     $pdo->exec("ALTER TABLE members ADD COLUMN full_name VARCHAR(120) NOT NULL DEFAULT ''");
+  }
+  // lifetime (36500 ngày) vượt INT 32-bit (~2038) → cần BIGINT
+  try {
+    $col = $pdo->query("SHOW COLUMNS FROM members LIKE 'expires_at'")->fetch();
+    $type = strtolower((string) ($col['Type'] ?? ''));
+    if ($type !== '' && strpos($type, 'bigint') === false) {
+      $pdo->exec('ALTER TABLE members MODIFY COLUMN expires_at BIGINT NOT NULL');
+    }
+  } catch (Throwable $e) {
+    // ignore if no permission / already migrated
   }
   if (!db_mysql_has_column($pdo, 'pending_signups', 'phone')) {
     try {
