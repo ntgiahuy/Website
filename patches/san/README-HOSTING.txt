@@ -1,8 +1,6 @@
 Shop drawing thép sàn — deploy lên giahuy.net (KHÔNG CDN)
 =========================================================
 
-Ngày 6/10/2026
-
 Zip CHỈ gồm
 -----------
   shop-drawing/san/app/index.html
@@ -10,12 +8,12 @@ Zip CHỈ gồm
   shop-drawing/san/app/fonts/
 
 KHÔNG đóng gói: san/index.php, shop-drawing/app/, membership.js,
-shop-drawing/index.html, favicon.
+shop-drawing/index.html, favicon thừa.
 
 Cài đặt
 -------
-1. Giải nén zip.
-2. Copy nội dung vào:
+1. Tải shop-drawing-san-app-hosting.zip
+2. Giải nén → copy vào:
      public_html/shop-drawing/san/app/
 3. KHÔNG ghi đè:
      public_html/shop-drawing/san/index.php   (cổng)
@@ -30,15 +28,12 @@ index.html gọi:
   data-activate-url="/shop-drawing/dang-nhap/"
 KHÔNG copy file này vào san/app/.
 
-Đối tác nhúng CỔNG (không nhúng san/app/):
-  <iframe src="https://giahuy.net/shop-drawing/san/"
-    width="100%" height="980" style="border:0" allow="download"></iframe>
-
-Admin URL sàn = ./san/
+Build local (agent)
+-------------------
+  Vite base "./" + patch từ patches/san/
+  → dist/ đóng gói thành shop-drawing/san/app/
 
 Kiểm tra
 --------
-  rg -n "fonts.google|gstatic|unpkg|jsdelivr|github.io" dist/   → 0
-  rg -n "membership.js" shop-drawing/san/app/index.html
-    → chỉ /shop-drawing/assets/membership.js
-  Trong zip KHÔNG có file membership.js.
+  Zip không chứa membership.js
+  index.html có redirect hub + script membership hub
