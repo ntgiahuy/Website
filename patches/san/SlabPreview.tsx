@@ -1183,14 +1183,12 @@ export const SlabPreview = memo(function SlabPreview({
                         });
                         const z = hits.find((h) => h.layer === "bottom") ?? hits[0];
                         const hooks = hooksForRebarBar(project, bar, zones);
-                        const len = Math.round(
-                          rebarBarStraightLenMm(bar) + hooks.left + hooks.right,
-                        );
-                        // Mỗi số hiệu (Ø+a+L+móc) một khoảng rải riêng trên minh họa
+                        // Họ số hiệu (không L): dầm lệch biến thiên L → 1 đường khoảng rải
+                        // thẳng như sàn chữ nhật, neo tại điểm dài nhất.
                         if (z) {
-                          return `${z.mark}|${z.dia}|${z.spacing}|${z.direction}|L${len}|H${hooks.left}/${hooks.right}`;
+                          return `${z.mark}|${z.dia}|${z.spacing}|${z.direction}|H${hooks.left}/${hooks.right}`;
                         }
-                        return `${bar.dir}|10|150|L${len}|H${hooks.left}/${hooks.right}`;
+                        return `${bar.dir}|10|150|H${hooks.left}/${hooks.right}`;
                       };
                       const merged = buildMergedDistRanges(
                         project,
@@ -1200,6 +1198,7 @@ export const SlabPreview = memo(function SlabPreview({
                         markKeyOf,
                         undefined,
                         zones,
+                        { extentMode: "max", placeAt: "longest" },
                       );
                       const ah = 7; // ×0.5
                       const aw = 3.5;

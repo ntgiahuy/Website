@@ -4,3 +4,4 @@ Khi dầm biên / dầm quanh ô thủng / sàn thấp **cắt thép** lệch (D
 
 - **Xuất PDF — bảng thống kê**: tách `1a`, `1b`, `1c…` theo bậc chiều dài (≤ 3).
 - **Hình minh họa / PDF mặt bằng**: vẫn chỉ số hiệu họ `1` (`planMark`).
+- **Đường khoảng rải (minh họa / PDF MB)**: một nét thẳng như sàn chữ nhật (không tách theo từng L), bao dài nhất + neo tại điểm dài nhất (`extentMode: "max"`, `placeAt: "longest"`).

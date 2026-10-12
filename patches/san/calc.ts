@@ -720,7 +720,7 @@ function mergeScheduleRows(rows: ScheduleRow[]): ScheduleRow[] {
 
 /**
  * Chia thanh trong một dải ô thành ≤ maxClasses bậc chiều dài (lớn → bé).
- * Sàn đều (ΔL nhỏ) → 1 lớp; dầm lệch → 1a/1b/1c (Excel).
+ * Sàn đều (ΔL nhỏ) → 1 lớp; dầm lệch → 1a/1b/1c (bảng TK PDF).
  */
 function partitionVaryingLengthClasses(
   bars: RebarBarSeg[],

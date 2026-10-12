@@ -114,6 +114,20 @@ export function beamSegAvgOuterFaces(
   return { lo: (f.lo0 + f.lo1) / 2, hi: (f.hi0 + f.hi1) / 2 };
 }
 
+/**
+ * Mặt trong theo bao lòng sàn dài nhất (max clear) khi dầm lệch/xéo:
+ * lo = max(lo0,lo1), hi = min(hi0,hi1).
+ * Dùng làm biên ô: x0 = left.hi (= min hi đầu/cuối), x1 = right.lo (= max lo đầu/cuối)
+ * → khoảng rải thẳng như sàn chữ nhật, dài bằng điểm dài nhất.
+ */
+export function beamSegMaxClearFaces(
+  beam: PlanBeam,
+  segIndex: number,
+): { lo: number; hi: number } {
+  const f = beamSegSideFaces(beam, segIndex);
+  return { lo: Math.max(f.lo0, f.lo1), hi: Math.min(f.hi0, f.hi1) };
+}
+
 /** Ghi dịch đoạn dầm đang chọn (song song hoặc từng đầu — dầm xéo). */
 export function patchBeamSegShift(
   project: SlabProject,
@@ -1523,6 +1537,72 @@ export function baySlabExtent(
   };
 }
 
+/**
+ * Mặt ngoài dầm tại nhịp theo bao lòng dài nhất (dầm lệch → max clear).
+ * Đoạn đã xóa / không có dầm → bề dày 0.
+ */
+export function beamOuterFacesMaxClearAtSpan(
+  project: SlabProject,
+  beamDir: PlanBeam["direction"],
+  axis: GridAxis,
+  spanIndex: number,
+): { lo: number; hi: number } {
+  if (!beamCoversOrthogonalSpan(project, beamDir, axis, spanIndex)) {
+    return { lo: axis.pos, hi: axis.pos };
+  }
+  const beam = findBeamOnAxis(project, beamDir, axis)!;
+  return beamSegMaxClearFaces(beam, spanIndex);
+}
+
+/**
+ * Lòng ô sàn theo bao dài nhất (dầm lệch/xéo):
+ * giống chữ nhật tại điểm dài nhất — dùng cho đường khoảng rải minh họa/PDF.
+ */
+export function baySlabExtentMaxEnvelope(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+  ix: number,
+  iy: number,
+): { x0: number; x1: number; y0: number; y1: number; mx: number; my: number } {
+  const ax0 = axesX[ix];
+  const ax1 = axesX[ix + 1];
+  const ay0 = axesY[iy];
+  const ay1 = axesY[iy + 1];
+  const left = beamOuterFacesMaxClearAtSpan(project, "Y", ax0, iy);
+  const right = beamOuterFacesMaxClearAtSpan(project, "Y", ax1, iy);
+  const bottom = beamOuterFacesMaxClearAtSpan(project, "X", ay0, ix);
+  const top = beamOuterFacesMaxClearAtSpan(project, "X", ay1, ix);
+  const x0 = left.hi;
+  const x1 = Math.max(x0, right.lo);
+  const y0 = bottom.hi;
+  const y1 = Math.max(y0, top.lo);
+  return {
+    x0,
+    x1,
+    y0,
+    y1,
+    mx: (x0 + x1) / 2,
+    my: (y0 + y1) / 2,
+  };
+}
+
+/** Chọn bao ô sàn: avg (mặc định) hoặc max (điểm dài nhất khi dầm lệch). */
+export type BayExtentMode = "avg" | "max";
+
+function bayExtentByMode(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+  ix: number,
+  iy: number,
+  mode: BayExtentMode,
+): { x0: number; x1: number; y0: number; y1: number; mx: number; my: number } {
+  return mode === "max"
+    ? baySlabExtentMaxEnvelope(project, axesX, axesY, ix, iy)
+    : baySlabExtent(project, axesX, axesY, ix, iy);
+}
+
 /** Inset khoảng rải từ mí dầm trong (mm). */
 export const SLAB_DIST_RANGE_INSET_MM = 50;
 
@@ -1539,6 +1619,7 @@ export type DistRangeSeg = {
  * đầu/cuối = mí dầm trong ± inset (mặc định 50mm vào lòng sàn).
  * Thanh X → khoảng rải theo Y; thanh Y → theo X.
  * Ô liền qua dầm đã xóa (không còn thân) → gộp 1 khoảng để đầu/cuối chạm nhau.
+ * `extentMode: "max"` — bao dài nhất khi dầm lệch (minh họa/PDF mặt bằng).
  */
 export function slabDistRangeForBar(
   project: SlabProject,
@@ -1546,9 +1627,12 @@ export function slabDistRangeForBar(
   axesY: GridAxis[],
   bar: RebarBarSeg,
   insetMm: number = SLAB_DIST_RANGE_INSET_MM,
+  extentMode: BayExtentMode = "avg",
 ): DistRangeSeg | null {
   if (axesX.length < 2 || axesY.length < 2) return null;
   const inset = Math.max(0, Math.round(insetMm));
+  const bayOf = (ix: number, iy: number) =>
+    bayExtentByMode(project, axesX, axesY, ix, iy, extentMode);
 
   /**
    * Lan ô theo phương `along` khi dầm vuông góc giữa ô đã mất thân.
@@ -1559,20 +1643,20 @@ export function slabDistRangeForBar(
     iy0: number,
     along: "X" | "Y",
   ): { lo: number; hi: number } => {
-    const s0 = baySlabExtent(project, axesX, axesY, ix0, iy0);
+    const s0 = bayOf(ix0, iy0);
     if (along === "Y") {
       let y0 = s0.y0;
       let y1 = s0.y1;
       for (let iy = iy0 - 1; iy >= 0; iy--) {
         if (beamCoversOrthogonalSpan(project, "X", axesY[iy + 1]!, ix0)) break;
         if (!bayHasSlabRebar(project, axesX, axesY, ix0, iy)) break;
-        const u = baySlabExtent(project, axesX, axesY, ix0, iy);
+        const u = bayOf(ix0, iy);
         y0 = Math.min(y0, u.y0);
       }
       for (let iy = iy0 + 1; iy < axesY.length - 1; iy++) {
         if (beamCoversOrthogonalSpan(project, "X", axesY[iy]!, ix0)) break;
         if (!bayHasSlabRebar(project, axesX, axesY, ix0, iy)) break;
-        const u = baySlabExtent(project, axesX, axesY, ix0, iy);
+        const u = bayOf(ix0, iy);
         y1 = Math.max(y1, u.y1);
       }
       return { lo: y0, hi: y1 };
@@ -1582,13 +1666,13 @@ export function slabDistRangeForBar(
     for (let ix = ix0 - 1; ix >= 0; ix--) {
       if (beamCoversOrthogonalSpan(project, "Y", axesX[ix + 1]!, iy0)) break;
       if (!bayHasSlabRebar(project, axesX, axesY, ix, iy0)) break;
-      const u = baySlabExtent(project, axesX, axesY, ix, iy0);
+      const u = bayOf(ix, iy0);
       x0 = Math.min(x0, u.x0);
     }
     for (let ix = ix0 + 1; ix < axesX.length - 1; ix++) {
       if (beamCoversOrthogonalSpan(project, "Y", axesX[ix]!, iy0)) break;
       if (!bayHasSlabRebar(project, axesX, axesY, ix, iy0)) break;
-      const u = baySlabExtent(project, axesX, axesY, ix, iy0);
+      const u = bayOf(ix, iy0);
       x1 = Math.max(x1, u.x1);
     }
     return { lo: x0, hi: x1 };
@@ -1624,7 +1708,7 @@ export function slabDistRangeForBar(
         for (let ix = 0; ix < axesX.length - 1; ix++) {
           // Ô thủng / sàn thấp cắt: không lấy làm neo expand (sàn thấp cắt có nhánh owned riêng)
           if (!bayHasSlabRebar(project, axesX, axesY, ix, iy)) continue;
-          const s = baySlabExtent(project, axesX, axesY, ix, iy);
+          const s = bayOf(ix, iy);
           if (bar.y < s.y0 - 1 || bar.y > s.y1 + 1) continue;
           if (requireXOverlap && (bx1 < s.x0 - 1 || bx0 > s.x1 + 1)) continue;
           const e = expandContiguous(ix, iy, "Y");
@@ -1654,7 +1738,7 @@ export function slabDistRangeForBar(
     for (let iy = 0; iy < axesY.length - 1; iy++) {
       for (let ix = 0; ix < axesX.length - 1; ix++) {
         if (!bayHasSlabRebar(project, axesX, axesY, ix, iy)) continue;
-        const s = baySlabExtent(project, axesX, axesY, ix, iy);
+        const s = bayOf(ix, iy);
         if (bar.x < s.x0 - 1 || bar.x > s.x1 + 1) continue;
         if (requireYOverlap && (by1 < s.y0 - 1 || by0 > s.y1 + 1)) continue;
         const e = expandContiguous(ix, iy, "X");
@@ -1732,6 +1816,21 @@ type DistRangePiece = DistRangeSeg & {
   /** Hàng/cột vuông góc — chỉ gộp trong cùng strip. */
   stripKey: number;
   junction: { x: number; y: number };
+  /** Đầu/cuối + L thanh — neo đường khoảng rải tại điểm dài nhất khi dầm lệch. */
+  barLo: number;
+  barHi: number;
+  barLen: number;
+};
+
+/** Tùy chọn gộp khoảng rải (minh họa dầm lệch). */
+export type MergeDistRangeOpts = {
+  /** Bao ô: avg (mặc định) | max (điểm dài nhất). */
+  extentMode?: BayExtentMode;
+  /**
+   * Vị trí đường ⊥ thanh: average (TB mọi thanh) | longest (qua thanh dài nhất /
+   * tại điểm dài nhất khi dầm lệch — giống sàn chữ nhật).
+   */
+  placeAt?: "average" | "longest";
 };
 
 /**
@@ -1739,6 +1838,8 @@ type DistRangePiece = DistRangeSeg & {
  * khi mid nằm trên thân dầm (khe giữa hai ô) → ô giao dài nhất với thanh.
  * Tránh fallback stripKey=0 khiến mọi thanh mid-trên-dầm gộp một dải sai.
  * Cho phép neo ở sàn thấp cắt (có thép riêng); bỏ qua ô thủng.
+ * Thanh liên tục qua nhiều ô (dầm lệch làm mid lệch cột/hàng): stripKey = min ô
+ * giao → cùng một dải khoảng rải, không tách theo mid.
  */
 function bayIndexForBar(
   project: SlabProject,
@@ -1751,6 +1852,7 @@ function bayIndexForBar(
     const by1 = Math.max(bar.y0, bar.y1);
     const my = (by0 + by1) / 2;
     let best: { ix: number; iy: number; score: number } | null = null;
+    let minStripIy = Infinity;
     for (let j = 0; j < axesY.length - 1; j++) {
       for (let i = 0; i < axesX.length - 1; i++) {
         if (bayKindAt(project, axesX, axesY, i, j) === "opening") continue;
@@ -1758,18 +1860,21 @@ function bayIndexForBar(
         if (bar.x < s.x0 - 1 || bar.x > s.x1 + 1) continue;
         const overlap = Math.min(by1, s.y1) - Math.max(by0, s.y0);
         if (overlap <= 1) continue;
+        minStripIy = Math.min(minStripIy, j);
         const containsMid = my >= s.y0 - 1 && my <= s.y1 + 1;
         const score = (containsMid ? 1e12 : 0) + overlap;
         if (!best || score > best.score) best = { ix: i, iy: j, score };
       }
     }
     if (!best) return null;
-    return { bayIndex: best.ix, stripKey: best.iy };
+    const stripKey = Number.isFinite(minStripIy) ? minStripIy : best.iy;
+    return { bayIndex: best.ix, stripKey };
   }
   const bx0 = Math.min(bar.x0, bar.x1);
   const bx1 = Math.max(bar.x0, bar.x1);
   const mx = (bx0 + bx1) / 2;
   let best: { ix: number; iy: number; score: number } | null = null;
+  let minStripIx = Infinity;
   for (let j = 0; j < axesY.length - 1; j++) {
     for (let i = 0; i < axesX.length - 1; i++) {
       if (bayKindAt(project, axesX, axesY, i, j) === "opening") continue;
@@ -1777,19 +1882,23 @@ function bayIndexForBar(
       if (bar.y < s.y0 - 1 || bar.y > s.y1 + 1) continue;
       const overlap = Math.min(bx1, s.x1) - Math.max(bx0, s.x0);
       if (overlap <= 1) continue;
+      minStripIx = Math.min(minStripIx, i);
       const containsMid = mx >= s.x0 - 1 && mx <= s.x1 + 1;
       const score = (containsMid ? 1e12 : 0) + overlap;
       if (!best || score > best.score) best = { ix: i, iy: j, score };
     }
   }
   if (!best) return null;
-  return { bayIndex: best.iy, stripKey: best.ix };
+  const stripKey = Number.isFinite(minStripIx) ? minStripIx : best.ix;
+  return { bayIndex: best.iy, stripKey };
 }
 
 /**
  * Gộp khoảng rải: ô sàn kề nhau liên tiếp cùng loại thép
  * (cùng chiều dài + Ø + móc) → 1 đường từ đầu dải đến cuối dải.
  * Khác dài / Ø / móc → không gộp (mỗi loại một khoảng rải riêng).
+ * Minh họa dầm lệch: `opts.extentMode="max"` + `placeAt="longest"` →
+ * một nét thẳng như sàn chữ nhật, neo tại điểm dài nhất.
  */
 export function buildMergedDistRanges(
   project: SlabProject,
@@ -1799,23 +1908,31 @@ export function buildMergedDistRanges(
   markKeyOf: (bar: RebarBarSeg) => string,
   insetMm: number = SLAB_DIST_RANGE_INSET_MM,
   zones?: RebarZone[],
+  opts?: MergeDistRangeOpts,
 ): MergedDistRange[] {
   const list = zones ?? project.zones ?? [];
+  const extentMode: BayExtentMode = opts?.extentMode ?? "avg";
+  const placeAt = opts?.placeAt ?? "average";
   const pieces: DistRangePiece[] = [];
   for (const bar of bars) {
-    const seg = slabDistRangeForBar(project, axesX, axesY, bar, insetMm);
+    const seg = slabDistRangeForBar(project, axesX, axesY, bar, insetMm, extentMode);
     if (!seg) continue;
     const idx = bayIndexForBar(project, axesX, axesY, bar);
     if (!idx) continue;
     const markKey = markKeyOf(bar);
     if (!markKey) continue;
     // Khoảng rải theo dải ô + Ø/móc (+ markKey từ caller).
-    // Caller minh họa/PDF đưa L+móc vào markKey → mỗi số hiệu một khoảng rải;
+    // Caller minh họa/PDF: họ số hiệu (không L) + placeAt longest khi dầm lệch;
     // caller thống kê chỉ dùng mark vùng → vẫn gộp biến thiên L trong vùng.
     const hooks = hooksForRebarBar(project, bar, list);
     const z = zoneForRebarBar(project, bar, list);
     const dia = z ? Math.round(Number(z.dia) || 0) : 0;
     const identityKey = `${bar.dir}|Ø${dia}|H${hooks.left}/${hooks.right}`;
+    const barLo =
+      bar.dir === "X" ? Math.min(bar.x0, bar.x1) : Math.min(bar.y0, bar.y1);
+    const barHi =
+      bar.dir === "X" ? Math.max(bar.x0, bar.x1) : Math.max(bar.y0, bar.y1);
+    const barLen = barHi - barLo;
     const junction =
       bar.dir === "X"
         ? { x: (bar.x0 + bar.x1) / 2, y: bar.y }
@@ -1828,6 +1945,9 @@ export function buildMergedDistRanges(
       bayIndex: idx.bayIndex,
       stripKey: idx.stripKey,
       junction,
+      barLo,
+      barHi,
+      barLen,
     });
   }
 
@@ -1839,6 +1959,23 @@ export function buildMergedDistRanges(
     arr.push(p);
     groups.set(key, arr);
   }
+
+  /** Tọa độ ⊥ thanh: TB mọi thanh, hoặc giữa các thanh dài nhất (điểm dài nhất). */
+  const placeCoord = (run: DistRangePiece[], along: "x" | "y"): number => {
+    if (placeAt === "longest" && run.length) {
+      const maxLen = Math.max(...run.map((p) => p.barLen));
+      const longest = run.filter((p) => p.barLen >= maxLen - 0.5);
+      if (longest.length) {
+        return (
+          longest.reduce((s, p) => s + (p.barLo + p.barHi) / 2, 0) / longest.length
+        );
+      }
+    }
+    if (along === "x") {
+      return run.reduce((s, p) => s + p.xA, 0) / run.length;
+    }
+    return run.reduce((s, p) => s + p.yA, 0) / run.length;
+  };
 
   const out: MergedDistRange[] = [];
   for (const group of groups.values()) {
@@ -1853,17 +1990,17 @@ export function buildMergedDistRanges(
       let xB: number;
       let yB: number;
       if (first.dir === "Y") {
-        // Khoảng rải ngang: từ đầu trái → cuối phải
+        // Khoảng rải ngang: từ đầu trái → cuối phải (bao dài nhất nếu extentMode=max)
         xA = Math.min(...run.map((p) => Math.min(p.xA, p.xB)));
         xB = Math.max(...run.map((p) => Math.max(p.xA, p.xB)));
-        const my = run.reduce((s, p) => s + p.yA, 0) / run.length;
+        const my = placeCoord(run, "y");
         yA = my;
         yB = my;
       } else {
         // Khoảng rải đứng: từ dưới → trên
         yA = Math.min(...run.map((p) => Math.min(p.yA, p.yB)));
         yB = Math.max(...run.map((p) => Math.max(p.yA, p.yB)));
-        const mx = run.reduce((s, p) => s + p.xA, 0) / run.length;
+        const mx = placeCoord(run, "x");
         xA = mx;
         xB = mx;
       }

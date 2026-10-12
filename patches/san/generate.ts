@@ -1220,10 +1220,9 @@ function drawPlan(
       });
       const z = hits[0];
       const hooks = hooksForRebarBar(project, bar, rebarZones);
-      const len = Math.round(rebarBarStraightLenMm(bar) + hooks.left + hooks.right);
-      // Mỗi số hiệu (Ø+a+L+móc) một khoảng rải riêng trên PDF
+      // Họ số hiệu (không L): dầm lệch → 1 khoảng rải thẳng tại điểm dài nhất
       if (z) {
-        return `${z.mark}|${z.dia}|${z.spacing}|${z.direction}|L${len}|H${hooks.left}/${hooks.right}`;
+        return `${z.mark}|${z.dia}|${z.spacing}|${z.direction}|H${hooks.left}/${hooks.right}`;
       }
       return "";
     };
@@ -1235,6 +1234,7 @@ function drawPlan(
       markKeyOf,
       undefined,
       layerZones,
+      { extentMode: "max", placeAt: "longest" },
     );
     for (const seg of merged) {
       const pxA = toX(seg.xA);
