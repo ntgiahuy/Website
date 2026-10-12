@@ -2,7 +2,6 @@
  * Demo: ô hình thang — thép biến thiên cả phương X và Y.
  */
 import { writeFileSync, mkdirSync } from "fs";
-import { Resvg } from "fs-extra-skip";
 import { createSampleS1 } from "../sample.ts";
 import { computeModel, planDisplayMark, effectiveZones } from "../calc.ts";
 import {
