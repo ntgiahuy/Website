@@ -1,13 +1,41 @@
-import type { BeamSegShift, BeamTypeDef, GridAxis, PlanBeam, SlabInfo, SlabProject } from "./types";
+import type {
+  BeamSegShift,
+  BeamTypeDef,
+  GridAxis,
+  PlanBeam,
+  RebarLayer,
+  RebarZone,
+  SectionCut,
+  SlabInfo,
+  SlabProject,
+} from "./types";
 import { uid } from "./utils";
 
 /** Thụt thép sàn khỏi da dầm (fallback nếu cover chưa có). */
 export const SLAB_REBAR_FACE_INSET_MM = 50;
 
-/** Lớp bảo vệ (mm) — sắt trừ da dầm biên. */
+/** Kích thước mặt bằng tối thiểu / tối đa (mm). Quá lớn → hàng nghìn thanh thép → đơ UI. */
+export const MIN_PLAN_SIZE_MM = 500;
+export const MAX_PLAN_SIZE_MM = 50_000;
+/** Diện tích tối đa (mm²) ≈ 500 m² — giữ computeModel/preview dưới ~0.3s. */
+export const MAX_PLAN_AREA_MM2 = 500_000_000;
+
+/** Giới hạn bề rộng / chiều dài sàn (mm). */
+export function clampPlanSizeMm(mm: number): number {
+  const n = Math.round(Number(mm));
+  if (!Number.isFinite(n)) return MIN_PLAN_SIZE_MM;
+  return Math.min(MAX_PLAN_SIZE_MM, Math.max(MIN_PLAN_SIZE_MM, n));
+}
+
+/** Lớp bảo vệ (mm) — khoảng hở đầu thép so với da dầm = Dày lớp bảo vệ. */
 export function slabCoverMm(project: SlabProject): number {
-  const c = Number(project.info.cover);
-  return Number.isFinite(c) && c >= 0 ? Math.round(c) : SLAB_REBAR_FACE_INSET_MM;
+  const c = Number(project.info?.cover);
+  if (Number.isFinite(c) && c >= 0) return Math.round(c);
+  const fromZones = (project.zones ?? [])
+    .map((z) => Number(z.cover))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+  if (fromZones.length) return Math.round(Math.max(...fromZones));
+  return SLAB_REBAR_FACE_INSET_MM;
 }
 
 export function formatBeamSize(b: number, h: number): string {
@@ -292,7 +320,10 @@ export function syncBeamsToAxes(project: SlabProject): SlabProject {
         ...b,
         axis: ax.pos,
         axisId: ax.id,
-        offset: beamOffsetForAxisIndex(bw, idx, axesX.length),
+        // Giữ B1 đã chỉnh (lệch ngoài biên); chỉ gán mặc định khi chưa có
+        offset: Number.isFinite(b.offset)
+          ? (b.offset as number)
+          : beamOffsetForAxisIndex(bw, idx, axesX.length),
         start: 0,
         end: Hplan,
         segShifts: b.segShifts,
@@ -308,7 +339,9 @@ export function syncBeamsToAxes(project: SlabProject): SlabProject {
       ...b,
       axis: ay.pos,
       axisId: ay.id,
-      offset: beamOffsetForAxisIndex(bw, idx, axesY.length),
+      offset: Number.isFinite(b.offset)
+        ? (b.offset as number)
+        : beamOffsetForAxisIndex(bw, idx, axesY.length),
       start: 0,
       end: W,
       segShifts: b.segShifts,
@@ -406,6 +439,124 @@ export function horizontalBeamSegExtent(
   return { xLo: faceLo.lo, xHi: faceHi.hi };
 }
 
+/** Trừ các khoảng cắt khỏi [from, to] → các đoạn còn lại (mm). */
+export function subtractIntervals(
+  from: number,
+  to: number,
+  cuts: Array<{ lo: number; hi: number }>,
+): Array<[number, number]> {
+  let parts: Array<[number, number]> = [[Math.min(from, to), Math.max(from, to)]];
+  const sorted = [...cuts].sort((a, b) => a.lo - b.lo);
+  for (const c of sorted) {
+    const next: Array<[number, number]> = [];
+    for (const [a, b] of parts) {
+      const clo = Math.max(a, c.lo);
+      const chi = Math.min(b, c.hi);
+      if (clo >= chi - 0.5) {
+        next.push([a, b]);
+        continue;
+      }
+      if (a < clo - 0.5) next.push([a, clo]);
+      if (chi < b - 0.5) next.push([chi, b]);
+    }
+    parts = next;
+  }
+  return parts.filter(([a, b]) => b - a > 2);
+}
+
+/**
+ * Khoảng dọc theo dầm cần cắt (thân dầm giao phương xuyên qua).
+ * beam Y (đứng): cuts theo Y tại faceX; beam X (ngang): cuts theo X tại faceY.
+ */
+export function crossBodyCutsAlong(
+  project: SlabProject,
+  beamDir: PlanBeam["direction"],
+  face0: number,
+  face1: number,
+  along0: number,
+  along1: number,
+): Array<{ lo: number; hi: number }> {
+  const cuts: Array<{ lo: number; hi: number }> = [];
+  const faceLo = Math.min(face0, face1);
+  const faceHi = Math.max(face0, face1);
+  const aLo = Math.min(along0, along1);
+  const aHi = Math.max(along0, along1);
+  const faceMid = (face0 + face1) / 2;
+  const crossDir: PlanBeam["direction"] = beamDir === "Y" ? "X" : "Y";
+  const perpAxes =
+    crossDir === "X" ? sortAxes(project.axesX ?? []) : sortAxes(project.axesY ?? []);
+
+  for (const other of project.beams ?? []) {
+    if (other.direction !== crossDir) continue;
+    for (const seg of beamSegments(project, other)) {
+      if (isBeamSegOmitted(other, seg.a0.id, seg.a1.id)) continue;
+      const s0 = Math.min(seg.lo, seg.hi);
+      const s1 = Math.max(seg.lo, seg.hi);
+      if (faceHi < s0 - 2 || faceLo > s1 + 2) continue;
+      const alongOnOther = Math.min(s1, Math.max(s0, faceMid));
+      const body = beamFacesAtAlongDirect(other, alongOnOther, perpAxes);
+      if (body.hi - body.lo < 1) continue;
+      if (body.hi < aLo - 2 || body.lo > aHi + 2) continue;
+      cuts.push({ lo: body.lo, hi: body.hi });
+    }
+  }
+  return cuts;
+}
+
+export type BeamFaceStrokeStyle = "solid" | "dashed";
+
+/**
+ * Các đoạn nét da dầm đã cắt chỗ giao thân (giống PDF).
+ * Y-beam: face = X, along = Y; X-beam: face = Y, along = X.
+ */
+export function clippedBeamFaceParts(
+  project: SlabProject,
+  beamDir: PlanBeam["direction"],
+  face0: number,
+  face1: number,
+  along0: number,
+  along1: number,
+): Array<{ faceA: number; faceB: number; alongA: number; alongB: number }> {
+  const cuts = crossBodyCutsAlong(project, beamDir, face0, face1, along0, along1);
+  const parts = subtractIntervals(along0, along1, cuts);
+  const span = along1 - along0;
+  if (Math.abs(span) < 1e-6) return [];
+  return parts.map(([a0, a1]) => {
+    const t0 = (a0 - along0) / span;
+    const t1 = (a1 - along0) / span;
+    return {
+      faceA: face0 + t0 * (face1 - face0),
+      faceB: face0 + t1 * (face1 - face0),
+      alongA: a0,
+      alongB: a1,
+    };
+  });
+}
+
+/**
+ * Da dầm biên ngoài cùng (trùng bleed) → nét liền (không sàn che phía ngoài);
+ * da trong hướng vào ô sàn → nét đứt.
+ * Dầm xéo/lệch: nếu một đầu da sát biên bleed thì cả đoạn coi là da ngoài.
+ */
+export function beamFaceDashStyle(
+  beamDir: PlanBeam["direction"],
+  face0: number,
+  face1: number,
+  bleed: { xMin: number; xMax: number; yMin: number; yMax: number },
+  epsMm = 2,
+): BeamFaceStrokeStyle {
+  const lo = Math.min(face0, face1);
+  const hi = Math.max(face0, face1);
+  if (beamDir === "Y") {
+    if (Math.abs(lo - bleed.xMin) <= epsMm || Math.abs(hi - bleed.xMin) <= epsMm) return "solid";
+    if (Math.abs(lo - bleed.xMax) <= epsMm || Math.abs(hi - bleed.xMax) <= epsMm) return "solid";
+  } else {
+    if (Math.abs(lo - bleed.yMin) <= epsMm || Math.abs(hi - bleed.yMin) <= epsMm) return "solid";
+    if (Math.abs(lo - bleed.yMax) <= epsMm || Math.abs(hi - bleed.yMax) <= epsMm) return "solid";
+  }
+  return "dashed";
+}
+
 /**
  * Phạm vi thép sàn trong ô: giữa da trong hai dầm, thụt insetMm (mặc định = lớp BV).
  * Không kéo thép xuyên qua thân dầm.
@@ -475,8 +626,8 @@ export function subtract1D(
 }
 
 export type RebarBarSeg =
-  | { dir: "X"; x0: number; x1: number; y: number }
-  | { dir: "Y"; y0: number; y1: number; x: number };
+  | { dir: "X"; x0: number; x1: number; y: number; layer?: RebarLayer }
+  | { dir: "Y"; y0: number; y1: number; x: number; layer?: RebarLayer };
 
 /**
  * Thép ô sàn: từ da dầm biên trừ lớp BV; cắt tại ô thủng / sàn thấp chế độ cắt.
@@ -677,6 +828,8 @@ export function expandCutsByCover(
 /**
  * Thép liên tục từ dầm biên đầu → dầm biên cuối:
  * điểm đầu/cuối = da dầm ngoài ± lớp bảo vệ (cover), theo đúng vị trí dầm lệch/xéo tại tim thanh.
+ * Bố trí theo khoảng a trên toàn dải — mỗi thanh clip theo da dầm tại đúng vị trí
+ * (biến thiên chiều dài khi dầm biên lệch/xéo).
  * Cắt tại ô thủng / sàn thấp chế độ cắt: mép = mí da ± cover.
  * Sàn thấp nhấn: thép chạy xuyên ô như sàn thường (nhấn tại dầm quanh ô).
  * Không bố trí thép trên dầm độc lập (cả hai bên đều không có thép liên tục).
@@ -695,80 +848,172 @@ export function stripRebarBarSegments(
   const axLast = axesX[axesX.length - 1];
   const ayFirst = axesY[0];
   const ayLast = axesY[axesY.length - 1];
+  const spaceX = stripRebarSpacingMm(project, "X");
+  const spaceY = stripRebarSpacingMm(project, "Y");
 
-  // Thanh ngang (phương X): mỗi hàng ô — đầu/cuối móc theo da dầm biên tại Y = tim thanh
-  for (let iy = 0; iy < axesY.length - 1; iy++) {
+  // —— Thanh ngang (X): trạm theo Y trên toàn lòng sàn (da trong ± inset) ——
+  {
     let yLo = Infinity;
     let yHi = -Infinity;
-    for (let ix = 0; ix < axesX.length - 1; ix++) {
-      const slab = baySlabExtent(project, axesX, axesY, ix, iy);
-      yLo = Math.min(yLo, slab.y0);
-      yHi = Math.max(yHi, slab.y1);
+    for (let iy = 0; iy < axesY.length - 1; iy++) {
+      for (let ix = 0; ix < axesX.length - 1; ix++) {
+        const slab = baySlabExtent(project, axesX, axesY, ix, iy);
+        yLo = Math.min(yLo, slab.y0);
+        yHi = Math.max(yHi, slab.y1);
+      }
     }
-    if (!(yHi > yLo)) continue;
-    const my = (yLo + yHi) / 2;
-    const leftOuter = beamOuterFacesAtAlong(project, "Y", axFirst, my).lo;
-    const rightOuter = beamOuterFacesAtAlong(project, "Y", axLast, my).hi;
-    const xBarLo = leftOuter + cover;
-    const xBarHi = rightOuter - cover;
-    if (!(xBarHi - xBarLo > 1)) continue;
-    const bandLo = yLo + 1;
-    const bandHi = yHi - 1;
-    const obstacleCuts = expandCutsByCover(
-      cuts
-        .filter((r) => Math.min(r.y1, r.y0) < bandHi && Math.max(r.y1, r.y0) > bandLo)
-        .map((r) => ({ lo: Math.min(r.x0, r.x1), hi: Math.max(r.x0, r.x1) })),
-      cover,
-    );
-    // Chỉ cắt hết thân dầm khi cả hai bên đều không có sàn thường
-    const indep = independentBeamGaps(project, axesX, axesY, "X", iy);
-    const normals = normalBaySpansAlongStrip(project, axesX, axesY, "X", iy);
-    const segs = keepSegmentsTouchingNormalBays(
-      dropSegmentsInsideGaps(subtract1D(xBarLo, xBarHi, [...obstacleCuts, ...indep]), indep),
-      normals,
-    );
-    for (const s of segs) {
-      out.push({ dir: "X", x0: s.lo, x1: s.hi, y: my });
+    if (yHi > yLo) {
+      const bandLo = yLo + SLAB_DIST_RANGE_INSET_MM;
+      const bandHi = yHi - SLAB_DIST_RANGE_INSET_MM;
+      for (const my of rebarStationsAlong(bandLo, bandHi, spaceX)) {
+        const leftOuter = beamOuterFacesAtAlong(project, "Y", axFirst, my).lo;
+        const rightOuter = beamOuterFacesAtAlong(project, "Y", axLast, my).hi;
+        const xBarLo = leftOuter + cover;
+        const xBarHi = rightOuter - cover;
+        if (!(xBarHi - xBarLo > 1)) continue;
+        // Hàng trục chứa my — ô thủng/sàn thấp cắt cả hàng (kể trạm trên thân dầm biên)
+        let iyHit = -1;
+        for (let iy = 0; iy < axesY.length - 1; iy++) {
+          const lo = axesY[iy]!.pos;
+          const hi = axesY[iy + 1]!.pos;
+          const last = iy === axesY.length - 2;
+          if (last ? my >= lo - 1 && my <= hi + 1 : my >= lo - 1 && my < hi) {
+            iyHit = iy;
+            break;
+          }
+        }
+        const rowLo = iyHit >= 0 ? axesY[iyHit]!.pos : -Infinity;
+        const rowHi = iyHit >= 0 ? axesY[iyHit + 1]!.pos : Infinity;
+        const obstacleCuts = expandCutsByCover(
+          cuts
+            .filter((r) => {
+              const ry0 = Math.min(r.y0, r.y1);
+              const ry1 = Math.max(r.y0, r.y1);
+              if (ry0 < my + 1 && ry1 > my - 1) return true;
+              return iyHit >= 0 && ry1 > rowLo + 1 && ry0 < rowHi - 1;
+            })
+            .map((r) => ({ lo: Math.min(r.x0, r.x1), hi: Math.max(r.x0, r.x1) })),
+          cover,
+        );
+        const indep =
+          iyHit >= 0 ? independentBeamGaps(project, axesX, axesY, "X", iyHit) : [];
+        const normals =
+          iyHit >= 0 ? normalBaySpansAlongStrip(project, axesX, axesY, "X", iyHit) : [];
+        const segs = keepSegmentsTouchingNormalBays(
+          dropSegmentsInsideGaps(subtract1D(xBarLo, xBarHi, [...obstacleCuts, ...indep]), indep),
+          normals.length ? normals : [{ lo: xBarLo, hi: xBarHi }],
+        );
+        for (const s of segs) {
+          // Cắt theo bao da ± BV (dầm xéo / hình thang) — tránh đầu thép rơi ngoài
+          const clipped = clipSpanToCoverEnvelope(project, "X", my, s.lo, s.hi, cover);
+          if (!clipped) continue;
+          out.push({ dir: "X", x0: clipped.lo, x1: clipped.hi, y: my });
+        }
+      }
     }
   }
 
-  // Thanh đứng (phương Y): mỗi cột ô — đầu/cuối móc theo da dầm biên tại X = tim thanh
-  for (let ix = 0; ix < axesX.length - 1; ix++) {
+  // —— Thanh đứng (Y): trạm theo X trên toàn lòng sàn ——
+  {
     let xLo = Infinity;
     let xHi = -Infinity;
     for (let iy = 0; iy < axesY.length - 1; iy++) {
-      const slab = baySlabExtent(project, axesX, axesY, ix, iy);
-      xLo = Math.min(xLo, slab.x0);
-      xHi = Math.max(xHi, slab.x1);
+      for (let ix = 0; ix < axesX.length - 1; ix++) {
+        const slab = baySlabExtent(project, axesX, axesY, ix, iy);
+        xLo = Math.min(xLo, slab.x0);
+        xHi = Math.max(xHi, slab.x1);
+      }
     }
-    if (!(xHi > xLo)) continue;
-    const mx = (xLo + xHi) / 2;
-    const bottomOuter = beamOuterFacesAtAlong(project, "X", ayFirst, mx).lo;
-    const topOuter = beamOuterFacesAtAlong(project, "X", ayLast, mx).hi;
-    const yBarLo = bottomOuter + cover;
-    const yBarHi = topOuter - cover;
-    if (!(yBarHi - yBarLo > 1)) continue;
-    const bandLo = xLo + 1;
-    const bandHi = xHi - 1;
-    const obstacleCuts = expandCutsByCover(
-      cuts
-        .filter((r) => Math.min(r.x1, r.x0) < bandHi && Math.max(r.x1, r.x0) > bandLo)
-        .map((r) => ({ lo: Math.min(r.y0, r.y1), hi: Math.max(r.y0, r.y1) })),
-      cover,
-    );
-    const indep = independentBeamGaps(project, axesX, axesY, "Y", ix);
-    const normals = normalBaySpansAlongStrip(project, axesX, axesY, "Y", ix);
-    const segs = keepSegmentsTouchingNormalBays(
-      dropSegmentsInsideGaps(subtract1D(yBarLo, yBarHi, [...obstacleCuts, ...indep]), indep),
-      normals,
-    );
-    for (const s of segs) {
-      out.push({ dir: "Y", y0: s.lo, y1: s.hi, x: mx });
+    if (xHi > xLo) {
+      const bandLo = xLo + SLAB_DIST_RANGE_INSET_MM;
+      const bandHi = xHi - SLAB_DIST_RANGE_INSET_MM;
+      for (const mx of rebarStationsAlong(bandLo, bandHi, spaceY)) {
+        const bottomOuter = beamOuterFacesAtAlong(project, "X", ayFirst, mx).lo;
+        const topOuter = beamOuterFacesAtAlong(project, "X", ayLast, mx).hi;
+        const yBarLo = bottomOuter + cover;
+        const yBarHi = topOuter - cover;
+        if (!(yBarHi - yBarLo > 1)) continue;
+        // Cột trục chứa mx — ô thủng/sàn thấp cắt cả cột (kể trạm trên thân dầm biên)
+        let ixHit = -1;
+        for (let ix = 0; ix < axesX.length - 1; ix++) {
+          const lo = axesX[ix]!.pos;
+          const hi = axesX[ix + 1]!.pos;
+          const last = ix === axesX.length - 2;
+          if (last ? mx >= lo - 1 && mx <= hi + 1 : mx >= lo - 1 && mx < hi) {
+            ixHit = ix;
+            break;
+          }
+        }
+        const colLo = ixHit >= 0 ? axesX[ixHit]!.pos : -Infinity;
+        const colHi = ixHit >= 0 ? axesX[ixHit + 1]!.pos : Infinity;
+        const obstacleCuts = expandCutsByCover(
+          cuts
+            .filter((r) => {
+              const rx0 = Math.min(r.x0, r.x1);
+              const rx1 = Math.max(r.x0, r.x1);
+              if (rx0 < mx + 1 && rx1 > mx - 1) return true;
+              return ixHit >= 0 && rx1 > colLo + 1 && rx0 < colHi - 1;
+            })
+            .map((r) => ({ lo: Math.min(r.y0, r.y1), hi: Math.max(r.y0, r.y1) })),
+          cover,
+        );
+        const indep =
+          ixHit >= 0 ? independentBeamGaps(project, axesX, axesY, "Y", ixHit) : [];
+        const normals =
+          ixHit >= 0 ? normalBaySpansAlongStrip(project, axesX, axesY, "Y", ixHit) : [];
+        const segs = keepSegmentsTouchingNormalBays(
+          dropSegmentsInsideGaps(subtract1D(yBarLo, yBarHi, [...obstacleCuts, ...indep]), indep),
+          normals.length ? normals : [{ lo: yBarLo, hi: yBarHi }],
+        );
+        for (const s of segs) {
+          const clipped = clipSpanToCoverEnvelope(project, "Y", mx, s.lo, s.hi, cover);
+          if (!clipped) continue;
+          out.push({ dir: "Y", y0: clipped.lo, y1: clipped.hi, x: mx });
+        }
+      }
     }
   }
 
   // Sàn thấp chế độ cắt: bố trí thép riêng trong ô + lên thân dầm quanh ô (tách với sàn thường)
   out.push(...cutLowSlabRebarSegments(project, axesX, axesY));
+  return out;
+}
+
+/** Khoảng a bố trí thép theo phương — ưu tiên tick/preset đang chọn (không lấy zone thủ công khi đang preset). */
+export function stripRebarSpacingMm(project: SlabProject, dir: "X" | "Y"): number {
+  const parseSpec = (spec?: string): number | null => {
+    const s = (spec ?? "").trim().toLowerCase().replace(/ø/g, "").replace(/\s+/g, "");
+    const m = s.match(/^(\d{1,2})[a\/x×-](\d{2,4})$/i);
+    if (!m) return null;
+    const sp = Number(m[2]);
+    return Number.isFinite(sp) && sp >= 50 ? sp : null;
+  };
+  if (project.layoutPreset === "simple2") {
+    return parseSpec(project.simple2?.bottomSpec) ?? 150;
+  }
+  if (project.layoutPreset === "economy2") {
+    return parseSpec(project.economy2?.bottomSpec) ?? 200;
+  }
+  for (const z of project.zones ?? []) {
+    if (z.direction === dir && Number(z.spacing) >= 50) return Math.round(Number(z.spacing));
+  }
+  return 150;
+}
+
+/**
+ * Các vị trí đặt thanh trong [lo, hi] theo khoảng a (tâm khe đều ≈ round(L/a) thanh).
+ */
+/** Trần số trạm thép/dải (= MAX/min a) — chỉ khi file lỗi vượt giới hạn kích thước. */
+const MAX_REBAR_STATIONS = Math.ceil(MAX_PLAN_SIZE_MM / 50);
+
+export function rebarStationsAlong(lo: number, hi: number, spacing: number): number[] {
+  const a = Math.max(50, Math.round(spacing) || 150);
+  const span = hi - lo;
+  if (!(span > 1)) return [];
+  const n = Math.min(MAX_REBAR_STATIONS, Math.max(1, Math.round(span / a)));
+  const step = span / n;
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) out.push(lo + (i + 0.5) * step);
   return out;
 }
 
@@ -862,13 +1107,18 @@ export type RebarPressMark = {
 /**
  * Điểm nhấn thép tại thân dầm quanh ô sàn thấp chế độ nhấn.
  * Độ nhấn = chênh cao độ sàn thấp (`drop`).
+ * Chỉ gắn trên cây điển hình (không đánh mọi thanh a=… — tránh chồng ↓drop).
  */
 export function stripRebarPressMarks(
   project: SlabProject,
   axesX: GridAxis[],
   axesY: GridAxis[],
+  zones?: RebarZone[],
+  /** Tái sử dụng kết quả `stripRebarBarSegments` đã tính — tránh gọi lại (đơ UI). */
+  precomputedBars?: RebarBarSeg[],
 ): RebarPressMark[] {
-  const bars = stripRebarBarSegments(project, axesX, axesY);
+  const allBars = precomputedBars ?? stripRebarBarSegments(project, axesX, axesY);
+  const bars = typicalLayeredRebarBars(project, allBars, zones ?? project.zones ?? []);
   const marks: RebarPressMark[] = [];
   const eps = 1;
 
@@ -1000,7 +1250,7 @@ function mergeAxisSpans(spans: { lo: number; hi: number }[]): { lo: number; hi: 
   return out;
 }
 
-/** Phần dầm nhô ngoài khung plan (mm) — dùng neo vòng số hiệu ngoài da dầm. */
+/** Phần dầm nhô ngoài khung plan (mm) — da ngoài cùng kể cả B1 lệch / dịch đoạn. */
 export function planBeamBleed(
   project: SlabProject,
   axesX: GridAxis[],
@@ -1010,16 +1260,58 @@ export function planBeamBleed(
   let xMax = project.planWidth;
   let yMin = 0;
   let yMax = project.planHeight;
+
+  const expandX = (lo: number, hi: number) => {
+    xMin = Math.min(xMin, Math.min(lo, hi));
+    xMax = Math.max(xMax, Math.max(lo, hi));
+  };
+  const expandY = (lo: number, hi: number) => {
+    yMin = Math.min(yMin, Math.min(lo, hi));
+    yMax = Math.max(yMax, Math.max(lo, hi));
+  };
+
+  /** Mở rộng theo da thật của dầm (B1 + dịch đoạn), không chỉ tim trục. */
+  const absorbBeam = (beam: PlanBeam) => {
+    const segs = beamSegments(project, beam);
+    let used = false;
+    for (const seg of segs) {
+      if (isBeamSegOmitted(beam, seg.a0.id, seg.a1.id)) continue;
+      const f = beamSegSideFaces(beam, seg.index);
+      if (beam.direction === "Y") {
+        expandX(f.lo0, f.hi0);
+        expandX(f.lo1, f.hi1);
+      } else {
+        expandY(f.lo0, f.hi0);
+        expandY(f.lo1, f.hi1);
+      }
+      used = true;
+    }
+    if (used) return;
+    const { b: bw } = parseSizeStr(beam.size);
+    const b1 = Number.isFinite(beam.offset) ? (beam.offset as number) : bw / 2;
+    const f = beamOuterFaces(beam.axis, { bw, b1 });
+    if (beam.direction === "Y") expandX(f.lo, f.hi);
+    else expandY(f.lo, f.hi);
+  };
+
+  for (const b of project.beams ?? []) absorbBeam(b);
+
+  // Trục chưa có dầm: fallback tiết diện mặc định
   for (const ax of axesX) {
+    if ((project.beams ?? []).some((b) => !b.free && b.direction === "Y" && (b.axisId === ax.id || Math.abs(b.axis - ax.pos) < 0.5))) {
+      continue;
+    }
     const f = beamOuterFaces(ax.pos, beamSectionOnAxis(project, "Y", ax));
-    xMin = Math.min(xMin, f.lo);
-    xMax = Math.max(xMax, f.hi);
+    expandX(f.lo, f.hi);
   }
   for (const ay of axesY) {
+    if ((project.beams ?? []).some((b) => !b.free && b.direction === "X" && (b.axisId === ay.id || Math.abs(b.axis - ay.pos) < 0.5))) {
+      continue;
+    }
     const f = beamOuterFaces(ay.pos, beamSectionOnAxis(project, "X", ay));
-    yMin = Math.min(yMin, f.lo);
-    yMax = Math.max(yMax, f.hi);
+    expandY(f.lo, f.hi);
   }
+
   return { xMin, xMax, yMin, yMax };
 }
 
@@ -1057,6 +1349,61 @@ export function beamOuterFacesAtSpan(
   }
   const beam = findBeamOnAxis(project, beamDir, axis)!;
   return beamSegAvgOuterFaces(beam, spanIndex);
+}
+
+/** Da dầm tại trục (fallback tiết diện nếu đoạn bị bỏ). */
+function facesAtAxisSpanForDim(
+  project: SlabProject,
+  beamDir: PlanBeam["direction"],
+  axis: GridAxis,
+  spanIndex: number,
+): { lo: number; hi: number } {
+  const f = beamOuterFacesAtSpan(project, beamDir, axis, spanIndex);
+  if (Math.abs(f.hi - f.lo) >= 1) return f;
+  return beamOuterFaces(axis.pos, beamSectionOnAxis(project, beamDir, axis));
+}
+
+/**
+ * Chuỗi mốc da dầm + lòng sàn theo phương X (dầm đứng trên axesX).
+ * [lo0, hi0, lo1, hi1, …] → đoạn hi−lo = B dầm; lo(i+1)−hi(i) = bề rộng sàn.
+ */
+export function faceChainAlongX(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+): number[] {
+  if (axesX.length === 0) return [];
+  const spanIy = Math.max(0, Math.min(axesY.length - 2, Math.floor((axesY.length - 1) / 2)));
+  const pts: number[] = [];
+  for (const ax of axesX) {
+    const f = facesAtAxisSpanForDim(project, "Y", ax, spanIy);
+    const lo = Math.min(f.lo, f.hi);
+    const hi = Math.max(f.lo, f.hi);
+    if (pts.length === 0 || Math.abs(pts[pts.length - 1]! - lo) > 0.5) pts.push(lo);
+    else pts[pts.length - 1] = lo;
+    pts.push(hi);
+  }
+  return pts;
+}
+
+/** Chuỗi mốc da dầm + lòng sàn theo phương Y (dầm ngang trên axesY). */
+export function faceChainAlongY(
+  project: SlabProject,
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+): number[] {
+  if (axesY.length === 0) return [];
+  const spanIx = Math.max(0, Math.min(axesX.length - 2, Math.floor((axesX.length - 1) / 2)));
+  const pts: number[] = [];
+  for (const ay of axesY) {
+    const f = facesAtAxisSpanForDim(project, "X", ay, spanIx);
+    const lo = Math.min(f.lo, f.hi);
+    const hi = Math.max(f.lo, f.hi);
+    if (pts.length === 0 || Math.abs(pts[pts.length - 1]! - lo) > 0.5) pts.push(lo);
+    else pts[pts.length - 1] = lo;
+    pts.push(hi);
+  }
+  return pts;
 }
 
 /** Khóa đoạn dầm giữa hai trục giao. */
@@ -1190,7 +1537,8 @@ export type DistRangeSeg = {
 /**
  * Đường khoảng rải thép sàn cho một thanh: nét ⊥ qua giữa thanh;
  * đầu/cuối = mí dầm trong ± inset (mặc định 50mm vào lòng sàn).
- * Thanh X → khoảng rải theo Y (ô chứa thanh); thanh Y → theo X.
+ * Thanh X → khoảng rải theo Y; thanh Y → theo X.
+ * Ô liền qua dầm đã xóa (không còn thân) → gộp 1 khoảng để đầu/cuối chạm nhau.
  */
 export function slabDistRangeForBar(
   project: SlabProject,
@@ -1202,19 +1550,92 @@ export function slabDistRangeForBar(
   if (axesX.length < 2 || axesY.length < 2) return null;
   const inset = Math.max(0, Math.round(insetMm));
 
+  /**
+   * Lan ô theo phương `along` khi dầm vuông góc giữa ô đã mất thân.
+   * Không lan vào ô thủng / sàn thấp cắt (không còn thép sàn liên tục).
+   */
+  const expandContiguous = (
+    ix0: number,
+    iy0: number,
+    along: "X" | "Y",
+  ): { lo: number; hi: number } => {
+    const s0 = baySlabExtent(project, axesX, axesY, ix0, iy0);
+    if (along === "Y") {
+      let y0 = s0.y0;
+      let y1 = s0.y1;
+      for (let iy = iy0 - 1; iy >= 0; iy--) {
+        if (beamCoversOrthogonalSpan(project, "X", axesY[iy + 1]!, ix0)) break;
+        if (!bayHasSlabRebar(project, axesX, axesY, ix0, iy)) break;
+        const u = baySlabExtent(project, axesX, axesY, ix0, iy);
+        y0 = Math.min(y0, u.y0);
+      }
+      for (let iy = iy0 + 1; iy < axesY.length - 1; iy++) {
+        if (beamCoversOrthogonalSpan(project, "X", axesY[iy]!, ix0)) break;
+        if (!bayHasSlabRebar(project, axesX, axesY, ix0, iy)) break;
+        const u = baySlabExtent(project, axesX, axesY, ix0, iy);
+        y1 = Math.max(y1, u.y1);
+      }
+      return { lo: y0, hi: y1 };
+    }
+    let x0 = s0.x0;
+    let x1 = s0.x1;
+    for (let ix = ix0 - 1; ix >= 0; ix--) {
+      if (beamCoversOrthogonalSpan(project, "Y", axesX[ix + 1]!, iy0)) break;
+      if (!bayHasSlabRebar(project, axesX, axesY, ix, iy0)) break;
+      const u = baySlabExtent(project, axesX, axesY, ix, iy0);
+      x0 = Math.min(x0, u.x0);
+    }
+    for (let ix = ix0 + 1; ix < axesX.length - 1; ix++) {
+      if (beamCoversOrthogonalSpan(project, "Y", axesX[ix]!, iy0)) break;
+      if (!bayHasSlabRebar(project, axesX, axesY, ix, iy0)) break;
+      const u = baySlabExtent(project, axesX, axesY, ix, iy0);
+      x1 = Math.max(x1, u.x1);
+    }
+    return { lo: x0, hi: x1 };
+  };
+
+  // Sàn thấp cắt: khoảng rải neo đúng bao ô thấp (không lan qua dải mất dầm).
+  const owned = barOwnedByCutLowSlab(project, bar);
+  if (owned) {
+    if (bar.dir === "X") {
+      const mx = (bar.x0 + bar.x1) / 2;
+      const yA = owned.y + inset;
+      const yB = owned.y + owned.h - inset;
+      if (!(yB - yA > 1)) return null;
+      return { xA: mx, yA, xB: mx, yB, lenMm: yB - yA };
+    }
+    const my = (bar.y0 + bar.y1) / 2;
+    const xA = owned.x + inset;
+    const xB = owned.x + owned.w - inset;
+    if (!(xB - xA > 1)) return null;
+    return { xA, yA: my, xB, yB: my, lenMm: xB - xA };
+  }
+
   if (bar.dir === "X") {
     const mx = (bar.x0 + bar.x1) / 2;
+    const bx0 = Math.min(bar.x0, bar.x1);
+    const bx1 = Math.max(bar.x0, bar.x1);
     let yLo = Infinity;
     let yHi = -Infinity;
-    for (let iy = 0; iy < axesY.length - 1; iy++) {
-      for (let ix = 0; ix < axesX.length - 1; ix++) {
-        const s = baySlabExtent(project, axesX, axesY, ix, iy);
-        if (bar.y >= s.y0 - 1 && bar.y <= s.y1 + 1) {
-          yLo = Math.min(yLo, s.y0);
-          yHi = Math.max(yHi, s.y1);
+    /** Ưu tiên ô giao đúng đoạn thanh; fallback (sàn xéo) chỉ theo hàng y. */
+    const accumulateX = (requireXOverlap: boolean): boolean => {
+      let hit = false;
+      for (let iy = 0; iy < axesY.length - 1; iy++) {
+        for (let ix = 0; ix < axesX.length - 1; ix++) {
+          // Ô thủng / sàn thấp cắt: không lấy làm neo expand (sàn thấp cắt có nhánh owned riêng)
+          if (!bayHasSlabRebar(project, axesX, axesY, ix, iy)) continue;
+          const s = baySlabExtent(project, axesX, axesY, ix, iy);
+          if (bar.y < s.y0 - 1 || bar.y > s.y1 + 1) continue;
+          if (requireXOverlap && (bx1 < s.x0 - 1 || bx0 > s.x1 + 1)) continue;
+          const e = expandContiguous(ix, iy, "Y");
+          yLo = Math.min(yLo, e.lo);
+          yHi = Math.max(yHi, e.hi);
+          hit = true;
         }
       }
-    }
+      return hit;
+    };
+    if (!accumulateX(true)) accumulateX(false);
     if (!(yHi > yLo)) return null;
     const yA = yLo + inset;
     const yB = yHi - inset;
@@ -1223,17 +1644,28 @@ export function slabDistRangeForBar(
   }
 
   const my = (bar.y0 + bar.y1) / 2;
+  const by0 = Math.min(bar.y0, bar.y1);
+  const by1 = Math.max(bar.y0, bar.y1);
   let xLo = Infinity;
   let xHi = -Infinity;
-  for (let iy = 0; iy < axesY.length - 1; iy++) {
-    for (let ix = 0; ix < axesX.length - 1; ix++) {
-      const s = baySlabExtent(project, axesX, axesY, ix, iy);
-      if (bar.x >= s.x0 - 1 && bar.x <= s.x1 + 1) {
-        xLo = Math.min(xLo, s.x0);
-        xHi = Math.max(xHi, s.x1);
+  /** Ưu tiên ô giao đúng đoạn thanh; fallback (sàn xéo) chỉ theo cột x. */
+  const accumulateY = (requireYOverlap: boolean): boolean => {
+    let hit = false;
+    for (let iy = 0; iy < axesY.length - 1; iy++) {
+      for (let ix = 0; ix < axesX.length - 1; ix++) {
+        if (!bayHasSlabRebar(project, axesX, axesY, ix, iy)) continue;
+        const s = baySlabExtent(project, axesX, axesY, ix, iy);
+        if (bar.x < s.x0 - 1 || bar.x > s.x1 + 1) continue;
+        if (requireYOverlap && (by1 < s.y0 - 1 || by0 > s.y1 + 1)) continue;
+        const e = expandContiguous(ix, iy, "X");
+        xLo = Math.min(xLo, e.lo);
+        xHi = Math.max(xHi, e.hi);
+        hit = true;
       }
     }
-  }
+    return hit;
+  };
+  if (!accumulateY(true)) accumulateY(false);
   if (!(xHi > xLo)) return null;
   const xA = xLo + inset;
   const xB = xHi - inset;
@@ -1248,9 +1680,53 @@ export type MergedDistRange = DistRangeSeg & {
   markKey: string;
 };
 
+/**
+ * Điểm giao đúng đường khoảng rải ∩ thanh điển hình (đã lệch lớp).
+ * Thanh X + khoảng rải đứng → (x đường, y thanh); thanh Y + khoảng rải ngang → (x thanh, y đường).
+ */
+export function distRangeJunctionsOnBars(
+  seg: Pick<MergedDistRange, "dir" | "xA" | "yA" | "xB" | "yB">,
+  bars: RebarBarSeg[],
+): Array<{ x: number; y: number }> {
+  const out: Array<{ x: number; y: number }> = [];
+  const tol = 1;
+  if (seg.dir === "X") {
+    // Khoảng rải ⊥ thanh X = đường đứng (x ≈ const)
+    const xLine = (seg.xA + seg.xB) / 2;
+    const yLo = Math.min(seg.yA, seg.yB);
+    const yHi = Math.max(seg.yA, seg.yB);
+    for (const bar of bars) {
+      if (bar.dir !== "X") continue;
+      const y = bar.y;
+      if (y < yLo - tol || y > yHi + tol) continue;
+      const x0 = Math.min(bar.x0, bar.x1);
+      const x1 = Math.max(bar.x0, bar.x1);
+      if (xLine < x0 - tol || xLine > x1 + tol) continue;
+      out.push({ x: xLine, y });
+    }
+  } else {
+    // Khoảng rải ⊥ thanh Y = đường ngang (y ≈ const)
+    const yLine = (seg.yA + seg.yB) / 2;
+    const xLo = Math.min(seg.xA, seg.xB);
+    const xHi = Math.max(seg.xA, seg.xB);
+    for (const bar of bars) {
+      if (bar.dir !== "Y") continue;
+      const x = bar.x;
+      if (x < xLo - tol || x > xHi + tol) continue;
+      const y0 = Math.min(bar.y0, bar.y1);
+      const y1 = Math.max(bar.y0, bar.y1);
+      if (yLine < y0 - tol || yLine > y1 + tol) continue;
+      out.push({ x, y: yLine });
+    }
+  }
+  return out;
+}
+
 type DistRangePiece = DistRangeSeg & {
   dir: "X" | "Y";
   markKey: string;
+  /** Khóa đồng nhất dài+Ø+móc — chỉ gộp khoảng rải khi trùng. */
+  identityKey: string;
   /** Chỉ số ô dọc theo phương khoảng rải (ix với thanh Y; iy với thanh X). */
   bayIndex: number;
   /** Hàng/cột vuông góc — chỉ gộp trong cùng strip. */
@@ -1258,6 +1734,12 @@ type DistRangePiece = DistRangeSeg & {
   junction: { x: number; y: number };
 };
 
+/**
+ * Ô neo khoảng rải cho thanh: ưu tiên ô chứa trung điểm;
+ * khi mid nằm trên thân dầm (khe giữa hai ô) → ô giao dài nhất với thanh.
+ * Tránh fallback stripKey=0 khiến mọi thanh mid-trên-dầm gộp một dải sai.
+ * Cho phép neo ở sàn thấp cắt (có thép riêng); bỏ qua ô thủng.
+ */
 function bayIndexForBar(
   project: SlabProject,
   axesX: GridAxis[],
@@ -1265,65 +1747,49 @@ function bayIndexForBar(
   bar: RebarBarSeg,
 ): { bayIndex: number; stripKey: number } | null {
   if (bar.dir === "Y") {
-    const my = (bar.y0 + bar.y1) / 2;
-    let ix = -1;
-    let iy = -1;
+    const by0 = Math.min(bar.y0, bar.y1);
+    const by1 = Math.max(bar.y0, bar.y1);
+    const my = (by0 + by1) / 2;
+    let best: { ix: number; iy: number; score: number } | null = null;
     for (let j = 0; j < axesY.length - 1; j++) {
       for (let i = 0; i < axesX.length - 1; i++) {
+        if (bayKindAt(project, axesX, axesY, i, j) === "opening") continue;
         const s = baySlabExtent(project, axesX, axesY, i, j);
-        if (bar.x >= s.x0 - 1 && bar.x <= s.x1 + 1 && my >= s.y0 - 1 && my <= s.y1 + 1) {
-          ix = i;
-          iy = j;
-          break;
-        }
+        if (bar.x < s.x0 - 1 || bar.x > s.x1 + 1) continue;
+        const overlap = Math.min(by1, s.y1) - Math.max(by0, s.y0);
+        if (overlap <= 1) continue;
+        const containsMid = my >= s.y0 - 1 && my <= s.y1 + 1;
+        const score = (containsMid ? 1e12 : 0) + overlap;
+        if (!best || score > best.score) best = { ix: i, iy: j, score };
       }
-      if (ix >= 0) break;
     }
-    if (ix < 0) {
-      // Thanh đứng xuyên nhiều hàng: lấy cột theo X
-      for (let i = 0; i < axesX.length - 1; i++) {
-        const s = baySlabExtent(project, axesX, axesY, i, 0);
-        if (bar.x >= s.x0 - 1 && bar.x <= s.x1 + 1) {
-          ix = i;
-          break;
-        }
-      }
-      iy = 0;
-    }
-    if (ix < 0) return null;
-    return { bayIndex: ix, stripKey: iy };
+    if (!best) return null;
+    return { bayIndex: best.ix, stripKey: best.iy };
   }
-  const mx = (bar.x0 + bar.x1) / 2;
-  let ix = -1;
-  let iy = -1;
+  const bx0 = Math.min(bar.x0, bar.x1);
+  const bx1 = Math.max(bar.x0, bar.x1);
+  const mx = (bx0 + bx1) / 2;
+  let best: { ix: number; iy: number; score: number } | null = null;
   for (let j = 0; j < axesY.length - 1; j++) {
     for (let i = 0; i < axesX.length - 1; i++) {
+      if (bayKindAt(project, axesX, axesY, i, j) === "opening") continue;
       const s = baySlabExtent(project, axesX, axesY, i, j);
-      if (mx >= s.x0 - 1 && mx <= s.x1 + 1 && bar.y >= s.y0 - 1 && bar.y <= s.y1 + 1) {
-        ix = i;
-        iy = j;
-        break;
-      }
+      if (bar.y < s.y0 - 1 || bar.y > s.y1 + 1) continue;
+      const overlap = Math.min(bx1, s.x1) - Math.max(bx0, s.x0);
+      if (overlap <= 1) continue;
+      const containsMid = mx >= s.x0 - 1 && mx <= s.x1 + 1;
+      const score = (containsMid ? 1e12 : 0) + overlap;
+      if (!best || score > best.score) best = { ix: i, iy: j, score };
     }
-    if (iy >= 0) break;
   }
-  if (iy < 0) {
-    for (let j = 0; j < axesY.length - 1; j++) {
-      const s = baySlabExtent(project, axesX, axesY, 0, j);
-      if (bar.y >= s.y0 - 1 && bar.y <= s.y1 + 1) {
-        iy = j;
-        break;
-      }
-    }
-    ix = 0;
-  }
-  if (iy < 0) return null;
-  return { bayIndex: iy, stripKey: ix };
+  if (!best) return null;
+  return { bayIndex: best.iy, stripKey: best.ix };
 }
 
 /**
- * Gộp khoảng rải: ô sàn kề nhau liên tiếp cùng số hiệu → 1 đường
- * từ điểm đầu khoảng rải đầu tiên đến điểm cuối khoảng rải cuối.
+ * Gộp khoảng rải: ô sàn kề nhau liên tiếp cùng loại thép
+ * (cùng chiều dài + Ø + móc) → 1 đường từ đầu dải đến cuối dải.
+ * Khác dài / Ø / móc → không gộp (mỗi loại một khoảng rải riêng).
  */
 export function buildMergedDistRanges(
   project: SlabProject,
@@ -1332,7 +1798,9 @@ export function buildMergedDistRanges(
   bars: RebarBarSeg[],
   markKeyOf: (bar: RebarBarSeg) => string,
   insetMm: number = SLAB_DIST_RANGE_INSET_MM,
+  zones?: RebarZone[],
 ): MergedDistRange[] {
+  const list = zones ?? project.zones ?? [];
   const pieces: DistRangePiece[] = [];
   for (const bar of bars) {
     const seg = slabDistRangeForBar(project, axesX, axesY, bar, insetMm);
@@ -1341,6 +1809,13 @@ export function buildMergedDistRanges(
     if (!idx) continue;
     const markKey = markKeyOf(bar);
     if (!markKey) continue;
+    // Khoảng rải theo dải ô + Ø/móc (+ markKey từ caller).
+    // Caller minh họa/PDF đưa L+móc vào markKey → mỗi số hiệu một khoảng rải;
+    // caller thống kê chỉ dùng mark vùng → vẫn gộp biến thiên L trong vùng.
+    const hooks = hooksForRebarBar(project, bar, list);
+    const z = zoneForRebarBar(project, bar, list);
+    const dia = z ? Math.round(Number(z.dia) || 0) : 0;
+    const identityKey = `${bar.dir}|Ø${dia}|H${hooks.left}/${hooks.right}`;
     const junction =
       bar.dir === "X"
         ? { x: (bar.x0 + bar.x1) / 2, y: bar.y }
@@ -1349,16 +1824,17 @@ export function buildMergedDistRanges(
       ...seg,
       dir: bar.dir,
       markKey,
+      identityKey,
       bayIndex: idx.bayIndex,
       stripKey: idx.stripKey,
       junction,
     });
   }
 
-  // Nhóm theo phương + số hiệu + strip (cùng hàng/cột)
+  // Nhóm theo phương + markKey + loại thép (Ø/móc) + strip (cùng hàng/cột)
   const groups = new Map<string, DistRangePiece[]>();
   for (const p of pieces) {
-    const key = `${p.dir}|${p.markKey}|${p.stripKey}`;
+    const key = `${p.dir}|${p.markKey}|${p.identityKey}|${p.stripKey}`;
     const arr = groups.get(key) ?? [];
     arr.push(p);
     groups.set(key, arr);
@@ -1367,12 +1843,11 @@ export function buildMergedDistRanges(
   const out: MergedDistRange[] = [];
   for (const group of groups.values()) {
     group.sort((a, b) => a.bayIndex - b.bayIndex);
-    // Chạy liên tiếp theo bayIndex
+    // Chạy liên tiếp theo bayIndex (cùng identity đã nhóm sẵn)
     let run: DistRangePiece[] = [];
     const flush = () => {
       if (!run.length) return;
       const first = run[0];
-      const last = run[run.length - 1];
       let xA: number;
       let yA: number;
       let xB: number;
@@ -1414,7 +1889,22 @@ export function buildMergedDistRanges(
       run = [];
     };
     for (const p of group) {
-      if (!run.length || p.bayIndex === run[run.length - 1].bayIndex + 1) {
+      // Cùng bayIndex (nhiều thanh trong 1 ô) hoặc ô kề (+1) → 1 đường liên tục.
+      // Khi xóa dầm giữa ô: bay kề mặt dày 0 — gộp để khoảng rải chạm nhau (không kẽ hở ±inset).
+      // Không gộp qua ô thủng / sàn thấp cắt (kể khi bayIndex nhảy có vẻ kề).
+      const prev = run.length ? run[run.length - 1]! : null;
+      const canJoin =
+        !!prev &&
+        (p.bayIndex === prev.bayIndex ||
+          (p.bayIndex === prev.bayIndex + 1 &&
+            (() => {
+              // Thanh Y: bayIndex=ix, stripKey=iy; thanh X: bayIndex=iy, stripKey=ix
+              if (p.dir === "Y") {
+                return bayHasSlabRebar(project, axesX, axesY, p.bayIndex, p.stripKey);
+              }
+              return bayHasSlabRebar(project, axesX, axesY, p.stripKey, p.bayIndex);
+            })()));
+      if (!run.length || canJoin) {
         run.push(p);
       } else {
         flush();
@@ -1423,7 +1913,128 @@ export function buildMergedDistRanges(
     }
     flush();
   }
+  return clipMergedDistRangesByVoids(project, out);
+}
+
+/**
+ * Cắt đường khoảng rải tại ô thủng — không vẽ nét xuyên lỗ trống.
+ * (Sàn thấp cắt giữ khoảng rải riêng trong bao ô — không clip ở đây.)
+ */
+export function clipMergedDistRangesByVoids(
+  project: SlabProject,
+  segs: MergedDistRange[],
+): MergedDistRange[] {
+  const voids: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
+  for (const o of project.openings ?? []) {
+    voids.push({ x0: o.x, y0: o.y, x1: o.x + o.w, y1: o.y + o.h });
+  }
+  if (!voids.length) return segs;
+
+  const out: MergedDistRange[] = [];
+  for (const seg of segs) {
+    const parts = splitDistSegAroundVoids(seg, voids);
+    for (const part of parts) {
+      const junctions = seg.junctions.filter((j) => {
+        if (part.dir === "Y") {
+          const x0 = Math.min(part.xA, part.xB);
+          const x1 = Math.max(part.xA, part.xB);
+          return j.x >= x0 - 1 && j.x <= x1 + 1 && Math.abs(j.y - part.yA) <= 1;
+        }
+        const y0 = Math.min(part.yA, part.yB);
+        const y1 = Math.max(part.yA, part.yB);
+        return j.y >= y0 - 1 && j.y <= y1 + 1 && Math.abs(j.x - part.xA) <= 1;
+      });
+      out.push({ ...part, junctions });
+    }
+  }
   return out;
+}
+
+function splitDistSegAroundVoids(
+  seg: MergedDistRange,
+  voids: Array<{ x0: number; y0: number; x1: number; y1: number }>,
+): MergedDistRange[] {
+  if (seg.dir === "Y") {
+    // Đường ngang y ≈ const
+    const y = (seg.yA + seg.yB) / 2;
+    let x0 = Math.min(seg.xA, seg.xB);
+    let x1 = Math.max(seg.xA, seg.xB);
+    const gaps: Array<{ lo: number; hi: number }> = [];
+    for (const v of voids) {
+      if (y <= v.y0 + 1 || y >= v.y1 - 1) continue;
+      const lo = Math.max(x0, v.x0);
+      const hi = Math.min(x1, v.x1);
+      if (hi - lo > 1) gaps.push({ lo, hi });
+    }
+    if (!gaps.length) return [seg];
+    gaps.sort((a, b) => a.lo - b.lo);
+    const parts: MergedDistRange[] = [];
+    let cur = x0;
+    for (const g of gaps) {
+      if (g.lo - cur > 1) {
+        const lenMm = g.lo - cur;
+        parts.push({
+          ...seg,
+          xA: cur,
+          xB: g.lo,
+          yA: y,
+          yB: y,
+          lenMm,
+        });
+      }
+      cur = Math.max(cur, g.hi);
+    }
+    if (x1 - cur > 1) {
+      parts.push({
+        ...seg,
+        xA: cur,
+        xB: x1,
+        yA: y,
+        yB: y,
+        lenMm: x1 - cur,
+      });
+    }
+    return parts;
+  }
+  // Đường đứng x ≈ const
+  const x = (seg.xA + seg.xB) / 2;
+  let y0 = Math.min(seg.yA, seg.yB);
+  let y1 = Math.max(seg.yA, seg.yB);
+  const gaps: Array<{ lo: number; hi: number }> = [];
+  for (const v of voids) {
+    if (x <= v.x0 + 1 || x >= v.x1 - 1) continue;
+    const lo = Math.max(y0, v.y0);
+    const hi = Math.min(y1, v.y1);
+    if (hi - lo > 1) gaps.push({ lo, hi });
+  }
+  if (!gaps.length) return [seg];
+  gaps.sort((a, b) => a.lo - b.lo);
+  const parts: MergedDistRange[] = [];
+  let cur = y0;
+  for (const g of gaps) {
+    if (g.lo - cur > 1) {
+      parts.push({
+        ...seg,
+        xA: x,
+        xB: x,
+        yA: cur,
+        yB: g.lo,
+        lenMm: g.lo - cur,
+      });
+    }
+    cur = Math.max(cur, g.hi);
+  }
+  if (y1 - cur > 1) {
+    parts.push({
+      ...seg,
+      xA: x,
+      xB: x,
+      yA: cur,
+      yB: y1,
+      lenMm: y1 - cur,
+    });
+  }
+  return parts;
 }
 
 /** Đoạn chéo trong hình chữ nhật (clip) theo hằng số x−y = c — nét sàn thấp /. */
@@ -1508,8 +2119,761 @@ export function rectNearlyEquals(
   );
 }
 
-/** Chiều dài móc thép sàn trên mặt bằng (mm). */
-export const SLAB_REBAR_HOOK_MM = 50;
+/** Chiều dài móc thép sàn trên mặt bằng (mm) — fallback khi zone không có. */
+export const SLAB_REBAR_HOOK_MM = 100;
+
+/**
+ * Chiều dài móc khi vẽ mặt bằng (mm).
+ * Giữ đúng số đã nhập; nếu quá ngắn so với tỉ lệ bản vẽ thì nâng tối thiểu
+ * để đoạn ⊥ vẫn thấy rõ (~minPx trên SVG/PDF). Thống kê / chiều dài phát triển
+ * vẫn dùng leftHook/rightHook gốc.
+ */
+export function hookDrawMm(hookMm: number, pxPerMm: number, minPx = 6): number {
+  const h = Math.max(0, Math.round(Number(hookMm) || 0));
+  if (h <= 0) return 0;
+  if (!(pxPerMm > 1e-9)) return h;
+  return Math.max(h, Math.ceil(minPx / pxPerMm));
+}
+
+/** Móc mặc định theo preset (simple2 / economy2) khi không khớp zone. */
+function presetHookFallbackMm(project: SlabProject): number {
+  if (project.layoutPreset === "simple2") {
+    return Math.max(0, Math.round(Number(project.simple2?.bottomHook) || 0));
+  }
+  if (project.layoutPreset === "economy2") {
+    return Math.max(0, Math.round(Number(project.economy2?.bottomHook) || 0));
+  }
+  return SLAB_REBAR_HOOK_MM;
+}
+
+/**
+ * Móc trái/phải theo vùng thép phủ tâm thanh (cùng phương).
+ * Truyền `zones` = effectiveZones(project) để đúng Móc thép trái/phải (kể cả preset).
+ * 0 = không vẽ móc.
+ */
+/** Chọn zone cùng phương phủ tâm thanh; ưu tiên đúng `bar.layer` nếu có. */
+export function zoneForRebarBar(
+  project: SlabProject,
+  bar: RebarBarSeg,
+  zones?: RebarZone[],
+): RebarZone | undefined {
+  const list = zones ?? project.zones ?? [];
+  const mx = bar.dir === "X" ? (bar.x0 + bar.x1) / 2 : bar.x;
+  const my = bar.dir === "X" ? bar.y : (bar.y0 + bar.y1) / 2;
+  const sameDir = list.filter((z) => z.direction === bar.dir);
+  const hits = sameDir.filter((z) => {
+    const zx0 = Math.min(z.x1, z.x2);
+    const zx1 = Math.max(z.x1, z.x2);
+    const zy0 = Math.min(z.y1, z.y2);
+    const zy1 = Math.max(z.y1, z.y2);
+    return mx >= zx0 - 1 && mx <= zx1 + 1 && my >= zy0 - 1 && my <= zy1 + 1;
+  });
+  const prefer = bar.layer;
+  if (prefer) {
+    return (
+      hits.find((h) => h.layer === prefer) ??
+      sameDir.find((h) => h.layer === prefer) ??
+      hits.find((h) => h.layer === "bottom") ??
+      hits[0] ??
+      sameDir.find((h) => h.layer === "bottom") ??
+      sameDir[0]
+    );
+  }
+  return (
+    hits.find((h) => h.layer === "bottom") ??
+    hits[0] ??
+    sameDir.find((h) => h.layer === "bottom") ??
+    sameDir[0]
+  );
+}
+
+export function hooksForRebarBar(
+  project: SlabProject,
+  bar: RebarBarSeg,
+  zones?: RebarZone[],
+): { left: number; right: number } {
+  const z = zoneForRebarBar(project, bar, zones);
+  if (!z) {
+    const h = presetHookFallbackMm(project);
+    return { left: h, right: h };
+  }
+  return {
+    left: Math.max(0, Math.round(Number(z.leftHook) || 0)),
+    right: Math.max(0, Math.round(Number(z.rightHook) || 0)),
+  };
+}
+
+/**
+ * Đoạn móc vuông góc với thanh thép (mm mặt bằng).
+ * Chiều dài đúng bằng Móc thép trái / Móc thép phải.
+ * Hướng móc hướng vào trong sàn (về tâm) để luôn thấy rõ trên mặt bằng.
+ */
+export function rebarHookSegments(
+  bar: RebarBarSeg,
+  leftMm: number,
+  rightMm: number,
+  planWidth: number,
+  planHeight: number,
+): Array<{ x1: number; y1: number; x2: number; y2: number }> {
+  const out: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+  const left = Math.max(0, Math.round(leftMm) || 0);
+  const right = Math.max(0, Math.round(rightMm) || 0);
+  if (bar.dir === "X") {
+    // Thanh ngang → móc thẳng đứng (⊥)
+    const midY = planHeight / 2;
+    const sign = bar.y <= midY ? 1 : -1;
+    if (left > 0) {
+      out.push({ x1: bar.x0, y1: bar.y, x2: bar.x0, y2: bar.y + sign * left });
+    }
+    if (right > 0) {
+      out.push({ x1: bar.x1, y1: bar.y, x2: bar.x1, y2: bar.y + sign * right });
+    }
+  } else {
+    // Thanh đứng → móc ngang (⊥)
+    const midX = planWidth / 2;
+    const sign = bar.x <= midX ? 1 : -1;
+    if (left > 0) {
+      out.push({ x1: bar.x, y1: bar.y0, x2: bar.x + sign * left, y2: bar.y0 });
+    }
+    if (right > 0) {
+      out.push({ x1: bar.x, y1: bar.y1, x2: bar.x + sign * right, y2: bar.y1 });
+    }
+  }
+  return out;
+}
+
+/** Khóa đồng nhất: chiều dài (làm tròn 100mm — nhóm biến thiên) + Ø + móc (+ phương). */
+/** Làm tròn chiều dài để gộp dạng thép biến thiên (~3 bậc trên nhịp lệch vừa). */
+export const REBAR_LEN_BUCKET_MM = 400;
+
+export function rebarBarStraightLenMm(bar: RebarBarSeg): number {
+  return bar.dir === "X" ? Math.round(bar.x1 - bar.x0) : Math.round(bar.y1 - bar.y0);
+}
+
+/** Làm tròn chiều dài để gộp dạng thép biến thiên (lớn → bé). */
+export function rebarLenBucketMm(lenMm: number, bucket = REBAR_LEN_BUCKET_MM): number {
+  const b = Math.max(50, Math.round(bucket) || 100);
+  return Math.max(b, Math.round(lenMm / b) * b);
+}
+
+export function rebarBarIdentityKey(
+  project: SlabProject,
+  bar: RebarBarSeg,
+  zones?: RebarZone[],
+): string {
+  const list = zones ?? project.zones ?? [];
+  const len = rebarLenBucketMm(rebarBarStraightLenMm(bar));
+  const hooks = hooksForRebarBar(project, bar, list);
+  const z = zoneForRebarBar(project, bar, list);
+  const dia = z ? Math.round(Number(z.dia) || 0) : 0;
+  return `${bar.dir}|L${len}|Ø${dia}|H${hooks.left}/${hooks.right}`;
+}
+
+export type TypicalRebarGroup = {
+  /** Các thanh liên tiếp cùng loại trong nhóm. */
+  bars: RebarBarSeg[];
+  /** Cây điển hình để vẽ / ghi số hiệu. */
+  typical: RebarBarSeg;
+  /** Chỉ số ô theo phương vuông góc (cột ix với thanh Y; hàng iy với thanh X). */
+  stripIndex?: number;
+};
+
+/**
+ * Chỉ số dải ô chứa thanh: thanh Y → cột giữa trục X; thanh X → hàng giữa trục Y.
+ * VD: trục 1-2 → 0, trục 2-3 → 1.
+ */
+export function bayStripIndexForBar(
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+  bar: RebarBarSeg,
+): number | null {
+  if (bar.dir === "Y") {
+    const pos = bar.x;
+    for (let i = 0; i < axesX.length - 1; i++) {
+      const lo = axesX[i]!.pos;
+      const hi = axesX[i + 1]!.pos;
+      const last = i === axesX.length - 2;
+      if (last ? pos >= lo - 1 && pos <= hi + 1 : pos >= lo - 1 && pos < hi) return i;
+    }
+    return null;
+  }
+  const pos = bar.y;
+  for (let j = 0; j < axesY.length - 1; j++) {
+    const lo = axesY[j]!.pos;
+    const hi = axesY[j + 1]!.pos;
+    const last = j === axesY.length - 2;
+    if (last ? pos >= lo - 1 && pos <= hi + 1 : pos >= lo - 1 && pos < hi) return j;
+  }
+  return null;
+}
+
+/**
+ * Tách thanh trong một dải thành các cụm không chồng nhau theo chiều dài thanh.
+ * Ô thủng / sàn thấp cắt tạo khe lớn → nhiều cụm → mỗi cụm 1 cây điển hình.
+ * Dải liên tục (không cắt) → 1 cụm (giữ 1 cây / dải).
+ */
+function clusterBarsByLengthSpan(bars: RebarBarSeg[], dir: "X" | "Y"): RebarBarSeg[][] {
+  type Item = { bar: RebarBarSeg; lo: number; hi: number };
+  const items: Item[] = bars
+    .map((bar) => ({
+      bar,
+      lo: dir === "X" && bar.dir === "X" ? bar.x0 : bar.dir === "Y" ? bar.y0 : 0,
+      hi: dir === "X" && bar.dir === "X" ? bar.x1 : bar.dir === "Y" ? bar.y1 : 0,
+    }))
+    .sort((a, b) => a.lo - b.lo || a.hi - b.hi);
+  /** Khe > bề rộng dầm thường → coi là cắt bởi ô thủng / sàn thấp. */
+  const GAP_MM = 400;
+  const clusters: Item[][] = [];
+  for (const it of items) {
+    const last = clusters[clusters.length - 1];
+    if (!last) {
+      clusters.push([it]);
+      continue;
+    }
+    const lastHi = Math.max(...last.map((x) => x.hi));
+    if (it.lo > lastHi + GAP_MM) clusters.push([it]);
+    else last.push(it);
+  }
+  return clusters.map((c) => c.map((x) => x.bar));
+}
+
+/**
+ * Gộp theo dải ô (1 cây điển hình / cột với thanh Y, / hàng với thanh X).
+ * Khi dải bị ô thủng / sàn thấp cắt thành nhiều đoạn rời → 1 cây / mỗi cụm liên tục.
+ * Minh họa: phương Y với 2 nhịp trục liên tục → đúng 2 thanh (1–2 và 2–3).
+ */
+export function groupTypicalRebarByBayStrip(
+  project: SlabProject,
+  bars: RebarBarSeg[],
+  axesX: GridAxis[],
+  axesY: GridAxis[],
+  _zones?: RebarZone[],
+): TypicalRebarGroup[] {
+  const groups: TypicalRebarGroup[] = [];
+  for (const dir of ["X", "Y"] as const) {
+    const byStrip = new Map<number, RebarBarSeg[]>();
+    for (const bar of bars) {
+      if (bar.dir !== dir) continue;
+      const strip = bayStripIndexForBar(axesX, axesY, bar);
+      if (strip == null) continue;
+      const arr = byStrip.get(strip) ?? [];
+      arr.push(bar);
+      byStrip.set(strip, arr);
+    }
+    for (const strip of [...byStrip.keys()].sort((a, b) => a - b)) {
+      const stripBars = byStrip.get(strip)!;
+      stripBars.sort((a, b) => {
+        if (dir === "X" && a.dir === "X" && b.dir === "X") return a.y - b.y;
+        if (dir === "Y" && a.dir === "Y" && b.dir === "Y") return a.x - b.x;
+        return 0;
+      });
+      // Ưu tiên thanh sàn thường làm điển hình dải — thép sàn thấp cắt vẽ riêng.
+      // Bỏ mẩu vụn còn lại sau khi cắt ô (quá ngắn) để không làm điển hình giả.
+      const normalBars = stripBars.filter((b) => {
+        if (barOwnedByCutLowSlab(project, b)) return false;
+        const len = b.dir === "X" ? b.x1 - b.x0 : b.y1 - b.y0;
+        return len >= 300;
+      });
+      if (!normalBars.length) continue;
+      const clusters = clusterBarsByLengthSpan(normalBars, dir);
+      for (const cluster of clusters) {
+        const sorted = [...cluster].sort((a, b) => {
+          if (dir === "X" && a.dir === "X" && b.dir === "X") return a.y - b.y;
+          if (dir === "Y" && a.dir === "Y" && b.dir === "Y") return a.x - b.x;
+          return 0;
+        });
+        const mid = sorted[Math.floor((sorted.length - 1) / 2)]!;
+        groups.push({ bars: sorted, typical: mid, stripIndex: strip });
+      }
+    }
+  }
+  return groups;
+}
+
+/**
+ * Gộp thanh kề nhau liên tiếp cùng chiều dài + Ø + móc (biến thiên trong dải).
+ * Dùng cho thống kê Xa/Xb/Xc — không dùng để vẽ điển hình mặt bằng.
+ */
+export function groupTypicalRebarBars(
+  project: SlabProject,
+  bars: RebarBarSeg[],
+  zones?: RebarZone[],
+): TypicalRebarGroup[] {
+  const list = zones ?? project.zones ?? [];
+  const groups: TypicalRebarGroup[] = [];
+
+  for (const dir of ["X", "Y"] as const) {
+    const items = bars
+      .filter((b) => b.dir === dir)
+      .map((bar) => ({
+        bar,
+        key: rebarBarIdentityKey(project, bar, list),
+        pos: bar.dir === "X" ? bar.y : bar.x,
+      }))
+      .sort((a, b) => a.pos - b.pos || a.key.localeCompare(b.key));
+
+    let run: typeof items = [];
+    const flush = () => {
+      if (!run.length) return;
+      const mid = run[Math.floor((run.length - 1) / 2)]!.bar;
+      groups.push({ bars: run.map((r) => r.bar), typical: mid });
+      run = [];
+    };
+
+    for (const item of items) {
+      if (!run.length || run[run.length - 1]!.key === item.key) {
+        run.push(item);
+      } else {
+        flush();
+        run.push(item);
+      }
+    }
+    flush();
+  }
+
+  return groups;
+}
+
+/** Danh sách cây điển hình (1 thanh / dải ô — mặt bằng). */
+export function typicalRebarBars(
+  project: SlabProject,
+  bars: RebarBarSeg[],
+  zones?: RebarZone[],
+): RebarBarSeg[] {
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  if (axesX.length >= 2 && axesY.length >= 2) {
+    return groupTypicalRebarByBayStrip(project, bars, axesX, axesY, zones).map((g) => g.typical);
+  }
+  return groupTypicalRebarBars(project, bars, zones).map((g) => g.typical);
+}
+
+/**
+ * Khoảng cách mặt bằng giữa lớp dưới và lớp trên (mm) =
+ * bề dày sàn − dày lớp bảo vệ.
+ */
+export function slabLayerPlanGapMm(project: SlabProject): number {
+  const thickness = Math.max(0, Math.round(Number(project.info?.thickness) || 0));
+  return Math.max(0, thickness - slabCoverMm(project));
+}
+
+/**
+ * Khoảng lệch ⊥ trên mặt bằng để 2 lớp không dính chùm.
+ * Lấy max(dày−BV, ~1/12 nhịp ngắn, 600mm) — đủ thấy rõ preview/PDF.
+ */
+export function slabLayerPlanVisualGapMm(project: SlabProject): number {
+  const eng = slabLayerPlanGapMm(project);
+  const W = Math.max(0, Number(project.planWidth) || 0);
+  const H = Math.max(0, Number(project.planHeight) || 0);
+  const short = Math.min(W || H, H || W);
+  const bySpan = short > 0 ? Math.round(short / 12) : 0;
+  return Math.max(eng, bySpan, 600);
+}
+
+/**
+ * Phương nằm dưới trước ở lớp dưới: phương nhịp ngắn
+ * (cạnh sàn nhỏ hơn — W≤H → X, ngược lại → Y).
+ */
+export function bottomUnderDir(project: SlabProject): "X" | "Y" {
+  const W = Math.max(0, Number(project.planWidth) || 0);
+  const H = Math.max(0, Number(project.planHeight) || 0);
+  return W <= H ? "X" : "Y";
+}
+
+function offsetBarPerp(bar: RebarBarSeg, deltaMm: number): RebarBarSeg {
+  if (bar.dir === "X") return { ...bar, y: bar.y + deltaMm };
+  return { ...bar, x: bar.x + deltaMm };
+}
+
+/**
+ * Điểm (x,y) còn nằm trong bao da ngoài ± lớp BV (4 cạnh biên, kể cả dầm xéo).
+ * Dùng để cắt đầu thép / bỏ trạm rơi ra ngoài hình thang.
+ */
+export function pointInCoverEnvelope(
+  project: SlabProject,
+  x: number,
+  y: number,
+  cover = slabCoverMm(project),
+): boolean {
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  if (axesX.length < 2 || axesY.length < 2) return false;
+  const L = beamOuterFacesAtAlong(project, "Y", axesX[0]!, y);
+  const R = beamOuterFacesAtAlong(project, "Y", axesX[axesX.length - 1]!, y);
+  const B = beamOuterFacesAtAlong(project, "X", axesY[0]!, x);
+  const T = beamOuterFacesAtAlong(project, "X", axesY[axesY.length - 1]!, x);
+  return (
+    x >= L.lo + cover - 0.5 &&
+    x <= R.hi - cover + 0.5 &&
+    y >= B.lo + cover - 0.5 &&
+    y <= T.hi - cover + 0.5
+  );
+}
+
+/**
+ * Cắt đoạn [lo,hi] trên thanh (X: theo x tại y; Y: theo y tại x) còn trong bao da ± BV.
+ */
+export function clipSpanToCoverEnvelope(
+  project: SlabProject,
+  dir: "X" | "Y",
+  station: number,
+  lo: number,
+  hi: number,
+  cover = slabCoverMm(project),
+): { lo: number; hi: number } | null {
+  if (!(hi - lo > 1)) return null;
+  const inside = (t: number) =>
+    dir === "X"
+      ? pointInCoverEnvelope(project, t, station, cover)
+      : pointInCoverEnvelope(project, station, t, cover);
+  const step = Math.max(8, Math.min(40, (hi - lo) / 50));
+  const samples: number[] = [];
+  for (let t = lo; t <= hi + 1e-6; t += step) samples.push(t);
+  if (samples.length === 0 || samples[samples.length - 1]! < hi - 0.5) samples.push(hi);
+
+  let first = -1;
+  let last = -1;
+  for (let i = 0; i < samples.length; i++) {
+    if (inside(samples[i]!)) {
+      if (first < 0) first = i;
+      last = i;
+    }
+  }
+  if (first < 0 || last < 0) return null;
+
+  const refine = (a: number, b: number, wantInside: boolean): number => {
+    let loT = a;
+    let hiT = b;
+    for (let k = 0; k < 18; k++) {
+      const mid = (loT + hiT) / 2;
+      if (inside(mid) === wantInside) hiT = mid;
+      else loT = mid;
+    }
+    return wantInside ? hiT : loT;
+  };
+
+  let outLo = samples[first]!;
+  let outHi = samples[last]!;
+  if (first > 0) outLo = refine(samples[first - 1]!, samples[first]!, true);
+  if (last < samples.length - 1) outHi = refine(samples[last]!, samples[last + 1]!, false);
+  if (!(outHi - outLo > 1)) return null;
+  return { lo: outLo, hi: outHi };
+}
+
+/** Thanh nằm trong ô sàn thấp chế độ cắt (thép riêng của ô, không phải sàn thường). */
+export function barOwnedByCutLowSlab(
+  project: SlabProject,
+  bar: RebarBarSeg,
+): NonNullable<SlabProject["lowSlabs"]>[number] | null {
+  for (const ls of project.lowSlabs ?? []) {
+    if ((ls.rebarMode ?? "press") !== "cut") continue;
+    const x0 = ls.x;
+    const y0 = ls.y;
+    const x1 = ls.x + ls.w;
+    const y1 = ls.y + ls.h;
+    if (bar.dir === "X") {
+      const mid = (bar.x0 + bar.x1) / 2;
+      if (mid >= x0 - 1 && mid <= x1 + 1 && bar.y >= y0 - 1 && bar.y <= y1 + 1) return ls;
+    } else {
+      const mid = (bar.y0 + bar.y1) / 2;
+      if (bar.x >= x0 - 1 && bar.x <= x1 + 1 && mid >= y0 - 1 && mid <= y1 + 1) return ls;
+    }
+  }
+  return null;
+}
+
+/**
+ * Neo thép sàn thấp cắt theo dầm bao quanh đúng ô đó (không kéo full biên sàn).
+ */
+function reanchorCutLowBarToBay(
+  project: SlabProject,
+  bar: RebarBarSeg,
+  ls: NonNullable<SlabProject["lowSlabs"]>[number],
+): RebarBarSeg {
+  const cover = slabCoverMm(project);
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  let ix = -1;
+  let iy = -1;
+  for (let j = 0; j < axesY.length - 1 && iy < 0; j++) {
+    for (let i = 0; i < axesX.length - 1; i++) {
+      const slab = baySlabExtent(project, axesX, axesY, i, j);
+      if (rectNearlyEquals(ls, slab.x0, slab.y0, slab.x1, slab.y1)) {
+        ix = i;
+        iy = j;
+        break;
+      }
+    }
+  }
+  if (ix < 0 || iy < 0) return bar;
+  const ax0 = axesX[ix]!;
+  const ax1 = axesX[ix + 1]!;
+  const ay0 = axesY[iy]!;
+  const ay1 = axesY[iy + 1]!;
+  if (bar.dir === "X") {
+    const left = beamOuterFacesAtAlong(project, "Y", ax0, bar.y);
+    const right = beamOuterFacesAtAlong(project, "Y", ax1, bar.y);
+    const x0 = left.lo + cover;
+    const x1 = right.hi - cover;
+    if (!(x1 - x0 > 1)) return bar;
+    return { ...bar, x0, x1 };
+  }
+  const bottom = beamOuterFacesAtAlong(project, "X", ay0, bar.x);
+  const top = beamOuterFacesAtAlong(project, "X", ay1, bar.x);
+  const y0 = bottom.lo + cover;
+  const y1 = top.hi - cover;
+  if (!(y1 - y0 > 1)) return bar;
+  return { ...bar, y0, y1 };
+}
+
+/**
+ * Sau khi neo full biên ± BV: cắt lại ô thủng / sàn thấp cắt + khe dầm độc lập,
+ * rồi giữ đoạn chứa trung điểm thanh gốc (không cầu nối xuyên ô trống).
+ */
+function pickSpanAfterObstacles(
+  project: SlabProject,
+  dir: "X" | "Y",
+  station: number,
+  lo: number,
+  hi: number,
+  preferMid: number,
+  cover: number,
+): { lo: number; hi: number } | null {
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  const cuts = rebarCutRects(project);
+
+  let stripHit = -1;
+  if (dir === "X") {
+    for (let iy = 0; iy < axesY.length - 1; iy++) {
+      const a0 = axesY[iy]!.pos;
+      const a1 = axesY[iy + 1]!.pos;
+      const last = iy === axesY.length - 2;
+      if (last ? station >= a0 - 1 && station <= a1 + 1 : station >= a0 - 1 && station < a1) {
+        stripHit = iy;
+        break;
+      }
+    }
+  } else {
+    for (let ix = 0; ix < axesX.length - 1; ix++) {
+      const a0 = axesX[ix]!.pos;
+      const a1 = axesX[ix + 1]!.pos;
+      const last = ix === axesX.length - 2;
+      if (last ? station >= a0 - 1 && station <= a1 + 1 : station >= a0 - 1 && station < a1) {
+        stripHit = ix;
+        break;
+      }
+    }
+  }
+  const stripLo =
+    stripHit >= 0 ? (dir === "X" ? axesY[stripHit]!.pos : axesX[stripHit]!.pos) : -Infinity;
+  const stripHi =
+    stripHit >= 0
+      ? dir === "X"
+        ? axesY[stripHit + 1]!.pos
+        : axesX[stripHit + 1]!.pos
+      : Infinity;
+
+  const obstacleCuts =
+    dir === "X"
+      ? expandCutsByCover(
+          cuts
+            .filter((r) => {
+              const ry0 = Math.min(r.y0, r.y1);
+              const ry1 = Math.max(r.y0, r.y1);
+              if (ry0 < station + 1 && ry1 > station - 1) return true;
+              return stripHit >= 0 && ry1 > stripLo + 1 && ry0 < stripHi - 1;
+            })
+            .map((r) => ({ lo: Math.min(r.x0, r.x1), hi: Math.max(r.x0, r.x1) })),
+          cover,
+        )
+      : expandCutsByCover(
+          cuts
+            .filter((r) => {
+              const rx0 = Math.min(r.x0, r.x1);
+              const rx1 = Math.max(r.x0, r.x1);
+              if (rx0 < station + 1 && rx1 > station - 1) return true;
+              return stripHit >= 0 && rx1 > stripLo + 1 && rx0 < stripHi - 1;
+            })
+            .map((r) => ({ lo: Math.min(r.y0, r.y1), hi: Math.max(r.y0, r.y1) })),
+          cover,
+        );
+  const indep =
+    stripHit >= 0 ? independentBeamGaps(project, axesX, axesY, dir, stripHit) : [];
+  const segs = subtract1D(lo, hi, [...obstacleCuts, ...indep]);
+  if (!segs.length) return null;
+  return (
+    segs.find((s) => preferMid >= s.lo - 1 && preferMid <= s.hi + 1) ??
+    [...segs].sort((a, b) => b.hi - b.lo - (a.hi - a.lo))[0] ??
+    null
+  );
+}
+
+/**
+ * Đặt lại đầu thanh vào da ngoài ± lớp BV tại đúng trạm (sau khi lệch ⊥ 2 lớp),
+ * rồi cắt theo bao 4 cạnh — tránh móc rơi ngoài dầm xéo / hình thang.
+ * Giữ cắt ô thủng / sàn thấp cắt (không kéo thép xuyên ô trống).
+ * Thép sàn thấp cắt: neo theo dầm bao quanh đúng ô đó.
+ */
+export function reanchorBarEndsToCover(project: SlabProject, bar: RebarBarSeg): RebarBarSeg {
+  const owned = barOwnedByCutLowSlab(project, bar);
+  if (owned) return reanchorCutLowBarToBay(project, bar, owned);
+
+  const cover = slabCoverMm(project);
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  if (axesX.length < 2 || axesY.length < 2) return bar;
+
+  if (bar.dir === "X") {
+    const left = beamOuterFacesAtAlong(project, "Y", axesX[0]!, bar.y);
+    const right = beamOuterFacesAtAlong(project, "Y", axesX[axesX.length - 1]!, bar.y);
+    const x0 = left.lo + cover;
+    const x1 = right.hi - cover;
+    if (!(x1 - x0 > 1)) return bar;
+    const clipped = clipSpanToCoverEnvelope(project, "X", bar.y, x0, x1, cover);
+    if (!clipped) return bar;
+    const hit = pickSpanAfterObstacles(
+      project,
+      "X",
+      bar.y,
+      clipped.lo,
+      clipped.hi,
+      (bar.x0 + bar.x1) / 2,
+      cover,
+    );
+    if (!hit) return bar;
+    return { ...bar, x0: hit.lo, x1: hit.hi };
+  }
+
+  const bottom = beamOuterFacesAtAlong(project, "X", axesY[0]!, bar.x);
+  const top = beamOuterFacesAtAlong(project, "X", axesY[axesY.length - 1]!, bar.x);
+  const y0 = bottom.lo + cover;
+  const y1 = top.hi - cover;
+  if (!(y1 - y0 > 1)) return bar;
+  const clipped = clipSpanToCoverEnvelope(project, "Y", bar.x, y0, y1, cover);
+  if (!clipped) return bar;
+  const hit = pickSpanAfterObstacles(
+    project,
+    "Y",
+    bar.x,
+    clipped.lo,
+    clipped.hi,
+    (bar.y0 + bar.y1) / 2,
+    cover,
+  );
+  if (!hit) return bar;
+  return { ...bar, y0: hit.lo, y1: hit.hi };
+}
+
+/** Lệch ⊥ minh họa 2 lớp + neo đầu thép lại theo lớp BV tại trạm mới. */
+function offsetBarPerpReanchored(
+  project: SlabProject,
+  bar: RebarBarSeg,
+  deltaMm: number,
+): RebarBarSeg {
+  return reanchorBarEndsToCover(project, offsetBarPerp(bar, deltaMm));
+}
+
+/**
+ * Cắt thanh điển hình theo các vùng lớp trên (thép mũ):
+ * mỗi vùng mũ → một đoạn ngắn từ tim dầm ± L/n, không chạy full nhịp.
+ */
+export function clipBarToTopZones(bar: RebarBarSeg, zones: RebarZone[]): RebarBarSeg[] {
+  const tops = zones.filter((z) => z.layer === "top" && z.direction === bar.dir);
+  if (!tops.length) return [{ ...bar, layer: "top" }];
+
+  const out: RebarBarSeg[] = [];
+  for (const z of tops) {
+    const zx0 = Math.min(z.x1, z.x2);
+    const zx1 = Math.max(z.x1, z.x2);
+    const zy0 = Math.min(z.y1, z.y2);
+    const zy1 = Math.max(z.y1, z.y2);
+    if (bar.dir === "X") {
+      if (bar.y < zy0 - 1 || bar.y > zy1 + 1) continue;
+      const x0 = Math.max(bar.x0, zx0);
+      const x1 = Math.min(bar.x1, zx1);
+      if (x1 - x0 < 50) continue;
+      out.push({ dir: "X", x0, x1, y: bar.y, layer: "top" });
+    } else {
+      if (bar.x < zx0 - 1 || bar.x > zx1 + 1) continue;
+      const y0 = Math.max(bar.y0, zy0);
+      const y1 = Math.min(bar.y1, zy1);
+      if (y1 - y0 < 50) continue;
+      out.push({ dir: "Y", y0, y1, x: bar.x, layer: "top" });
+    }
+  }
+  return out;
+}
+
+/**
+ * Cây điển hình theo lớp: khi cùng phương có cả lớp dưới + lớp trên
+ * → hiện 2 thanh (mỗi lớp 1), lệch ⊥ rõ ràng để không dính chùm
+ * (khoảng = `slabLayerPlanVisualGapMm`).
+ * Lớp trên (mũ): cắt theo vùng top — nhiều đoạn ngắn từ tim dầm.
+ * Lớp dưới: phương nhịp ngắn nằm dưới trước; lớp trên đảo ngược thứ tự vẽ.
+ */
+export function typicalLayeredRebarBars(
+  project: SlabProject,
+  bars: RebarBarSeg[],
+  zones?: RebarZone[],
+): RebarBarSeg[] {
+  const list = zones ?? project.zones ?? [];
+  /** Chỉ vẽ phương đã có vùng thép — thêm vùng → minh họa cập nhật ngay. */
+  if (!list.length) return [];
+
+  const groups = groupTypicalRebarByBayStrip(
+    project,
+    bars,
+    sortAxes(project.axesX ?? []),
+    sortAxes(project.axesY ?? []),
+    list,
+  ).filter((g) => list.some((z) => z.direction === g.typical.dir));
+  const sep = slabLayerPlanVisualGapMm(project);
+  const half = sep / 2;
+  const underBot = bottomUnderDir(project);
+  const underTop: "X" | "Y" = underBot === "X" ? "Y" : "X";
+
+  const layerOf = (dir: "X" | "Y", layer: "bottom" | "top") =>
+    list.some((z) => z.direction === dir && z.layer === layer);
+
+  const pushTypical = (mid: RebarBarSeg) => {
+    const dir = mid.dir;
+    const hasBot = layerOf(dir, "bottom");
+    const hasTop = layerOf(dir, "top");
+    /** Có zone structural-only vẫn hiện 1 thanh điển hình. */
+    if (!hasBot && !hasTop && !list.some((z) => z.direction === dir)) return;
+    if (hasBot && hasTop) {
+      // Căn quanh cây giữa dải: dưới −half, trên +half (tách rõ 2 lớp)
+      // Neo lại đầu ± BV tại trạm mới — tránh móc rơi ngoài da dầm khi dầm xéo.
+      out.push({ ...offsetBarPerpReanchored(project, mid, -half), layer: "bottom" });
+      const topBase = offsetBarPerpReanchored(project, mid, half);
+      // Thép mũ: clip theo vùng — không neo lại mép biên (đầu nằm trên dầm trong).
+      out.push(...clipBarToTopZones(topBase, list));
+    } else if (hasTop && !hasBot) {
+      out.push(...clipBarToTopZones(mid, list));
+    } else {
+      out.push({ ...reanchorBarEndsToCover(project, mid), layer: "bottom" });
+    }
+  };
+
+  const out: RebarBarSeg[] = [];
+  for (const g of groups) pushTypical(g.typical);
+
+  // Mỗi ô sàn thấp cắt: luôn có cây điển hình X+Y riêng (không gộp mất vào dải sàn thường)
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  for (const bar of cutLowSlabRebarSegments(project, axesX, axesY)) {
+    pushTypical(bar);
+  }
+
+  const rank = (b: RebarBarSeg): number => {
+    const layer = b.layer === "top" ? 1 : 0;
+    const under = b.layer === "top" ? underTop : underBot;
+    const dirRank = b.dir === under ? 0 : 1;
+    return layer * 10 + dirRank;
+  };
+  return out.sort((a, b) => rank(a) - rank(b));
+}
 
 /** Đọc B / H / B1 từ info (kèm fallback chuỗi beamSize cũ). */
 export function beamDims(info: SlabInfo): { B: number; H: number; B1: number } {
@@ -1574,6 +2938,62 @@ export function nextAxisNameY(axes: GridAxis[]): string {
 
 export function sortAxes(axes: GridAxis[]): GridAxis[] {
   return [...axes].sort((a, b) => a.pos - b.pos);
+}
+
+/** Vị trí cắt tuyệt đối (mm) = pos(trục) + offset từ trục trở ra. */
+export function sectionCutAtMm(
+  project: SlabProject,
+  section: Pick<SectionCut, "direction" | "at" | "axisId" | "offsetMm">,
+): number {
+  const axes = sortAxes(
+    section.direction === "X" ? project.axesX ?? [] : project.axesY ?? [],
+  );
+  const ax =
+    (section.axisId ? axes.find((a) => a.id === section.axisId) : undefined) ??
+    axes[Math.floor((axes.length - 1) / 2)] ??
+    axes[0];
+  if (!ax) return Math.round(Number(section.at) || 0);
+  return Math.round(ax.pos + (Number(section.offsetMm) || 0));
+}
+
+/**
+ * Đảm bảo có mặt cắt theo phương X và Y; gắn trục + offset → `at`.
+ * Giữ tên mặt cắt chung từ phần tử đầu (hoặc "1").
+ */
+export function ensureSectionCuts(project: SlabProject): SectionCut[] {
+  const name = project.sections?.[0]?.name?.trim() || "1";
+  const textHeight = project.sections?.[0]?.textHeight || 150;
+  const xs = sortAxes(project.axesX ?? []);
+  const ys = sortAxes(project.axesY ?? []);
+  const midX = xs[Math.floor((xs.length - 1) / 2)] ?? xs[0];
+  const midY = ys[Math.floor((ys.length - 1) / 2)] ?? ys[0];
+  const W = project.planWidth || xs[xs.length - 1]?.pos || 6000;
+  const H = project.planHeight || ys[ys.length - 1]?.pos || 4500;
+
+  const pick = (dir: "X" | "Y"): SectionCut => {
+    const prev = (project.sections ?? []).find((s) => s.direction === dir);
+    const axes = dir === "X" ? xs : ys;
+    const fallback = dir === "X" ? midX : midY;
+    const ax =
+      (prev?.axisId ? axes.find((a) => a.id === prev.axisId) : undefined) ??
+      fallback ??
+      axes[0];
+    const offsetMm = Math.round(Number(prev?.offsetMm) || 0);
+    const at = ax ? Math.round(ax.pos + offsetMm) : Math.round(Number(prev?.at) || 0);
+    return {
+      id: prev?.id ?? uid("sec"),
+      name,
+      textHeight: prev?.textHeight || textHeight,
+      direction: dir,
+      axisId: ax?.id,
+      offsetMm,
+      at,
+      from: 0,
+      to: dir === "X" ? H : W,
+    };
+  };
+
+  return [pick("X"), pick("Y")];
 }
 
 export function defaultAxesX(width = 6000): GridAxis[] {
@@ -1664,8 +3084,7 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
   const axesX = sortAxes(project.axesX ?? []);
   const axesY = sortAxes(project.axesY ?? []);
   const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
-  const prefix = project.info.beamNamePrefix || "D";
-  const { B, H, B1 } = beamDims(project.info);
+  const { B, H } = beamDims(project.info);
   const defaultSize = formatBeamSize(B, H);
   const prev = project.beams ?? [];
   const findPrev = (direction: PlanBeam["direction"], axisId: string, axis: number) =>
@@ -1673,17 +3092,13 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
     prev.find((b) => !b.free && b.direction === direction && Math.abs(b.axis - axis) < 0.5);
 
   const beams: PlanBeam[] = [];
-  let n = 1;
-  const usedNames = new Set<string>();
-  const nextName = (preferred?: string) => {
-    if (preferred && preferred.trim() && !usedNames.has(preferred)) {
-      usedNames.add(preferred);
-      return preferred;
-    }
-    let name = `${prefix}${n++}`;
-    while (usedNames.has(name)) name = `${prefix}${n++}`;
-    usedNames.add(name);
-    return name;
+  const catalog = beamTypeNameSet(project);
+  let typeIdx = 0;
+  const pickName = (preferred?: string) => {
+    const pref = normalizeBeamTypeName(preferred || "");
+    if (pref && catalog.has(pref.toLowerCase())) return pref;
+    const t = beamTypeAtIndex(project, typeIdx++);
+    return t?.name || "—";
   };
 
   for (const ax of axesX) {
@@ -1692,7 +3107,7 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
     const idx = axesX.findIndex((a) => a.id === ax.id);
     beams.push({
       id: old?.id ?? uid("beam"),
-      name: nextName(old?.name),
+      name: pickName(old?.name),
       size: old ? formatBeamSize(dims.b, dims.h) : defaultSize,
       direction: "Y",
       axis: ax.pos,
@@ -1708,7 +3123,7 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
     const idx = axesY.findIndex((a) => a.id === ay.id);
     beams.push({
       id: old?.id ?? uid("beam"),
-      name: nextName(old?.name),
+      name: pickName(old?.name),
       size: old ? formatBeamSize(dims.b, dims.h) : defaultSize,
       direction: "X",
       axis: ay.pos,
@@ -1718,10 +3133,11 @@ export function beamsFromAxes(project: SlabProject): PlanBeam[] {
       offset: beamOffsetForAxisIndex(dims.b, idx, axesY.length),
     });
   }
-  // Giữ dầm chèn giữa ô (không gắn trục)
+  // Giữ dầm chèn giữa ô (không gắn trục) — tên vẫn chỉ trong danh sách
   for (const b of prev.filter((x) => x.free)) {
     beams.push({
       ...b,
+      name: pickName(b.name),
       free: true,
       axisId: undefined,
       start: 0,
@@ -1767,10 +3183,39 @@ export function applyBeamDimsToAll(
   dims: { beamB: number; beamH: number; beamB1: number },
 ): SlabProject {
   const size = formatBeamSize(dims.beamB, dims.beamH);
-  const beams = (project.beams?.length ? project.beams : []).map((b) => ({
-    ...b,
-    size,
-  }));
+  const axesX = sortAxes(project.axesX ?? []);
+  const axesY = sortAxes(project.axesY ?? []);
+  const peersY = (project.beams ?? [])
+    .filter((b) => b.direction === "Y" && !b.free)
+    .slice()
+    .sort((a, b) => a.axis - b.axis || a.name.localeCompare(b.name));
+  const peersX = (project.beams ?? [])
+    .filter((b) => b.direction === "X" && !b.free)
+    .slice()
+    .sort((a, b) => a.axis - b.axis || a.name.localeCompare(b.name));
+  const beams = (project.beams?.length ? project.beams : []).map((b) => {
+    if (b.free) return { ...b, size };
+    if (b.direction === "Y") {
+      const idx = resolveBeamAxisIndex(b, axesX, peersY);
+      return {
+        ...b,
+        size,
+        offset:
+          idx >= 0
+            ? beamOffsetForAxisIndex(dims.beamB, idx, axesX.length)
+            : beamOffsetForAxisIndex(dims.beamB, 0, Math.max(1, axesX.length)),
+      };
+    }
+    const idx = resolveBeamAxisIndex(b, axesY, peersX);
+    return {
+      ...b,
+      size,
+      offset:
+        idx >= 0
+          ? beamOffsetForAxisIndex(dims.beamB, idx, axesY.length)
+          : beamOffsetForAxisIndex(dims.beamB, 0, Math.max(1, axesY.length)),
+    };
+  });
   const info = syncBeamInfo({
     ...project.info,
     beamB: dims.beamB,
@@ -1815,17 +3260,93 @@ export function ensureAxes(project: SlabProject): SlabProject {
   return { ...project, info, axesX, axesY, ...size };
 }
 
+/**
+ * Ô sàn = khoảng giữa 4 dầm. Dầm free / lệch trục phải có trục tại tim
+ * để tách ô (1 dầm cắt ngang → 2 ô; cắt ngang + dọc → 4 ô).
+ */
+export function ensureBeamsSplitBays(project: SlabProject): SlabProject {
+  const base = ensureAxes(project);
+  let axesX = sortAxes(base.axesX ?? []);
+  let axesY = sortAxes(base.axesY ?? []);
+  const beamsIn = base.beams ?? [];
+  const tol = 1;
+
+  const addAxisX = (pos: number) => {
+    const p = Math.round(pos);
+    if (axesX.some((a) => Math.abs(a.pos - p) <= tol)) return;
+    axesX = sortAxes([...axesX, { id: uid("ax"), name: nextAxisNameX(axesX), pos: p }]);
+  };
+  const addAxisY = (pos: number) => {
+    const p = Math.round(pos);
+    if (axesY.some((a) => Math.abs(a.pos - p) <= tol)) return;
+    axesY = sortAxes([...axesY, { id: uid("ay"), name: nextAxisNameY(axesY), pos: p }]);
+  };
+
+  for (const b of beamsIn) {
+    if (b.direction === "Y") addAxisX(b.axis);
+    else addAxisY(b.axis);
+  }
+
+  const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
+  const snapped = beamsIn.map((b) => {
+    const axes = b.direction === "Y" ? axesX : axesY;
+    let best = axes[0];
+    let bestD = Infinity;
+    for (const a of axes) {
+      const d = Math.abs(a.pos - b.axis);
+      if (d < bestD) {
+        bestD = d;
+        best = a;
+      }
+    }
+    const { free: _free, ...rest } = b;
+    return {
+      ...rest,
+      axisId: best.id,
+      axis: best.pos,
+      start: 0,
+      end: b.direction === "Y" ? Hplan : W,
+    };
+  });
+
+  // Một dầm / (phương + trục)
+  const seen = new Set<string>();
+  const dedup: PlanBeam[] = [];
+  for (const b of snapped) {
+    const k = `${b.direction}:${b.axisId}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    dedup.push(b);
+  }
+
+  const size = planSizeFromAxes(axesX, axesY);
+  return syncBeamsToAxes({
+    ...base,
+    axesX,
+    axesY,
+    ...size,
+    beams: dedup,
+    info: syncBeamInfo({
+      ...base.info,
+      beamCountX: dedup.filter((b) => b.direction === "Y").length,
+      beamCountY: dedup.filter((b) => b.direction === "X").length,
+    }),
+  });
+}
+
 /** Cập nhật trục + kích thước mặt bằng; dầm theo tim trục (biên / giữa). */
 export function applyAxesToProject(project: SlabProject): SlabProject {
   const withAxes = ensureAxes(project);
   const size = planSizeFromAxes(withAxes.axesX, withAxes.axesY);
   const info = syncBeamInfo(withAxes.info);
-  return syncBeamsToAxes({
+  const synced = syncBeamsToAxes({
     ...withAxes,
     info,
     ...size,
     beams: withAxes.beams ?? [],
   });
+  // Dầm giữa ô / lệch trục → thêm trục để ô sàn không dính liền băng qua dầm
+  return ensureBeamsSplitBays(synced);
 }
 
 /**
@@ -1850,29 +3371,24 @@ export function applyAxisCount(
           axesX: project.axesX,
           axesY: setAxisCount(project.axesY ?? [], n, project.planHeight || 4500, "Y"),
         };
-  const withAxes = applyAxesToProject({ ...project, ...nextAxes });
+  const withAxes = applyAxesToProject({
+    ...project,
+    ...nextAxes,
+    // Bỏ dầm free — số trục mới quyết định ô; free sẽ bị ensureBeamsSplitBays thêm trục lệch
+    beams: (project.beams ?? []).filter((b) => !b.free),
+  });
   const axesX = sortAxes(withAxes.axesX ?? []);
   const axesY = sortAxes(withAxes.axesY ?? []);
   const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
-  const { B, H, B1 } = beamDims(withAxes.info);
+  const { B, H } = beamDims(withAxes.info);
   const defaultSize = formatBeamSize(B, H);
-  const prefix = withAxes.info.beamNamePrefix || "D";
+  const catalog = beamTypeNameSet(withAxes);
 
   const beamDir: PlanBeam["direction"] = dir === "X" ? "Y" : "X";
   const axes = dir === "X" ? axesX : axesY;
-  const existingAll = (withAxes.beams ?? [])
-    .filter((b) => b.direction === beamDir)
+  const existing = (withAxes.beams ?? [])
+    .filter((b) => b.direction === beamDir && !b.free)
     .sort((a, b) => a.axis - b.axis);
-  const freeKept = existingAll
-    .filter((b) => b.free)
-    .map((b) => ({
-      ...b,
-      free: true as const,
-      axisId: undefined,
-      start: 0,
-      end: beamDir === "Y" ? Hplan : W,
-    }));
-  const existing = existingAll.filter((b) => !b.free);
   const keptOther = (withAxes.beams ?? [])
     .filter((b) => b.direction !== beamDir)
     .map((b) => ({
@@ -1881,38 +3397,43 @@ export function applyAxisCount(
       end: b.direction === "Y" ? Hplan : W,
     }));
 
-  const usedNames = new Set(keptOther.map((b) => b.name).filter(Boolean));
-  let nameIdx = 1;
-  const nextName = (preferred?: string) => {
-    if (preferred && preferred.trim() && !usedNames.has(preferred)) {
-      usedNames.add(preferred);
-      return preferred;
-    }
-    let name = `${prefix}${nameIdx++}`;
-    while (usedNames.has(name)) name = `${prefix}${nameIdx++}`;
-    usedNames.add(name);
-    return name;
+  const pickName = (i: number, preferred?: string) => {
+    const pref = normalizeBeamTypeName(preferred || "");
+    if (pref && catalog.has(pref.toLowerCase())) return pref;
+    return beamTypeAtIndex(withAxes, i)?.name || "—";
   };
 
   const synced: PlanBeam[] = axes.map((ax, i) => {
     const prev = existing[i];
-    const dims = prev ? parseSize(prev.size) : { b: B, h: H };
+    const fromList = beamTypeAtIndex(withAxes, i);
+    const dims = prev
+      ? parseSize(prev.size)
+      : fromList
+        ? parseSize(fromList.size)
+        : { b: B, h: H };
     const bw = dims.b;
     return {
       id: prev?.id ?? uid("beam"),
-      name: nextName(prev?.name),
-      size: prev ? formatBeamSize(dims.b, dims.h) : defaultSize,
+      name: pickName(i, prev?.name),
+      size: prev
+        ? formatBeamSize(dims.b, dims.h)
+        : fromList?.size || defaultSize,
       direction: beamDir,
       axis: ax.pos,
       axisId: ax.id,
       start: 0,
       end: beamDir === "Y" ? Hplan : W,
-      offset: beamOffsetForAxisIndex(bw, i, axes.length),
+      offset:
+        prev && Number.isFinite(prev.offset)
+          ? (prev.offset as number)
+          : fromList && Number.isFinite(fromList.offset)
+            ? (fromList.offset as number)
+            : beamOffsetForAxisIndex(bw, i, axes.length),
     };
   });
 
-  const beams = dir === "X" ? [...synced, ...freeKept, ...keptOther] : [...keptOther, ...synced, ...freeKept];
-  return {
+  const beams = dir === "X" ? [...synced, ...keptOther] : [...keptOther, ...synced];
+  return ensureBeamsSplitBays({
     ...withAxes,
     beams,
     info: syncBeamInfo({
@@ -1920,18 +3441,16 @@ export function applyAxisCount(
       beamCountX: beams.filter((b) => b.direction === "Y").length,
       beamCountY: beams.filter((b) => b.direction === "X").length,
     }),
-  };
+  });
 }
 
-/** Tạo dầm mới theo phương (Y = dầm đứng / theo trục X). */
+/** Tạo dầm mới theo phương (Y = dầm đứng / theo trục X). Tên lấy từ Danh sách dầm. */
 export function createBeam(
   project: SlabProject,
   direction: PlanBeam["direction"],
   axisPos: number,
   index: number,
 ): PlanBeam {
-  const { B, H } = beamDims(project.info);
-  const prefix = project.info.beamNamePrefix || "D";
   const axesX = sortAxes(project.axesX ?? []);
   const axesY = sortAxes(project.axesY ?? []);
   const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(axesX, axesY);
@@ -1949,21 +3468,29 @@ export function createBeam(
     }
   }
   const axis = axisIdx >= 0 ? axes[axisIdx] : undefined;
+  const fromList = beamTypeAtIndex(project, Math.max(0, index - 1));
+  const { B: bDef, H: hDef } = beamDims(project.info);
+  const size = fromList?.size || formatBeamSize(bDef, hDef);
+  const parsed = parseSize(size);
   return {
     id: uid("beam"),
-    name: `${prefix}${index}`,
-    size: formatBeamSize(B, H),
+    name: fromList?.name || "—",
+    size: formatBeamSize(parsed.b, parsed.h),
     direction,
     axis: axis?.pos ?? axisPos,
     axisId: axis?.id,
     start: 0,
     end: direction === "Y" ? Hplan : W,
-    offset: beamOffsetForAxisIndex(B, Math.max(0, axisIdx), Math.max(1, axes.length)),
+    offset:
+      fromList && Number.isFinite(fromList.offset)
+        ? (fromList.offset as number)
+        : beamOffsetForAxisIndex(parsed.b, Math.max(0, axisIdx), Math.max(1, axes.length)),
   };
 }
 
 /**
- * Đổi số lượng dầm theo phương — không thêm/bớt trục.
+ * Đổi số lượng dầm theo phương — đồng bộ số trục + dầm trên tim
+ * (mỗi dầm một trục → ô sàn tách đúng giữa các dầm).
  * Phương X (UI): dầm đứng (direction Y). Phương Y: dầm ngang (direction X).
  */
 export function applyBeamCounts(
@@ -1974,82 +3501,10 @@ export function applyBeamCounts(
   const base = ensureAxes(project);
   const cx = Math.max(0, Math.round(countX ?? base.info.beamCountX ?? 0));
   const cy = Math.max(0, Math.round(countY ?? base.info.beamCountY ?? 0));
-  const { planWidth: W, planHeight: Hplan } = planSizeFromAxes(base.axesX, base.axesY);
-  const { B, H, B1 } = beamDims(base.info);
-  const size = formatBeamSize(B, H);
-  const prefix = base.info.beamNamePrefix || "D";
-
-  const existingY = (base.beams ?? [])
-    .filter((b) => b.direction === "Y" && !b.free)
-    .sort((a, b) => a.axis - b.axis);
-  const existingX = (base.beams ?? [])
-    .filter((b) => b.direction === "X" && !b.free)
-    .sort((a, b) => a.axis - b.axis);
-  const freeY = (base.beams ?? [])
-    .filter((b) => b.direction === "Y" && b.free)
-    .map((b) => ({ ...b, free: true as const, axisId: undefined, start: 0, end: Hplan }));
-  const freeX = (base.beams ?? [])
-    .filter((b) => b.direction === "X" && b.free)
-    .map((b) => ({ ...b, free: true as const, axisId: undefined, start: 0, end: W }));
-
-  const place = (n: number, i: number, total: number) =>
-    n <= 1 ? Math.round(total / 2) : Math.round((total * i) / (n - 1));
-
-  const nextY: PlanBeam[] = [];
-  for (let i = 0; i < cx; i++) {
-    const axisPos = place(cx, i, W);
-    const prev = existingY[i];
-    if (prev) {
-      nextY.push({ ...prev, axis: axisPos, start: 0, end: Hplan });
-    } else {
-      nextY.push({
-        id: uid("beam"),
-        name: `${prefix}${nextY.length + existingX.length + 1}`,
-        size,
-        direction: "Y",
-        axis: axisPos,
-        start: 0,
-        end: Hplan,
-        offset: B1,
-      });
-    }
-  }
-
-  const nextX: PlanBeam[] = [];
-  for (let i = 0; i < cy; i++) {
-    const axisPos = place(cy, i, Hplan);
-    const prev = existingX[i];
-    if (prev) {
-      nextX.push({ ...prev, axis: axisPos, start: 0, end: W });
-    } else {
-      nextX.push({
-        id: uid("beam"),
-        name: `${prefix}${nextY.length + nextX.length + 1}`,
-        size,
-        direction: "X",
-        axis: axisPos,
-        start: 0,
-        end: W,
-        offset: B1,
-      });
-    }
-  }
-
-  // Đánh lại tên nếu trùng / thiếu
-  const beams = [...nextY, ...freeY, ...nextX, ...freeX].map((b, i) => ({
-    ...b,
-    name: b.name?.trim() ? b.name : `${prefix}${i + 1}`,
-  }));
-
-  return {
-    ...base,
-    info: syncBeamInfo({
-      ...base.info,
-      beamCountX: beams.filter((b) => b.direction === "Y").length,
-      beamCountY: beams.filter((b) => b.direction === "X").length,
-    }),
-    beams,
-  };
+  let next: SlabProject = base;
+  if (cx >= 2) next = applyAxisCount(next, "X", cx);
+  if (cy >= 2) next = applyAxisCount(next, "Y", cy);
+  return ensureBeamsSplitBays(next);
 }
 
 /** Chèn thêm trục X — không thêm dầm. */
@@ -2311,7 +3766,7 @@ export function beamSegments(project: SlabProject, beam: PlanBeam): BeamSegment[
   return out;
 }
 
-/** Thêm một dầm theo phương (không thêm trục). */
+/** Thêm một dầm theo phương — tạo trục tại tim để tách ô sàn. */
 export function addBeam(
   project: SlabProject,
   direction: PlanBeam["direction"],
@@ -2326,13 +3781,15 @@ export function addBeam(
       : Math.round(Hplan / 2 + same.length * 300);
   const beam = createBeam(base, direction, axisPos, beams.length + 1);
   beams.push(beam);
-  const beamCountX = beams.filter((b) => b.direction === "Y").length;
-  const beamCountY = beams.filter((b) => b.direction === "X").length;
-  return {
+  return ensureBeamsSplitBays({
     ...base,
     beams,
-    info: syncBeamInfo({ ...base.info, beamCountX, beamCountY }),
-  };
+    info: syncBeamInfo({
+      ...base.info,
+      beamCountX: beams.filter((b) => b.direction === "Y").length,
+      beamCountY: beams.filter((b) => b.direction === "X").length,
+    }),
+  });
 }
 
 /** Tăng số đuôi tên dầm: D1 → D2, DX → DX1, D → D1. */
@@ -2343,6 +3800,86 @@ export function bumpBeamTypeName(name: string): string {
   return `${raw}1`;
 }
 
+/** Chuẩn hóa tên loại dầm để so khớp (không phân biệt hoa thường / khoảng trắng). */
+export function normalizeBeamTypeName(name: string): string {
+  return (name || "").trim().replace(/\s+/g, " ");
+}
+
+/** Tập tên trong Danh sách dầm. */
+export function beamTypeNameSet(project: SlabProject): Set<string> {
+  return new Set(
+    (project.beamTypes ?? [])
+      .map((t) => normalizeBeamTypeName(t.name))
+      .filter(Boolean)
+      .map((n) => n.toLowerCase()),
+  );
+}
+
+export function findBeamTypeByName(
+  project: SlabProject,
+  name: string,
+): BeamTypeDef | undefined {
+  const key = normalizeBeamTypeName(name).toLowerCase();
+  if (!key) return undefined;
+  return (project.beamTypes ?? []).find(
+    (t) => normalizeBeamTypeName(t.name).toLowerCase() === key,
+  );
+}
+
+/** Tên hiển thị trên mặt bằng: chỉ tên có trong Danh sách dầm. */
+export function planBeamDisplayName(project: SlabProject, beamName: string): string {
+  const t = findBeamTypeByName(project, beamName);
+  return t ? normalizeBeamTypeName(t.name) : "—";
+}
+
+/**
+ * Đồng bộ tên dầm trên mặt bằng với Danh sách dầm:
+ * tên ngoài list được gán lại theo thứ tự list (xoay vòng).
+ */
+export function clampPlanBeamNamesToCatalog(project: SlabProject): SlabProject {
+  const types = project.beamTypes ?? [];
+  if (!types.length) {
+    let changed = false;
+    const beams = (project.beams ?? []).map((b) => {
+      if (normalizeBeamTypeName(b.name) === "—") return b;
+      changed = true;
+      return { ...b, name: "—" };
+    });
+    return changed ? { ...project, beams } : project;
+  }
+  const catalog = beamTypeNameSet(project);
+  let idx = 0;
+  let changed = false;
+  const beams = (project.beams ?? []).map((b) => {
+    const pref = normalizeBeamTypeName(b.name);
+    if (pref && catalog.has(pref.toLowerCase())) {
+      const canon = findBeamTypeByName(project, pref)?.name ?? pref;
+      if (canon !== b.name) changed = true;
+      return canon === b.name ? b : { ...b, name: canon };
+    }
+    const t = types[((idx % types.length) + types.length) % types.length];
+    idx += 1;
+    changed = true;
+    return { ...b, name: normalizeBeamTypeName(t.name) || t.name };
+  });
+  return changed ? { ...project, beams } : project;
+}
+
+/** Lấy loại dầm theo thứ tự danh sách (xoay vòng) — không tự tạo tên ngoài list. */
+export function beamTypeAtIndex(
+  project: SlabProject,
+  index: number,
+): Pick<BeamTypeDef, "name" | "size" | "offset"> | null {
+  const types = project.beamTypes ?? [];
+  if (!types.length) return null;
+  const t = types[((index % types.length) + types.length) % types.length];
+  return {
+    name: normalizeBeamTypeName(t.name) || t.name,
+    size: t.size,
+    offset: t.offset,
+  };
+}
+
 /** Tên gợi ý cho loại dầm tiếp theo (D1, D2…). */
 export function suggestNextBeamTypeName(project: SlabProject): string {
   const types = project.beamTypes ?? [];
@@ -2351,19 +3888,24 @@ export function suggestNextBeamTypeName(project: SlabProject): string {
     return `${prefix}1`;
   }
   const last = types[types.length - 1]?.name || "D1";
-  return bumpBeamTypeName(last);
+  let next = bumpBeamTypeName(last);
+  const used = beamTypeNameSet(project);
+  while (used.has(next.toLowerCase())) next = bumpBeamTypeName(next);
+  return next;
 }
 
 /**
  * Thêm loại dầm vào danh sách (nút Thêm).
- * Cùng tên vẫn thêm được dòng mới nếu H/B khác (1 tên có thể nhiều kích thước).
+ * Không cho trùng tên (không phân biệt hoa thường).
+ * Trả về null nếu tên trống hoặc trùng.
  */
 export function addOrUpdateBeamType(
   project: SlabProject,
   input: { name: string; size?: string; offset?: number },
-): SlabProject {
-  const name = (input.name || "").trim();
-  if (!name) return project;
+): SlabProject | null {
+  const name = normalizeBeamTypeName(input.name);
+  if (!name) return null;
+  if (beamTypeNameSet(project).has(name.toLowerCase())) return null;
   const { B, H, B1 } = beamDims(project.info);
   const size = (input.size || formatBeamSize(B, H)).trim() || formatBeamSize(B, H);
   const offset = Number.isFinite(input.offset as number)
@@ -2407,10 +3949,32 @@ export function patchBeamType(
   typeId: string,
   patch: Partial<BeamTypeDef>,
 ): SlabProject {
-  return {
-    ...project,
-    beamTypes: (project.beamTypes ?? []).map((t) => (t.id === typeId ? { ...t, ...patch } : t)),
-  };
+  const types = project.beamTypes ?? [];
+  const prev = types.find((t) => t.id === typeId);
+  if (!prev) return project;
+
+  let nextName = prev.name;
+  if (patch.name !== undefined) {
+    const n = normalizeBeamTypeName(patch.name);
+    if (!n) return project;
+    const dup = types.some(
+      (t) => t.id !== typeId && normalizeBeamTypeName(t.name).toLowerCase() === n.toLowerCase(),
+    );
+    if (dup) return project;
+    nextName = n;
+  }
+
+  const nextTypes = types.map((t) =>
+    t.id === typeId ? { ...t, ...patch, name: nextName } : t,
+  );
+  const oldKey = normalizeBeamTypeName(prev.name).toLowerCase();
+  const beams =
+    nextName !== prev.name
+      ? (project.beams ?? []).map((b) =>
+          normalizeBeamTypeName(b.name).toLowerCase() === oldKey ? { ...b, name: nextName } : b,
+        )
+      : project.beams;
+  return { ...project, beamTypes: nextTypes, beams };
 }
 
 /** Gán loại dầm (tên + BxH + B1) cho các dầm mặt bằng theo id. */
@@ -2619,8 +4183,21 @@ export function setPlanSize(
 ): SlabProject {
   const prevW = project.planWidth || 0;
   const prevH = project.planHeight || 0;
-  const W = Math.max(500, Math.round(widthMm) || 500);
-  const H = Math.max(500, Math.round(heightMm) || 500);
+  let W = clampPlanSizeMm(widthMm);
+  let H = clampPlanSizeMm(heightMm);
+  if (W * H > MAX_PLAN_AREA_MM2) {
+    const widthChanged = W !== prevW;
+    const heightChanged = H !== prevH;
+    if (widthChanged && !heightChanged) {
+      W = clampPlanSizeMm(Math.floor(MAX_PLAN_AREA_MM2 / Math.max(H, 1)));
+    } else if (heightChanged && !widthChanged) {
+      H = clampPlanSizeMm(Math.floor(MAX_PLAN_AREA_MM2 / Math.max(W, 1)));
+    } else {
+      const scale = Math.sqrt(MAX_PLAN_AREA_MM2 / (W * H));
+      W = clampPlanSizeMm(W * scale);
+      H = clampPlanSizeMm(H * scale);
+    }
+  }
   const widthChanged = W !== prevW;
   const heightChanged = H !== prevH;
   if (!widthChanged && !heightChanged) return project;
