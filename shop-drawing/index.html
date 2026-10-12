@@ -37,13 +37,13 @@
       z-index: 20;
     }
     .brand {
-      display: flex; align-items: center; gap: 0.65rem;
+      display: flex; align-items: flex-end; gap: 0.1rem;
       text-decoration: none; color: #fff; min-width: 0; flex: none;
     }
-    .brand .custom-logo { width: 40px; height: 40px; flex: none; display: block; }
+    .brand .custom-logo { width: 45px; height: 45px; flex: none; display: block; }
     .brand strong {
-      font-size: 1.1rem; letter-spacing: 0.08em; font-weight: 800;
-      color: #fff; white-space: nowrap;
+      font-size: 1.4rem; letter-spacing: 0.03em; font-weight: 800;
+      color: #fff; white-space: nowrap; line-height: 1; padding-bottom: 5px;
     }
     .nav-slot {
       position: relative;
@@ -327,7 +327,6 @@
     .mono { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; word-break: break-all; }
     .otp-step[hidden] { display: none !important; }
     @media (max-width: 900px) {
-      .brand strong { font-size: 1rem; }
       .tab { font-size: 0.82rem; padding: 0.42rem 0.65rem; }
       .chip { max-width: 34vw; font-size: 0.65rem; }
     }
