@@ -750,7 +750,10 @@ export function independentBeamGaps(
   return gaps;
 }
 
-/** Khoảng lòng ô còn bố trí thép (sàn thường + sàn thấp) trên một hàng/cột. */
+/**
+ * Khoảng lòng ô còn bố trí thép (sàn thường + sàn thấp) trên một hàng/cột.
+ * Dùng bao dài nhất — ô thang/tam/ngũ/lục giác vẫn giữ đoạn thép ở mũi hình học.
+ */
 export function normalBaySpansAlongStrip(
   project: SlabProject,
   axesX: GridAxis[],
@@ -763,14 +766,14 @@ export function normalBaySpansAlongStrip(
     const iy = stripIndex;
     for (let ix = 0; ix < axesX.length - 1; ix++) {
       if (!bayHasSlabRebar(project, axesX, axesY, ix, iy)) continue;
-      const e = baySlabExtent(project, axesX, axesY, ix, iy);
+      const e = baySlabExtentMaxEnvelope(project, axesX, axesY, ix, iy);
       spans.push({ lo: e.x0, hi: e.x1 });
     }
   } else {
     const ix = stripIndex;
     for (let iy = 0; iy < axesY.length - 1; iy++) {
       if (!bayHasSlabRebar(project, axesX, axesY, ix, iy)) continue;
-      const e = baySlabExtent(project, axesX, axesY, ix, iy);
+      const e = baySlabExtentMaxEnvelope(project, axesX, axesY, ix, iy);
       spans.push({ lo: e.y0, hi: e.y1 });
     }
   }
@@ -842,8 +845,8 @@ export function expandCutsByCover(
 /**
  * Thép liên tục từ dầm biên đầu → dầm biên cuối:
  * điểm đầu/cuối = da dầm ngoài ± lớp bảo vệ (cover), theo đúng vị trí dầm lệch/xéo tại tim thanh.
- * Bố trí theo khoảng a trên toàn dải — mỗi thanh clip theo da dầm tại đúng vị trí
- * (biến thiên chiều dài khi dầm biên lệch/xéo).
+ * Bố trí theo khoảng a trên bao dài nhất (max envelope) — mỗi thanh clip theo da dầm tại đúng vị trí.
+ * Ô hình thang / tam giác / ngũ giác / lục giác: biến thiên chiều dài cả phương X và Y.
  * Cắt tại ô thủng / sàn thấp chế độ cắt: mép = mí da ± cover.
  * Sàn thấp nhấn: thép chạy xuyên ô như sàn thường (nhấn tại dầm quanh ô).
  * Không bố trí thép trên dầm độc lập (cả hai bên đều không có thép liên tục).
@@ -866,12 +869,13 @@ export function stripRebarBarSegments(
   const spaceY = stripRebarSpacingMm(project, "Y");
 
   // —— Thanh ngang (X): trạm theo Y trên toàn lòng sàn (da trong ± inset) ——
+  // Bao dài nhất (max envelope): ô thang/tam/ngũ/lục giác — biến thiên cả X và Y.
   {
     let yLo = Infinity;
     let yHi = -Infinity;
     for (let iy = 0; iy < axesY.length - 1; iy++) {
       for (let ix = 0; ix < axesX.length - 1; ix++) {
-        const slab = baySlabExtent(project, axesX, axesY, ix, iy);
+        const slab = baySlabExtentMaxEnvelope(project, axesX, axesY, ix, iy);
         yLo = Math.min(yLo, slab.y0);
         yHi = Math.max(yHi, slab.y1);
       }
@@ -886,6 +890,7 @@ export function stripRebarBarSegments(
         const xBarHi = rightOuter - cover;
         if (!(xBarHi - xBarLo > 1)) continue;
         // Hàng trục chứa my — ô thủng/sàn thấp cắt cả hàng (kể trạm trên thân dầm biên)
+        // Trạm ngoài tim trục (mũi thang/tam giác) → kẹp vào ô biên gần nhất.
         let iyHit = -1;
         for (let iy = 0; iy < axesY.length - 1; iy++) {
           const lo = axesY[iy]!.pos;
@@ -895,6 +900,10 @@ export function stripRebarBarSegments(
             iyHit = iy;
             break;
           }
+        }
+        if (iyHit < 0 && axesY.length >= 2) {
+          if (my < axesY[0]!.pos) iyHit = 0;
+          else if (my > axesY[axesY.length - 1]!.pos) iyHit = axesY.length - 2;
         }
         const rowLo = iyHit >= 0 ? axesY[iyHit]!.pos : -Infinity;
         const rowHi = iyHit >= 0 ? axesY[iyHit + 1]!.pos : Infinity;
@@ -928,12 +937,13 @@ export function stripRebarBarSegments(
   }
 
   // —— Thanh đứng (Y): trạm theo X trên toàn lòng sàn ——
+  // Bao dài nhất: mũi ô hình thang/tam/ngũ/lục → thép Y cũng biến thiên L.
   {
     let xLo = Infinity;
     let xHi = -Infinity;
     for (let iy = 0; iy < axesY.length - 1; iy++) {
       for (let ix = 0; ix < axesX.length - 1; ix++) {
-        const slab = baySlabExtent(project, axesX, axesY, ix, iy);
+        const slab = baySlabExtentMaxEnvelope(project, axesX, axesY, ix, iy);
         xLo = Math.min(xLo, slab.x0);
         xHi = Math.max(xHi, slab.x1);
       }
@@ -948,6 +958,7 @@ export function stripRebarBarSegments(
         const yBarHi = topOuter - cover;
         if (!(yBarHi - yBarLo > 1)) continue;
         // Cột trục chứa mx — ô thủng/sàn thấp cắt cả cột (kể trạm trên thân dầm biên)
+        // Trạm ngoài tim trục (mũi hình học) → kẹp vào ô biên gần nhất.
         let ixHit = -1;
         for (let ix = 0; ix < axesX.length - 1; ix++) {
           const lo = axesX[ix]!.pos;
@@ -957,6 +968,10 @@ export function stripRebarBarSegments(
             ixHit = ix;
             break;
           }
+        }
+        if (ixHit < 0 && axesX.length >= 2) {
+          if (mx < axesX[0]!.pos) ixHit = 0;
+          else if (mx > axesX[axesX.length - 1]!.pos) ixHit = axesX.length - 2;
         }
         const colLo = ixHit >= 0 ? axesX[ixHit]!.pos : -Infinity;
         const colHi = ixHit >= 0 ? axesX[ixHit + 1]!.pos : Infinity;
@@ -2426,21 +2441,28 @@ export function bayStripIndexForBar(
 ): number | null {
   if (bar.dir === "Y") {
     const pos = bar.x;
+    if (axesX.length < 2) return null;
     for (let i = 0; i < axesX.length - 1; i++) {
       const lo = axesX[i]!.pos;
       const hi = axesX[i + 1]!.pos;
       const last = i === axesX.length - 2;
       if (last ? pos >= lo - 1 && pos <= hi + 1 : pos >= lo - 1 && pos < hi) return i;
     }
+    // Mũi ô thang/tam giác ngoài tim trục → dải biên gần nhất
+    if (pos < axesX[0]!.pos) return 0;
+    if (pos > axesX[axesX.length - 1]!.pos) return axesX.length - 2;
     return null;
   }
   const pos = bar.y;
+  if (axesY.length < 2) return null;
   for (let j = 0; j < axesY.length - 1; j++) {
     const lo = axesY[j]!.pos;
     const hi = axesY[j + 1]!.pos;
     const last = j === axesY.length - 2;
     if (last ? pos >= lo - 1 && pos <= hi + 1 : pos >= lo - 1 && pos < hi) return j;
   }
+  if (pos < axesY[0]!.pos) return 0;
+  if (pos > axesY[axesY.length - 1]!.pos) return axesY.length - 2;
   return null;
 }
 
