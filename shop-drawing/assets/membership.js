@@ -155,10 +155,14 @@
     });
   }
 
-  async function login(username, password) {
+  async function login(username, password, remember) {
     return api("auth_login.php", {
       method: "POST",
-      body: { username: username, password: password },
+      body: {
+        username: username,
+        password: password,
+        remember: !!remember,
+      },
     });
   }
 

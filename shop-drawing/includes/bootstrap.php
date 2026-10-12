@@ -71,6 +71,11 @@ require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/domains.php';
 require_once __DIR__ . '/embed.php';
 
+// Gia hạn cookie session khi đã bật Remember me
+if (!empty($_SESSION['remember_me']) && function_exists('refresh_remember_me_cookie')) {
+  refresh_remember_me_cookie();
+}
+
 function cfg(string $key, $default = null) {
   global $CONFIG;
   return $CONFIG[$key] ?? $default;

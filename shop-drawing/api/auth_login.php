@@ -7,9 +7,11 @@ try {
     json_out(['ok' => false, 'error' => 'POST only'], 405);
   }
   $body = read_json_body();
+  $remember = !empty($body['remember']);
   $result = login_with_password(
     (string) ($body['username'] ?? ''),
-    (string) ($body['password'] ?? '')
+    (string) ($body['password'] ?? ''),
+    $remember
   );
   json_out($result, !empty($result['ok']) ? 200 : 400);
 } catch (Throwable $e) {

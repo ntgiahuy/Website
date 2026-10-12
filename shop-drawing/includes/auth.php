@@ -63,11 +63,55 @@ function current_member(): ?array {
   return null;
 }
 
-function login_member(array $row): void {
+function remember_me_lifetime(): int {
+  return 60 * 60 * 24 * 30; // 30 ngày
+}
+
+function apply_session_cookie_lifetime(int $lifetime): void {
+  if (!ini_get('session.use_cookies')) {
+    return;
+  }
+  $p = session_get_cookie_params();
+  $expires = $lifetime > 0 ? time() + $lifetime : 0;
+  if ($lifetime > 0) {
+    ini_set('session.gc_maxlifetime', (string) $lifetime);
+  }
+  if (PHP_VERSION_ID >= 70300) {
+    setcookie(session_name(), session_id(), [
+      'expires' => $expires,
+      'path' => $p['path'] ?? '/',
+      'domain' => $p['domain'] ?? '',
+      'secure' => (bool) ($p['secure'] ?? false),
+      'httponly' => (bool) ($p['httponly'] ?? true),
+      'samesite' => $p['samesite'] ?? 'Lax',
+    ]);
+  } else {
+    setcookie(
+      session_name(),
+      session_id(),
+      $expires,
+      $p['path'] ?? '/',
+      $p['domain'] ?? '',
+      (bool) ($p['secure'] ?? false),
+      (bool) ($p['httponly'] ?? true)
+    );
+  }
+}
+
+function refresh_remember_me_cookie(): void {
+  if (empty($_SESSION['remember_me'])) {
+    return;
+  }
+  apply_session_cookie_lifetime(remember_me_lifetime());
+}
+
+function login_member(array $row, bool $remember = false): void {
   session_regenerate_id(true);
   $_SESSION['email'] = normalize_email((string) $row['email']);
   $_SESSION['username'] = normalize_username((string) ($row['username'] ?? ''));
   $_SESSION['logged_in_at'] = time();
+  $_SESSION['remember_me'] = $remember;
+  apply_session_cookie_lifetime($remember ? remember_me_lifetime() : 0);
 }
 
 function logout_session(): void {
@@ -380,7 +424,7 @@ function password_reset_confirm(string $email, string $token, string $password):
   ];
 }
 
-function login_with_password(string $username, string $password): array {
+function login_with_password(string $username, string $password, bool $remember = false): array {
   $username = normalize_username($username);
   if (!valid_username($username)) {
     return ['ok' => false, 'error' => 'Username không hợp lệ.'];
@@ -398,11 +442,12 @@ function login_with_password(string $username, string $password): array {
   if (!password_verify($password, (string) $row['password_hash'])) {
     return ['ok' => false, 'error' => 'Sai username hoặc mật khẩu.'];
   }
-  login_member($row);
+  login_member($row, $remember);
   return [
     'ok' => true,
     'username' => $username,
     'email' => $row['email'],
+    'remember' => $remember,
     'member' => current_member(),
   ];
 }
