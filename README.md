@@ -10,6 +10,13 @@ Repo phục vụ file tĩnh tại **https://ntgiahuy.github.io/home/** (GitHub P
 - Dùng thử **10 phút / 1 lần** mỗi trình duyệt
 - Hết giờ → đăng ký thành viên: 3 tháng, 6 tháng, 1 năm, 2 năm, 3 năm, 5 năm, vĩnh viễn
 
+## Work Chat — nhóm làm việc (kiểu Telegram)
+
+| Trang | Địa chỉ |
+|-------|---------|
+| Messenger nội bộ | https://ntgiahuy.github.io/home/workchat/ |
+| Hướng dẫn | [workchat/README.md](workchat/README.md) |
+
 ## Thành viên trả phí theo thời gian
 
 | Trang | Địa chỉ |
