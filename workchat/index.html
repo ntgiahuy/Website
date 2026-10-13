@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>GiaHuy Work — Nhóm làm việc</title>
+  <meta name="description" content="Ứng dụng nhắn tin nội bộ kiểu Telegram cho nhóm làm việc công ty. Tạo nhóm, chat riêng, đồng bộ đa tab." />
+  <meta name="theme-color" content="#17212b" />
+  <link rel="icon" href="../app/favicon.ico" />
+  <link rel="manifest" href="../app/manifest.json" />
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+  <!-- Auth -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-card">
+      <div class="auth-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.1 2 11.2c0 2.9 1.4 5.5 3.6 7.3V22l3.4-1.9c.9.3 1.9.4 2.9.4 5.5 0 10-4.1 10-9.3S17.5 2 12 2zm1.1 12.5l-2.5-2.7-4.9 2.7 5.4-5.8 2.6 2.7 4.8-2.7-5.4 5.8z"/></svg>
+      </div>
+      <h1>GiaHuy Work</h1>
+      <p class="auth-sub">Messenger nội bộ kiểu Telegram cho công ty.<br />Tạo nhóm làm việc, chat riêng, đồng bộ nhiều tab.</p>
+
+      <form id="auth-form">
+        <div class="auth-field">
+          <label for="auth-name">Họ và tên</label>
+          <input id="auth-name" name="name" autocomplete="name" placeholder="Nguyễn Văn A" required maxlength="48" />
+        </div>
+        <div class="auth-field">
+          <label for="auth-role">Chức vụ</label>
+          <input id="auth-role" name="role" placeholder="Kỹ sư / Giám sát / ..." maxlength="48" />
+        </div>
+        <div class="auth-field">
+          <label for="auth-company">Công ty</label>
+          <input id="auth-company" name="company" value="GiaHuy Construction" maxlength="64" />
+        </div>
+        <button type="submit" class="btn-primary">Bắt đầu làm việc</button>
+      </form>
+
+      <div class="demo-accounts">
+        <h3>Hoặc dùng tài khoản demo</h3>
+        <div id="demo-list" class="demo-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- App -->
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <button type="button" class="icon-btn" id="menu-btn" aria-label="Menu">
+          <svg viewBox="0 0 24 24"><path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z"/></svg>
+        </button>
+        <div class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.8l-.3-.3A6.5 6.5 0 1 0 14 15.5l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0C7 14 5 12 5 9.5S7 5 9.5 5 14 7 14 9.5 12 14 9.5 14z"/></svg>
+          <input id="search" type="search" placeholder="Tìm kiếm" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="folder-tabs" id="folder-tabs">
+        <button type="button" class="folder-tab active" data-folder="all">Tất cả</button>
+        <button type="button" class="folder-tab" data-folder="groups">Nhóm</button>
+        <button type="button" class="folder-tab" data-folder="private">Riêng tư</button>
+      </div>
+
+      <div id="chat-list" class="chat-list" role="list"></div>
+
+      <div class="sidebar-footer">
+        <div id="footer-avatar" class="avatar">?</div>
+        <div class="user-info">
+          <strong id="footer-name">—</strong>
+          <span id="footer-role">—</span>
+        </div>
+      </div>
+
+      <button type="button" class="fab" id="fab" aria-label="Tạo nhóm" title="Tạo nhóm mới">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      </button>
+    </aside>
+
+    <section class="main" id="main">
+      <div id="empty-main" class="empty-panel">
+        <div class="empty-badge">Chọn một cuộc trò chuyện để bắt đầu</div>
+      </div>
+
+      <div id="chat-view" class="chat-view hidden">
+        <header class="chat-header">
+          <button type="button" class="icon-btn back-btn" id="back-btn" aria-label="Quay lại">
+            <svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20v-2z"/></svg>
+          </button>
+          <div id="chat-avatar"></div>
+          <button type="button" class="info" id="header-info">
+            <strong id="chat-title">—</strong>
+            <span id="chat-sub">—</span>
+          </button>
+          <button type="button" class="icon-btn" id="header-info-icon" aria-label="Thông tin" onclick="document.getElementById('header-info').click()">
+            <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+          </button>
+        </header>
+
+        <div id="messages" class="messages"></div>
+        <div id="typing" class="typing"></div>
+
+        <form class="composer" id="composer" onsubmit="return false">
+          <button type="button" class="icon-btn" aria-label="Đính kèm" title="Đính kèm (sắp có)" disabled style="opacity:0.4">
+            <svg viewBox="0 0 24 24"><path d="M16.5 6.5v8.5a4.5 4.5 0 1 1-9 0V6a2.5 2.5 0 0 1 5 0v8.5a.5.5 0 1 1-1 0V6.5h-1.5V14a2 2 0 1 0 4 0V6a4 4 0 0 0-8 0v9a5.5 5.5 0 0 0 11 0V6.5H16.5z"/></svg>
+          </button>
+          <textarea id="composer-input" rows="1" placeholder="Nhắn tin..." maxlength="4000"></textarea>
+          <button type="button" class="send-btn" id="send-btn" aria-label="Gửi">
+            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </form>
+
+        <aside id="info-panel" class="info-panel" aria-hidden="true">
+          <div style="display:flex;justify-content:flex-end;padding:0.5rem">
+            <button type="button" class="icon-btn" id="info-close" aria-label="Đóng">
+              <svg viewBox="0 0 24 24"><path d="M19 6.4L17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg>
+            </button>
+          </div>
+          <div class="info-top"></div>
+          <div class="info-members"></div>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <!-- Side menu -->
+  <div id="overlay" class="overlay"></div>
+  <nav id="side-menu" class="side-menu" aria-label="Menu">
+    <div class="menu-profile">
+      <div id="menu-avatar" class="avatar xl">?</div>
+      <div class="name" id="menu-name">—</div>
+      <div class="sub" id="menu-sub">—</div>
+    </div>
+    <div class="menu-nav">
+      <button type="button" id="new-group-btn">
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3zm-8 0c1.7 0 3-1.3 3-3S9.7 5 8 5 5 6.3 5 8s1.3 3 3 3zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5C15 14.2 10.3 13 8 13zm8 0c-.3 0-.6 0-1 .1 1.2.9 2 2.1 2 3.4V19h6v-2.5c0-2.3-4.7-3.5-7-3.5z"/></svg>
+        Nhóm mới
+      </button>
+      <button type="button" id="new-chat-btn">
+        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/></svg>
+        Tin nhắn mới
+      </button>
+      <button type="button" id="theme-toggle">
+        <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9c0-.5 0-1-.1-1.4A7 7 0 0 1 12 3z"/></svg>
+        Chế độ sáng
+      </button>
+      <button type="button" id="reset-btn">
+        <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg>
+        Đặt lại demo
+      </button>
+      <button type="button" id="logout-btn">
+        <svg viewBox="0 0 24 24"><path d="M17 7l-1.4 1.4L18.2 11H8v2h10.2l-2.6 2.6L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+        Đăng xuất
+      </button>
+    </div>
+  </nav>
+
+  <div id="modal-root"></div>
+
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
