@@ -433,8 +433,9 @@ export const SlabPreview = memo(function SlabPreview({
               aria-label={view.title}
             >
               <defs>
-                <pattern id="lowHatch3d" patternUnits="userSpaceOnUse" width="6" height="6">
-                  <circle cx="1.2" cy="1.2" r="0.7" fill="#9ca3af" />
+                <pattern id="lowHatch3d" patternUnits="userSpaceOnUse" width="5" height="5">
+                  <circle cx="1" cy="1" r="0.55" fill="#6b7280" />
+                  <circle cx="3.5" cy="3.2" r="0.45" fill="#9ca3af" />
                 </pattern>
               </defs>
               {view.polygons.map((poly, i) => (
@@ -490,6 +491,7 @@ export const SlabPreview = memo(function SlabPreview({
                 fontSize="13"
                 fontWeight="700"
                 fontFamily="sans-serif"
+                textDecoration="underline"
               >
                 {view.title}
               </text>
