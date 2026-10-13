@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   Box,
   Check,
@@ -17,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, Panel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { SlabPreview } from "@/components/slab/SlabPreview";
 import {
   computeModel,
@@ -35,14 +45,21 @@ import {
   baySlabExtent,
   beamSegments,
   bumpBeamTypeName,
+  clampPlanBeamNamesToCatalog,
   equalizeAxisSpans,
+  ensureBeamsSplitBays,
+  ensureSectionCuts,
+  findBeamTypeByName,
   isBeamSegOmitted,
+  sectionCutAtMm,
+  normalizeBeamTypeName,
   patchBeam,
   patchBeamOnAxis,
   patchBeamSegShift,
   getBeamSegShift,
   patchBeamType,
   patchBeamTypeDim,
+  planBeamDisplayName,
   rectNearlyEquals,
   removeAxis,
   removeBeam,
@@ -51,6 +68,9 @@ import {
   renameAxis,
   setAxisSpan,
   setPlanSize,
+  clampPlanSizeMm,
+  MAX_PLAN_AREA_MM2,
+  MAX_PLAN_SIZE_MM,
   sortAxes,
   suggestNextBeamTypeName,
   syncBeamInfo,
@@ -59,6 +79,7 @@ import {
   patchBeamSelectedSegShiftsContinuous,
 } from "@/lib/grid";
 import { withBasePath } from "@/lib/base-path";
+import { ensureMemberForExport } from "@/lib/membership-gate";
 import { downloadPdf, generateSlabPdf } from "@/lib/pdf/generate";
 import {
   SHOP_SAN_FILENAME,
@@ -70,6 +91,7 @@ import {
   DIAMETERS,
   SPACING_OPTIONS,
   TABS,
+  type LayoutPanelId,
   type LayoutPreset,
   type LowSlabRebarMode,
   type PlanSelection,
@@ -78,21 +100,22 @@ import {
   type RebarZone,
   type SlabProject,
   type TabId,
+  rebarLayerMark,
 } from "@/lib/types";
 import { uid } from "@/lib/utils";
 
 const STORE_KEY = "thep-san-project-v1";
 
-function draftZone(mark = "MC 1-1"): RebarZone {
+function draftZone(layer: RebarLayer = "bottom"): RebarZone {
   return {
     id: uid("zone"),
-    mark,
-    layer: "bottom",
+    mark: rebarLayerMark(layer),
+    layer,
     direction: "X",
     dia: 10,
     spacing: 200,
-    leftHook: 50,
-    rightHook: 50,
+    leftHook: 100,
+    rightHook: 100,
     x1: 110,
     y1: 110,
     x2: 5890,
@@ -101,6 +124,41 @@ function draftZone(mark = "MC 1-1"): RebarZone {
     showSpacing: true,
     spacingSymbol: "a",
   };
+}
+
+function AxisMmInput({
+  value,
+  onCommit,
+  className,
+  title,
+}: {
+  value: number;
+  onCommit: (v: number) => void;
+  className?: string;
+  title?: string;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+  return (
+    <Input
+      type="number"
+      className={className}
+      title={title}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        const v = Number(draft);
+        const next = Number.isFinite(v) ? v : 0;
+        if (next !== value) onCommit(next);
+        else setDraft(String(value));
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+    />
+  );
 }
 
 export function SlabApp() {
@@ -134,27 +192,124 @@ export function SlabApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedBeamPanelRef = useRef<HTMLDivElement>(null);
   const selectedBayPanelRef = useRef<HTMLDivElement>(null);
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  /** Draft ô Bề rộng / Chiều dài — chỉ commit khi blur/Enter (tránh đơ mỗi phím). */
+  const [planWDraft, setPlanWDraft] = useState<string | null>(null);
+  const [planHDraft, setPlanHDraft] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORE_KEY);
       if (raw) {
-        const parsed = parseProjectFile(JSON.parse(raw));
+        const parsed = clampPlanBeamNamesToCatalog(
+          ensureBeamsSplitBays(parseProjectFile(JSON.parse(raw))),
+        );
         setProject(parsed);
+        try {
+          localStorage.setItem(STORE_KEY, JSON.stringify(parsed));
+        } catch {
+          /* ignore quota */
+        }
         if (parsed.zones[0]) {
           setZoneForm(parsed.zones[0]);
           setSelectedZoneId(parsed.zones[0].id);
         }
+      } else if (project.zones[0]) {
+        setZoneForm(project.zones[0]);
+        setSelectedZoneId(project.zones[0].id);
       }
     } catch {
       /* keep sample */
     }
+    // chỉ hydrate một lần khi mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Đảm bảo đang ở chế độ manual với đủ zone (X/Y) lấy từ effectiveZones,
+   * rồi gán Móc thép trái/phải — luôn phản ánh lên mặt bằng.
+   */
+  function persistZoneHooks(partial: { leftHook?: number; rightHook?: number }) {
+    const nextForm = {
+      ...zoneForm,
+      ...partial,
+      leftHook:
+        partial.leftHook !== undefined
+          ? Math.max(0, Math.round(partial.leftHook) || 0)
+          : zoneForm.leftHook,
+      rightHook:
+        partial.rightHook !== undefined
+          ? Math.max(0, Math.round(partial.rightHook) || 0)
+          : zoneForm.rightHook,
+    };
+    setZoneForm(nextForm);
+
+    const seeded =
+      project.layoutPreset === "manual" && (project.zones?.length ?? 0) > 0
+        ? project.zones
+        : effectiveZones(project).map((z) => ({ ...z, id: z.id || uid("zone") }));
+
+    let targetId = selectedZoneId;
+    if (!targetId || !seeded.some((z) => z.id === targetId)) {
+      targetId = seeded.find((z) => z.direction === nextForm.direction)?.id ?? seeded[0]?.id ?? null;
+    }
+
+    const zones = seeded.map((z) => {
+      if (targetId && z.id === targetId) return { ...nextForm, id: targetId };
+      // Cùng lớp + phương: đồng bộ móc để mọi thanh cùng hướng cập nhật
+      if (z.layer === nextForm.layer && z.direction === nextForm.direction) {
+        return {
+          ...z,
+          leftHook: nextForm.leftHook,
+          rightHook: nextForm.rightHook,
+        };
+      }
+      return z;
+    });
+
+    if (targetId) setSelectedZoneId(targetId);
+    persist({
+      ...project,
+      layoutPreset: "manual",
+      zones,
+      // Đồng bộ móc preset để tab 2 lớp không lệch
+      simple2: {
+        ...project.simple2,
+        bottomHook:
+          nextForm.layer === "bottom" ? nextForm.leftHook : project.simple2.bottomHook,
+        topHook: nextForm.layer === "top" ? nextForm.leftHook : project.simple2.topHook,
+      },
+      economy2: {
+        ...project.economy2,
+        bottomHook:
+          nextForm.layer === "bottom" ? nextForm.leftHook : project.economy2.bottomHook,
+        topHook: nextForm.layer === "top" ? nextForm.leftHook : project.economy2.topHook,
+      },
+    });
+  }
+
   function persist(next: SlabProject) {
-    setProject(next);
+    // Dầm cắt qua ô phải có trục — tránh chọn ô sàn dính liền băng qua dầm
+    // Tên dầm mặt bằng chỉ trong Danh sách dầm
+    // Đồng bộ tên vùng thép theo lớp; mỗi (lớp, phương) chỉ giữ 1 vùng
+    const seen = new Set<string>();
+    const zones: RebarZone[] = [];
+    for (const z of next.zones ?? []) {
+      const key = `${z.layer}|${z.direction}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      zones.push({ ...z, mark: rebarLayerMark(z.layer) });
+    }
+    const withMarks: SlabProject = { ...next, zones };
+    const split = clampPlanBeamNamesToCatalog(ensureBeamsSplitBays(withMarks));
+    const normalized: SlabProject = {
+      ...split,
+      sections: ensureSectionCuts(split),
+    };
+    setProject(normalized);
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(next));
+      localStorage.setItem(STORE_KEY, JSON.stringify(normalized));
     } catch {
       /* ignore quota */
     }
@@ -194,9 +349,13 @@ export function SlabApp() {
     const ys = sortAxes(project.axesY);
     const { ix, iy } = planSelection;
     if (ix < 0 || ix >= xs.length - 1 || iy < 0 || iy >= ys.length - 1) return null;
+    // Kích thước ô sàn đã chọn = lòng sàn giữa da dầm (baySlabExtent), không phải tim–tim trục
+    const e = baySlabExtent(project, xs, ys, ix, iy);
     return {
-      lx: xs[ix + 1].pos - xs[ix].pos,
-      ly: ys[iy + 1].pos - ys[iy].pos,
+      lx: e.x1 - e.x0,
+      ly: e.y1 - e.y0,
+      axisLx: xs[ix + 1].pos - xs[ix].pos,
+      axisLy: ys[iy + 1].pos - ys[iy].pos,
       name: `${xs[ix].name}-${xs[ix + 1].name} / ${ys[iy].name}-${ys[iy + 1].name}`,
     };
   }
@@ -228,7 +387,7 @@ export function SlabApp() {
 
     return {
       id: beam.id,
-      name: `${beam.name} · ${seg.a0.name}–${seg.a1.name} · ${beam.direction === "Y" ? "đứng" : "ngang"}${beam.free ? " · giữa ô" : ""}`,
+      name: `${planBeamDisplayName(project, beam.name)} · ${seg.a0.name}–${seg.a1.name} · ${beam.direction === "Y" ? "đứng" : "ngang"}${beam.free ? " · giữa ô" : ""}`,
       length: seg.span,
       axis: beam.axis,
       free: Boolean(beam.free),
@@ -250,7 +409,13 @@ export function SlabApp() {
 
   function patchSelectedBaySpan(which: "lx" | "ly", value: number) {
     if (planSelection?.kind !== "bay") return;
-    const v = Math.max(500, Math.round(value) || 500);
+    const spans = selectedBaySpans();
+    if (!spans) return;
+    // Ô nhập = kích thước lòng ô; đổi nhịp trục = giá trị mới + phần da dầm hai bên
+    const clear = which === "lx" ? spans.lx : spans.ly;
+    const axis = which === "lx" ? spans.axisLx : spans.axisLy;
+    const inset = Math.max(0, axis - clear);
+    const v = Math.max(500, Math.round(value) + inset);
     if (which === "lx") {
       persist(applyAxesToProject({ ...project, axesX: setAxisSpan(project.axesX, planSelection.ix + 1, v) }));
     } else {
@@ -271,13 +436,28 @@ export function SlabApp() {
     }
   }
 
-  /** Đổi vị trí tim dầm chèn giữa ô (không gắn trục). */
+  /** Đổi vị trí tim dầm (kèm trục) — luôn tách ô sàn theo dầm. */
   function patchSelectedFreeBeamAxis(value: number) {
     if (planSelection?.kind !== "beam") return;
     const beam = project.beams.find((b) => b.id === planSelection.beamId);
-    if (!beam?.free) return;
+    if (!beam) return;
     const v = Math.max(0, Math.round(value) || 0);
-    persist(patchBeam(project, beam.id, { axis: v, free: true, axisId: undefined }));
+    // Di chuyển tim + gắn trục (promote free) để ô sàn không dính liền qua dầm
+    if (beam.free || !beam.axisId) {
+      persist(ensureBeamsSplitBays(patchBeam(project, beam.id, { axis: v, free: undefined, axisId: undefined })));
+      return;
+    }
+    const axesKey = beam.direction === "Y" ? "axesX" : "axesY";
+    const axes = sortAxes(project[axesKey] ?? []).map((a) =>
+      a.id === beam.axisId ? { ...a, pos: v } : a,
+    );
+    persist(
+      applyAxesToProject({
+        ...project,
+        [axesKey]: axes,
+        beams: project.beams.map((b) => (b.id === beam.id ? { ...b, axis: v } : b)),
+      }),
+    );
   }
 
 
@@ -460,27 +640,32 @@ export function SlabApp() {
     setInsertBeamMode(false);
   }
 
-  /** Loại dầm dùng khi chèn: ưu tiên dòng đã chọn trên danh sách. */
+  /** Loại dầm dùng khi chèn: ưu tiên dòng đã chọn trên danh sách; tên phải có trong list. */
   function resolveInsertBeamType(): { name: string; size: string; offset: number } | null {
     const selectedTypes = (project.beamTypes ?? []).filter((t) => listSelectedIds.includes(t.id));
     const t = selectedTypes[0];
     if (t) {
       return {
-        name: t.name,
+        name: normalizeBeamTypeName(t.name) || t.name,
         size: t.size || `${project.info.beamB}x${project.info.beamH}`,
         offset: Number.isFinite(t.offset)
           ? t.offset
           : Math.round((project.info.beamB || 220) / 2),
       };
     }
-    const name = (bulkBeamName.trim() || project.info.beamNamePrefix || "").trim();
-    if (!name) return null;
+    const typed = findBeamTypeByName(
+      project,
+      bulkBeamName.trim() || project.info.beamNamePrefix || "",
+    );
+    if (!typed) return null;
     return {
-      name,
-      size: `${project.info.beamB}x${project.info.beamH}`,
-      offset: Number.isFinite(project.info.beamB1)
-        ? project.info.beamB1
-        : Math.round((project.info.beamB || 220) / 2),
+      name: normalizeBeamTypeName(typed.name) || typed.name,
+      size: typed.size || `${project.info.beamB}x${project.info.beamH}`,
+      offset: Number.isFinite(typed.offset)
+        ? typed.offset
+        : Number.isFinite(project.info.beamB1)
+          ? project.info.beamB1
+          : Math.round((project.info.beamB || 220) / 2),
     };
   }
 
@@ -626,6 +811,16 @@ export function SlabApp() {
     else if (sel.kind === "axis") setTab("axes");
   }
 
+  const handlePlanSelectRef = useRef(handlePlanSelect);
+  handlePlanSelectRef.current = handlePlanSelect;
+  /** Callback ổn định — tránh SlabPreview re-render (nháy) mỗi lần đổi tab. */
+  const stablePlanSelect = useCallback(
+    (sel: PlanSelection | null, e?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean }) => {
+      handlePlanSelectRef.current(sel, e);
+    },
+    [],
+  );
+
   /** Danh sách loại dầm đã lưu (D1, D2…). */
   function sortedBeamTypes() {
     return [...(project.beamTypes ?? [])];
@@ -738,11 +933,17 @@ export function SlabApp() {
     // Ưu tiên: đoạn đã chọn trên bản vẽ; nếu chọn loại dầm trên list thì lấy tên loại
     const selectedTypes = (project.beamTypes ?? []).filter((t) => listSelectedIds.includes(t.id));
     const typeFromList = selectedTypes[0];
-    const name = (bulkBeamName.trim() || typeFromList?.name || "").trim();
-    if (!name) {
+    const rawName = (bulkBeamName.trim() || typeFromList?.name || "").trim();
+    if (!rawName) {
       setStatus("Nhập tên hoặc chọn loại trên danh sách, rồi click đoạn trên bản vẽ (không cần phím).");
       return;
     }
+    const type = findBeamTypeByName(project, rawName) || typeFromList;
+    if (!type || !findBeamTypeByName(project, type.name)) {
+      setStatus(`«${rawName}» không có trong Danh sách dầm — chỉ gán tên đã có trong list.`);
+      return;
+    }
+    const name = normalizeBeamTypeName(type.name) || type.name;
     const targetBeamIds =
       fromPlan.length > 0
         ? fromPlan
@@ -753,10 +954,12 @@ export function SlabApp() {
       setStatus("Click đoạn dầm trên bản vẽ để gán tên — Shift/Ctrl chỉ khi chọn nhiều.");
       return;
     }
-    const size = typeFromList?.size || `${project.info.beamB}x${project.info.beamH}`;
-    const offset =
-      typeFromList?.offset ??
-      (Number.isFinite(project.info.beamB1) ? project.info.beamB1 : Math.round((project.info.beamB || 220) / 2));
+    const size = type.size || `${project.info.beamB}x${project.info.beamH}`;
+    const offset = Number.isFinite(type.offset)
+      ? type.offset
+      : Number.isFinite(project.info.beamB1)
+        ? project.info.beamB1
+        : Math.round((project.info.beamB || 220) / 2);
     persist(applyBeamTypeToBeams(project, targetBeamIds, { name, size, offset }));
     setStatus(`Đã gán «${name}» cho ${targetBeamIds.length} dầm trên mặt bằng.`);
     setBulkBeamName("");
@@ -775,12 +978,16 @@ export function SlabApp() {
       size: `${Math.round(B)}x${Math.round(H)}`,
       offset: Math.round(B1),
     });
+    if (!next) {
+      setStatus(`Tên «${name}» đã có trong danh sách — không được trùng tên.`);
+      return;
+    }
     const bumped = bumpBeamTypeName(name);
     persist({
       ...next,
       info: { ...next.info, beamNamePrefix: bumped },
     });
-    setStatus(`Đã thêm loại dầm «${name}» vào danh sách.`);
+    setStatus(`Đã thêm loại dầm «${normalizeBeamTypeName(name)}» vào danh sách.`);
   }
 
   useEffect(() => {
@@ -837,11 +1044,13 @@ export function SlabApp() {
       if (!spans) return;
       const next = applyAxesToProject({
         ...project,
-        axesX: equalizeAxisSpans(project.axesX, spans.lx),
-        axesY: equalizeAxisSpans(project.axesY, spans.ly),
+        axesX: equalizeAxisSpans(project.axesX, spans.axisLx),
+        axesY: equalizeAxisSpans(project.axesY, spans.axisLy),
       });
       persist(next);
-      setStatus(`Đã áp dụng Lx=${Math.round(spans.lx)}, Ly=${Math.round(spans.ly)} cho mọi ô sàn.`);
+      setStatus(
+        `Đã áp dụng Lx=${Math.round(spans.lx)}, Ly=${Math.round(spans.ly)} (lòng ô) cho mọi ô sàn.`,
+      );
       return;
     }
     const info = selectedBeamInfo();
@@ -859,35 +1068,60 @@ export function SlabApp() {
   }
 
   function setPreset(layoutPreset: LayoutPreset) {
-    persist({ ...project, layoutPreset });
+    persist({ ...projectRef.current, layoutPreset });
   }
 
-  const model = computeModel(project);
-  const zones = effectiveZones(project);
+  const deferredProject = useDeferredValue(project);
+  const model = useMemo(() => computeModel(deferredProject), [deferredProject]);
+  const zones = useMemo(() => effectiveZones(project), [project]);
+
+  function applyPlanSize(nextW: number, nextH: number) {
+    const wantW = clampPlanSizeMm(nextW);
+    const wantH = clampPlanSizeMm(nextH);
+    if (nextW > MAX_PLAN_SIZE_MM || nextH > MAX_PLAN_SIZE_MM) {
+      setStatus(
+        `Kích thước tối đa ${MAX_PLAN_SIZE_MM} mm (50 m) mỗi cạnh — đã giới hạn để tránh đơ trang.`,
+      );
+    }
+    const cur = projectRef.current;
+    if (wantW === cur.planWidth && wantH === cur.planHeight) return;
+    startTransition(() => {
+      const sized = setPlanSize(projectRef.current, wantW, wantH);
+      if (wantW * wantH > MAX_PLAN_AREA_MM2 && sized.planWidth * sized.planHeight < wantW * wantH) {
+        setStatus(
+          `Diện tích tối đa ~${Math.round(MAX_PLAN_AREA_MM2 / 1_000_000)} m² — đã giới hạn để tránh đơ trang.`,
+        );
+      }
+      persist(sized);
+    });
+  }
 
   async function exportPdf() {
     setBusy(true);
     setError(null);
     setStatus(null);
     try {
-      if (typeof window !== "undefined" && window.GiaHuyMembership) {
-        const ok = await window.GiaHuyMembership.requireActive({
-          feature: "Xuất PDF",
-          app: "san",
-        });
-        if (!ok) {
-          setBusy(false);
-          return;
-        }
+      const ok = await ensureMemberForExport("Xuất PDF");
+      if (!ok) {
+        setBusy(false);
+        return;
       }
       const fontRes = [
         fetch(withBasePath("/fonts/BeVietnamPro-Regular.ttf")),
         fetch(withBasePath("/fonts/BeVietnamPro-Bold.ttf")),
       ];
       const [regular, bold] = await Promise.all(fontRes.map((r) => r.then((x) => x.arrayBuffer())));
-      const bytes = await generateSlabPdf(project, { regular, bold });
-      downloadPdf(bytes, `KetCauSan_${project.info.name.replace(/\s+/g, "_")}.pdf`);
-      setStatus("Đã xuất PDF A2.");
+      // Xuất đúng tick đang chọn (layoutPreset), không dùng state UI lệch.
+      const exportProject = projectRef.current;
+      const bytes = await generateSlabPdf(exportProject, { regular, bold });
+      const modeLabel =
+        exportProject.layoutPreset === "economy2"
+          ? "Thép 2 lớn tiết kiệm"
+          : exportProject.layoutPreset === "simple2"
+            ? "Thép 2 lớp đơn giản"
+            : "Vẽ thép sàn";
+      downloadPdf(bytes, `KetCauSan_${exportProject.info.name.replace(/\s+/g, "_")}.pdf`);
+      setStatus(`Đã xuất PDF A2 (${modeLabel}).`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Xuất PDF thất bại.");
     } finally {
@@ -940,30 +1174,106 @@ export function SlabApp() {
     }
   }
 
+  function zonePlanBox(coverMm: number) {
+    const pad = Math.max(
+      ...(project.beams ?? []).map((b) => parseBeamSize(b.size).b / 2),
+      110,
+    );
+    const cover = Math.max(0, Math.round(Number(coverMm) || 0));
+    return {
+      x1: pad,
+      y1: pad,
+      x2: Math.max(pad + 1, project.planWidth - pad),
+      y2: Math.max(pad + 1, project.planHeight - pad),
+      cover,
+    };
+  }
+
+  /** Vùng đang dùng trên UI (manual hoặc preset). */
+  function listedZones(): RebarZone[] {
+    return project.layoutPreset === "manual" ? project.zones : zones;
+  }
+
+  function hasLayerDir(layer: RebarLayer, direction: RebarDir, exceptId?: string | null) {
+    return listedZones().some(
+      (z) => z.layer === layer && z.direction === direction && z.id !== exceptId,
+    );
+  }
+
   function addZone() {
-    const z = { ...zoneForm, id: uid("zone") };
-    persist({ ...project, layoutPreset: "manual", zones: [...project.zones, z] });
+    const layer = zoneForm.layer;
+    const direction = zoneForm.direction;
+    if (hasLayerDir(layer, direction)) {
+      setStatus(
+        `Đã có ${rebarLayerMark(layer)} phương ${direction}. Chỉ được Sửa hoặc Xóa rồi thêm lại.`,
+      );
+      return;
+    }
+    const base =
+      project.layoutPreset === "manual" && (project.zones?.length ?? 0) > 0
+        ? project.zones
+        : effectiveZones(project).map((z) => ({ ...z, id: z.id || uid("zone") }));
+    const box = zonePlanBox(zoneForm.cover);
+    const z: RebarZone = {
+      ...zoneForm,
+      ...box,
+      id: uid("zone"),
+      mark: rebarLayerMark(layer),
+      layer,
+      direction,
+    };
+    persist({
+      ...project,
+      layoutPreset: "manual",
+      info: { ...project.info, cover: z.cover },
+      zones: [...base.filter((b) => !(b.layer === layer && b.direction === direction)), z],
+    });
     setSelectedZoneId(z.id);
-    setStatus(`Đã thêm ${z.mark}`);
+    setZoneForm(z);
+    setStatus(`Đã thêm ${z.mark} · ${direction} — đã cập nhật mặt bằng.`);
   }
 
   function editZone() {
     if (!selectedZoneId) return;
+    if (hasLayerDir(zoneForm.layer, zoneForm.direction, selectedZoneId)) {
+      setStatus(
+        `Đã có ${rebarLayerMark(zoneForm.layer)} phương ${zoneForm.direction}. Chọn lớp/phương khác hoặc Xóa vùng trùng.`,
+      );
+      return;
+    }
+    const box = zonePlanBox(zoneForm.cover);
+    const nextForm: RebarZone = {
+      ...zoneForm,
+      ...box,
+      id: selectedZoneId,
+      mark: rebarLayerMark(zoneForm.layer),
+    };
+    const base =
+      project.layoutPreset === "manual" && (project.zones?.length ?? 0) > 0
+        ? project.zones
+        : effectiveZones(project).map((z) => ({ ...z, id: z.id || uid("zone") }));
     persist({
       ...project,
       layoutPreset: "manual",
-      zones: project.zones.map((z) => (z.id === selectedZoneId ? { ...zoneForm, id: selectedZoneId } : z)),
+      info: { ...project.info, cover: nextForm.cover },
+      zones: base.map((z) => (z.id === selectedZoneId ? nextForm : z)),
     });
-    setStatus("Đã cập nhật vùng thép.");
+    setZoneForm(nextForm);
+    setStatus("Đã cập nhật vùng thép — đã làm mới mặt bằng.");
   }
 
   function delZone() {
     if (!selectedZoneId) return;
-    const next = project.zones.filter((z) => z.id !== selectedZoneId);
+    const base =
+      project.layoutPreset === "manual" && (project.zones?.length ?? 0) > 0
+        ? project.zones
+        : effectiveZones(project).map((z) => ({ ...z, id: z.id || uid("zone") }));
+    const next = base.filter((z) => z.id !== selectedZoneId);
     persist({ ...project, layoutPreset: "manual", zones: next });
     setSelectedZoneId(next[0]?.id ?? null);
     if (next[0]) setZoneForm(next[0]);
-    setStatus("Đã xóa vùng thép.");
+    else setZoneForm(draftZone());
+    setStatus("Đã xóa vùng thép — đã cập nhật mặt bằng.");
   }
 
   function applySimple2() {
@@ -971,9 +1281,25 @@ export function SlabApp() {
     setStatus("Đã áp dụng bố trí 2 lớp đơn giản.");
   }
 
-  function applyEconomy2() {
-    setPreset("economy2");
-    setStatus("Đã áp dụng bố trí 2 lớp tiết kiệm.");
+  /**
+   * Tick Bố trí sàn = layoutPreset (PDF + hình minh họa cùng nguồn).
+   * Không seed zone từ preset vào danh sách thủ công — tránh thêm Lớp dưới X/Y lặp.
+   */
+  function selectLayoutPanel(mode: LayoutPanelId) {
+    const cur = projectRef.current;
+    if (mode === cur.layoutPreset) return;
+    if (mode === "manual") {
+      persist({ ...cur, layoutPreset: "manual" });
+      setStatus("Đã chọn Vẽ thép sàn — minh họa / PDF theo danh sách vùng thép.");
+      return;
+    }
+    if (mode === "economy2") {
+      persist({ ...cur, layoutPreset: "economy2" });
+      setStatus("Đã chọn Thép 2 lớn tiết kiệm — minh họa / PDF theo preset tiết kiệm.");
+      return;
+    }
+    persist({ ...cur, layoutPreset: "simple2" });
+    setStatus("Đã chọn Thép 2 lớp đơn giản — minh họa / PDF theo preset đơn giản.");
   }
 
   function assignAllBeams() {
@@ -1088,27 +1414,8 @@ export function SlabApp() {
 
   return (
     <div className="flex h-dvh flex-col bg-zinc-950 text-zinc-100">
-      <header className="flex flex-wrap items-center gap-3 border-b border-zinc-800 bg-[#0d1117] px-3 py-2">
-        <div className="flex min-w-0 items-center gap-3">
-          <a href="https://giahuy.net" target="_blank" rel="noreferrer">
-            <img
-              src={withBasePath("/giahuy-logo.png")}
-              alt="GiaHuy"
-              width={171}
-              height={47}
-              className="h-10 w-auto sm:h-[44px]"
-            />
-          </a>
-          <div className="min-w-0 border-l border-[#8b949e] pl-4">
-            <div className="text-sm font-bold tracking-wide text-[#79b8ff] sm:text-base">
-              Shop drawing thép sàn
-            </div>
-            <div className="text-[11px] leading-snug text-zinc-400">
-              Bố trí thép sàn BTCT · thống kê · xuất PDF A2 (tham chiếu shop thép dầm).
-            </div>
-          </div>
-        </div>
-        <div className="ml-auto flex flex-col items-end gap-1">
+      <header className="flex flex-wrap items-center justify-end gap-3 border-b border-zinc-800 bg-[#0d1117] px-3 py-2">
+        <div className="flex flex-col items-end gap-1">
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               variant="secondary"
@@ -1177,10 +1484,14 @@ export function SlabApp() {
             {t.label}
           </button>
         ))}
-        {/* Zoom bản vẽ — sau «Thông tin xuất» */}
+        {/* Zoom bản vẽ / phối cảnh 3D — sau «Thông tin xuất» */}
         <div
           className="ml-1 flex shrink-0 items-center gap-1 border-l border-zinc-600 pl-2"
-          title="Thu nhỏ / phóng to bản vẽ"
+          title={
+            tab === "model3d"
+              ? "Thu nhỏ / phóng to phối cảnh 3D"
+              : "Thu nhỏ / phóng to bản vẽ"
+          }
         >
           <button
             type="button"
@@ -1239,25 +1550,49 @@ export function SlabApp() {
                     <Input
                       type="number"
                       value={project.info.cover}
-                      onChange={(e) => patchInfo({ cover: Number(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        const cover = Number(e.target.value) || 0;
+                        persist({
+                          ...project,
+                          info: { ...project.info, cover },
+                          zones: project.zones.map((z) => ({ ...z, cover })),
+                        });
+                        setZoneForm((f) => ({ ...f, cover }));
+                      }}
                     />
                   </Field>
                   <Field label="Bề rộng sàn" unit="mm">
                     <Input
                       type="number"
-                      value={project.planWidth}
-                      onChange={(e) =>
-                        persist(setPlanSize(project, Number(e.target.value) || 0, project.planHeight))
-                      }
+                      min={500}
+                      max={MAX_PLAN_SIZE_MM}
+                      value={planWDraft ?? String(project.planWidth)}
+                      onChange={(e) => setPlanWDraft(e.target.value)}
+                      onBlur={() => {
+                        const raw = Number(planWDraft ?? project.planWidth) || 0;
+                        applyPlanSize(raw, projectRef.current.planHeight);
+                        setPlanWDraft(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      }}
                     />
                   </Field>
                   <Field label="Chiều dài sàn" unit="mm">
                     <Input
                       type="number"
-                      value={project.planHeight}
-                      onChange={(e) =>
-                        persist(setPlanSize(project, project.planWidth, Number(e.target.value) || 0))
-                      }
+                      min={500}
+                      max={MAX_PLAN_SIZE_MM}
+                      value={planHDraft ?? String(project.planHeight)}
+                      onChange={(e) => setPlanHDraft(e.target.value)}
+                      onBlur={() => {
+                        const raw = Number(planHDraft ?? project.planHeight) || 0;
+                        applyPlanSize(projectRef.current.planWidth, raw);
+                        setPlanHDraft(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      }}
                     />
                   </Field>
                   <Field label="Chênh cao độ sàn thấp" unit="mm">
@@ -1303,7 +1638,7 @@ export function SlabApp() {
 
                 <div className="mt-3 border-t border-zinc-700 pt-3">
                   <div className="mb-1.5 text-[11px] text-zinc-500">
-                    Nhấp ô sàn trên bản vẽ để mở <b className="text-sky-300">Vẽ thép sàn</b>; nhấp đoạn dầm để mở{" "}
+                    Nhấp ô sàn trên bản vẽ để mở <b className="text-sky-300">Bố trí sàn</b>; nhấp đoạn dầm để mở{" "}
                     <b className="text-emerald-400">Số liệu dầm</b>.
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1361,19 +1696,24 @@ export function SlabApp() {
                         <div key={ax.id} className="flex min-w-0 flex-nowrap items-center gap-1.5">
                           <Input
                             className="w-12 max-w-12 shrink-0"
-                            value={ax.name}
-                            onChange={(e) => updateAxesX(renameAxis(project.axesX, ax.id, e.target.value))}
+                            key={`name-x-${ax.id}-${ax.name}`}
+                            defaultValue={ax.name}
+                            onBlur={(e) => {
+                              const name = e.target.value.trim();
+                              if (name && name !== ax.name) {
+                                updateAxesX(renameAxis(project.axesX, ax.id, name));
+                              }
+                            }}
                           />
-                          <Input
-                            type="number"
+                          <AxisMmInput
                             className="min-w-0 w-auto flex-1"
                             title={i === 0 ? "Vị trí gốc (mm)" : "Khoảng cách từ trục trước (mm)"}
                             value={axisSpan(project.axesX, i)}
-                            onChange={(e) => {
-                              const v = Number(e.target.value) || 0;
+                            onCommit={(v) => {
                               if (i === 0) {
                                 const sorted = sortAxes(project.axesX);
                                 const delta = v - sorted[0].pos;
+                                if (delta === 0) return;
                                 updateAxesX(sorted.map((a) => ({ ...a, pos: a.pos + delta })));
                               } else {
                                 updateAxesX(setAxisSpan(project.axesX, i, v));
@@ -1412,19 +1752,24 @@ export function SlabApp() {
                         <div key={ay.id} className="flex min-w-0 flex-nowrap items-center gap-1.5">
                           <Input
                             className="w-12 max-w-12 shrink-0"
-                            value={ay.name}
-                            onChange={(e) => updateAxesY(renameAxis(project.axesY, ay.id, e.target.value))}
+                            key={`name-y-${ay.id}-${ay.name}`}
+                            defaultValue={ay.name}
+                            onBlur={(e) => {
+                              const name = e.target.value.trim();
+                              if (name && name !== ay.name) {
+                                updateAxesY(renameAxis(project.axesY, ay.id, name));
+                              }
+                            }}
                           />
-                          <Input
-                            type="number"
+                          <AxisMmInput
                             className="min-w-0 w-auto flex-1"
                             title={i === 0 ? "Vị trí gốc (mm)" : "Khoảng cách từ trục trước (mm)"}
                             value={axisSpan(project.axesY, i)}
-                            onChange={(e) => {
-                              const v = Number(e.target.value) || 0;
+                            onCommit={(v) => {
                               if (i === 0) {
                                 const sorted = sortAxes(project.axesY);
                                 const delta = v - sorted[0].pos;
+                                if (delta === 0) return;
                                 updateAxesY(sorted.map((a) => ({ ...a, pos: a.pos + delta })));
                               } else {
                                 updateAxesY(setAxisSpan(project.axesY, i, v));
@@ -1463,93 +1808,93 @@ export function SlabApp() {
 
           {tab === "beams" && (
             <div className="flex flex-col gap-3">
-              <Panel title="Tạo dầm mới" className="min-w-0 w-full">
+              <Panel title="Số liệu dầm" className="min-w-0 w-full">
                 <div className="flex flex-col gap-2.5">
-                  <div className="flex flex-wrap items-end gap-1.5">
-                    <Field label="Tên dầm">
-                      <Input
-                        className="w-24"
-                        value={project.info.beamNamePrefix}
-                        placeholder="VD: D1"
-                        onChange={(e) => patchInfo({ beamNamePrefix: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            addBeamTypeFromForm();
-                          }
-                        }}
-                      />
-                    </Field>
-                    <Field label="H dầm" unit="mm">
-                      <Input
-                        type="number"
-                        className="w-20"
-                        value={project.info.beamH ?? 500}
-                        onChange={(e) => patchBeamDims({ beamH: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
-                    <Field label="B dầm" unit="mm">
-                      <Input
-                        type="number"
-                        className="w-20"
-                        value={project.info.beamB ?? 220}
-                        onChange={(e) => patchBeamDims({ beamB: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
-                    <Button size="sm" variant="success" onClick={addBeamTypeFromForm} title="Lưu vào danh sách">
-                      <Plus /> Thêm
-                    </Button>
-                  </div>
-                  <p className="text-[10px] text-zinc-500">
-                    Cùng tên D1 có thể thêm nhiều dòng với H/B khác nhau.
-                  </p>
+                  <Field label="Số lượng dầm theo phương X (dầm đứng)">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={project.info.beamCountX ?? project.beams.filter((b) => b.direction === "Y").length}
+                      onChange={(e) => patchBeamCount("X", Number(e.target.value))}
+                    />
+                  </Field>
+                  <Field label="Số lượng dầm theo phương Y (dầm ngang)">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={project.info.beamCountY ?? project.beams.filter((b) => b.direction === "X").length}
+                      onChange={(e) => patchBeamCount("Y", Number(e.target.value))}
+                    />
+                  </Field>
+                  <Field label="Chiều cao dầm H" unit="mm">
+                    <Input
+                      type="number"
+                      value={project.info.beamH ?? 500}
+                      onChange={(e) => patchBeamDims({ beamH: Number(e.target.value) || 0 })}
+                    />
+                  </Field>
+                  <Field label="Chiều rộng dầm B" unit="mm">
+                    <Input
+                      type="number"
+                      value={project.info.beamB ?? 220}
+                      onChange={(e) => patchBeamDims({ beamB: Number(e.target.value) || 0 })}
+                    />
+                  </Field>
+                  <Field label="Lệch trục B1" unit="mm">
+                    <Input
+                      type="number"
+                      value={project.info.beamB1 ?? 110}
+                      onChange={(e) => patchBeamDims({ beamB1: Number(e.target.value) || 0 })}
+                    />
+                  </Field>
                 </div>
+                <p className="mt-1.5 text-[11px] text-zinc-500">
+                  B1 tự động: trục biên = da dầm ngoài (B1=0 hoặc B); trục giữa = tâm dầm (B1=B/2).
+                  Đổi khoảng cách tim trục thì dầm theo tim. Kích thước:{" "}
+                  {project.info.beamSizeX || `${project.info.beamB}x${project.info.beamH}`}.
+                </p>
                 <div className="mt-3 rounded border border-zinc-700 bg-zinc-950/60 p-2">
-                  <div className="mb-2 text-xs font-semibold text-sky-300">Số liệu dầm</div>
+                  <div className="mb-2 text-xs font-semibold text-sky-300">Tạo dầm mới</div>
                   <div className="flex flex-col gap-2.5">
-                    <Field label="Số lượng dầm theo phương X (dầm đứng)">
-                      <Input
-                        type="number"
-                        min={0}
-                        value={project.info.beamCountX ?? project.beams.filter((b) => b.direction === "Y").length}
-                        onChange={(e) => patchBeamCount("X", Number(e.target.value))}
-                      />
-                    </Field>
-                    <Field label="Số lượng dầm theo phương Y (dầm ngang)">
-                      <Input
-                        type="number"
-                        min={0}
-                        value={project.info.beamCountY ?? project.beams.filter((b) => b.direction === "X").length}
-                        onChange={(e) => patchBeamCount("Y", Number(e.target.value))}
-                      />
-                    </Field>
-                    <Field label="Chiều cao dầm H" unit="mm">
-                      <Input
-                        type="number"
-                        value={project.info.beamH ?? 500}
-                        onChange={(e) => patchBeamDims({ beamH: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
-                    <Field label="Chiều rộng dầm B" unit="mm">
-                      <Input
-                        type="number"
-                        value={project.info.beamB ?? 220}
-                        onChange={(e) => patchBeamDims({ beamB: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
-                    <Field label="Lệch trục B1" unit="mm">
-                      <Input
-                        type="number"
-                        value={project.info.beamB1 ?? 110}
-                        onChange={(e) => patchBeamDims({ beamB1: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
+                    <div className="flex flex-wrap items-end gap-1.5">
+                      <Field label="Tên dầm">
+                        <Input
+                          className="w-24"
+                          value={project.info.beamNamePrefix}
+                          placeholder="VD: D1"
+                          onChange={(e) => patchInfo({ beamNamePrefix: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addBeamTypeFromForm();
+                            }
+                          }}
+                        />
+                      </Field>
+                      <Field label="H dầm" unit="mm">
+                        <Input
+                          type="number"
+                          className="w-20"
+                          value={project.info.beamH ?? 500}
+                          onChange={(e) => patchBeamDims({ beamH: Number(e.target.value) || 0 })}
+                        />
+                      </Field>
+                      <Field label="B dầm" unit="mm">
+                        <Input
+                          type="number"
+                          className="w-20"
+                          value={project.info.beamB ?? 220}
+                          onChange={(e) => patchBeamDims({ beamB: Number(e.target.value) || 0 })}
+                        />
+                      </Field>
+                      <Button size="sm" variant="success" onClick={addBeamTypeFromForm} title="Lưu vào danh sách">
+                        <Plus /> Thêm
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-zinc-500">
+                      Cùng tên D1 có thể thêm nhiều dòng với H/B khác nhau.
+                    </p>
                   </div>
-                  <p className="mt-1.5 text-[11px] text-zinc-500">
-                    B1 tự động: trục biên = da dầm ngoài (B1=0 hoặc B); trục giữa = tâm dầm (B1=B/2).
-                    Đổi khoảng cách tim trục thì dầm theo tim. Kích thước:{" "}
-                    {project.info.beamSizeX || `${project.info.beamB}x${project.info.beamH}`}.
-                  </p>
                 </div>
                 <div className="mt-3 rounded border border-zinc-700 bg-zinc-950/60 p-2">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -1595,9 +1940,22 @@ export function SlabApp() {
                             className="min-w-0 w-full whitespace-nowrap"
                             title="Tên dầm"
                             value={t.name}
-                            onChange={(e) =>
-                              persist(patchBeamType(project, t.id, { name: e.target.value }))
-                            }
+                            onChange={(e) => {
+                              const nextName = e.target.value;
+                              const next = patchBeamType(project, t.id, { name: nextName });
+                              if (
+                                next === project &&
+                                normalizeBeamTypeName(nextName) &&
+                                normalizeBeamTypeName(nextName).toLowerCase() !==
+                                  normalizeBeamTypeName(t.name).toLowerCase()
+                              ) {
+                                setStatus(
+                                  `Tên «${normalizeBeamTypeName(nextName)}» đã có — không được trùng tên.`,
+                                );
+                                return;
+                              }
+                              persist(next);
+                            }}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
@@ -1899,442 +2257,543 @@ export function SlabApp() {
 
           {tab === "draw" && (
             <div className="flex flex-col gap-3">
-              <Panel title="Vẽ thép sàn" className="min-w-0 flex-1">
-                <div className="flex flex-col gap-2.5">
-                  <Field label="Số hiệu thép" wide>
-                    <Input value={zoneForm.mark} onChange={(e) => setZoneForm({ ...zoneForm, mark: e.target.value })} />
-                  </Field>
-                  <Field label="Tỷ lệ bản vẽ">
-                    <Input
-                      type="number"
-                      value={project.info.drawingScale}
-                      onChange={(e) => patchInfo({ drawingScale: Number(e.target.value) || 100 })}
-                    />
-                  </Field>
-                  <Field label="Đường kính thép">
-                    <select
-                      className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
-                      value={zoneForm.dia}
-                      onChange={(e) => setZoneForm({ ...zoneForm, dia: Number(e.target.value) })}
+              <div className="rounded border border-zinc-700 bg-zinc-950/40 p-2">
+                <div className="mb-1.5 text-[11px] font-medium text-zinc-400">Chế độ bố trí</div>
+                <div className="flex flex-col gap-1.5">
+                  {(
+                    [
+                      ["manual", "Vẽ thép sàn"],
+                      ["economy2", "Thép 2 lớp tiết kiệm"],
+                      ["simple2", "Thép 2 lớp đơn giản"],
+                    ] as const
+                  ).map(([mode, label]) => (
+                    <label
+                      key={mode}
+                      className="flex cursor-pointer items-center gap-2 text-xs text-zinc-200"
                     >
-                      {DIAMETERS.map((d) => (
-                        <option key={d} value={d}>{d}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Khoảng rải thép (a)">
-                    <select
-                      className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
-                      value={zoneForm.spacing}
-                      onChange={(e) => setZoneForm({ ...zoneForm, spacing: Number(e.target.value) })}
-                    >
-                      {SPACING_OPTIONS.map((d) => (
-                        <option key={d} value={d}>{d}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Móc thép trái" unit="mm">
-                    <Input
-                      type="number"
-                      value={zoneForm.leftHook}
-                      onChange={(e) => setZoneForm({ ...zoneForm, leftHook: Number(e.target.value) || 0 })}
-                    />
-                  </Field>
-                  <Field label="Móc thép phải" unit="mm">
-                    <Input
-                      type="number"
-                      value={zoneForm.rightHook}
-                      onChange={(e) => setZoneForm({ ...zoneForm, rightHook: Number(e.target.value) || 0 })}
-                    />
-                  </Field>
-                  <Field label="Ký hiệu khoảng rải">
-                    <Input
-                      className="w-20"
-                      value={zoneForm.spacingSymbol}
-                      onChange={(e) => setZoneForm({ ...zoneForm, spacingSymbol: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Dày lớp bảo vệ" unit="mm">
-                    <Input
-                      type="number"
-                      value={zoneForm.cover}
-                      onChange={(e) => setZoneForm({ ...zoneForm, cover: Number(e.target.value) || 0 })}
-                    />
-                  </Field>
-                  <Field label="Lớp thép">
-                    <select
-                      className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
-                      value={zoneForm.layer}
-                      onChange={(e) => setZoneForm({ ...zoneForm, layer: e.target.value as RebarLayer })}
-                    >
-                      <option value="bottom">Lớp dưới</option>
-                      <option value="top">Lớp trên</option>
-                      <option value="structural">Cấu tạo</option>
-                    </select>
-                  </Field>
-                  <Field label="Phương">
-                    <select
-                      className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
-                      value={zoneForm.direction}
-                      onChange={(e) => setZoneForm({ ...zoneForm, direction: e.target.value as RebarDir })}
-                    >
-                      <option value="X">X</option>
-                      <option value="Y">Y</option>
-                    </select>
-                  </Field>
-                </div>
-                <label className="mt-2 flex items-center gap-2 text-xs text-zinc-300">
-                  <Checkbox
-                    checked={project.info.showDistRange !== false}
-                    onCheckedChange={(v) => {
-                      const on = Boolean(v);
-                      setZoneForm({ ...zoneForm, showSpacing: on });
-                      persist({
-                        ...project,
-                        info: { ...project.info, showDistRange: on },
-                        zones: project.zones.map((z) => ({ ...z, showSpacing: on })),
-                      });
-                    }}
-                  />
-                  Hiện / Ẩn khoảng rải thép sàn
-                </label>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button size="sm" variant="secondary" onClick={addZone}>
-                    <Plus /> Thêm vùng
-                  </Button>
-                  <Button size="sm" variant="secondary" onClick={editZone} disabled={!selectedZoneId}>
-                    Sửa
-                  </Button>
-                  <Button size="sm" variant="danger" onClick={delZone} disabled={!selectedZoneId}>
-                    <Trash2 /> Xóa
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className={planSelection?.kind === "bay" && selectedBayKind() === "opening" ? "border-sky-500 text-sky-300" : undefined}
-                    onClick={insertOpening}
-                    title="Chọn ô sàn rồi đặt thành ô thủng (X nét đứt)"
-                  >
-                    Ô thủng
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className={planSelection?.kind === "bay" && selectedBayKind() === "low" ? "border-sky-500 text-sky-300" : undefined}
-                    onClick={insertLowSlab}
-                    title="Chọn ô sàn rồi đặt thành sàn thấp (gạch chéo)"
-                  >
-                    Sàn thấp
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className={planSelection?.kind === "bay" && selectedBayKind() === "normal" ? "border-sky-500 text-sky-300" : undefined}
-                    onClick={() => setSelectedBayKind("normal")}
-                    title="Đặt lại ô đang chọn thành sàn thường"
-                    disabled={planSelection?.kind !== "bay"}
-                  >
-                    Sàn thường
-                  </Button>
-                </div>
-                <p className="mt-1.5 text-[11px] text-zinc-500">
-                  Chọn ô sàn → chọn loại: <b className="text-zinc-400">Sàn thường</b> / <b className="text-zinc-400">Ô thủng</b> /{" "}
-                  <b className="text-zinc-400">Sàn thấp</b> (đổi lại được nếu chèn nhầm).
-                </p>
-                <div className="mt-2 rounded border border-zinc-700/80 bg-zinc-950/50 p-2">
-                  <div className="mb-1.5 text-[11px] text-zinc-500">Thép sàn thấp</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(
-                      [
-                        ["press", "Nhấn thép"],
-                        ["cut", "Cắt thép"],
-                      ] as const
-                    ).map(([mode, label]) => {
-                      const active = lowRebarMode === mode;
-                      return (
-                        <Button
-                          key={mode}
-                          size="sm"
-                          variant={active ? "default" : "secondary"}
-                          className={active ? "bg-amber-700 text-white hover:bg-amber-600" : undefined}
-                          onClick={() => setSelectedLowRebarMode(mode)}
-                          title={
-                            mode === "press"
-                              ? "Thép chạy như sàn thường; nhấn xuống tại dầm quanh ô bằng chênh cao độ"
-                              : "Tách với sàn thường; vẫn bố trí thép trong ô thấp và lên thân dầm quanh ô"
-                          }
-                        >
-                          {label}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-1.5 text-[10px] leading-snug text-zinc-500">
-                    {lowRebarMode === "press"
-                      ? "Nhấn: thép đi thẳng xuyên ô; tại dầm quanh ô nhấn xuống bằng chênh cao độ sàn thấp."
-                      : "Cắt: tách với sàn thường; thép trong ô thấp + lên thân dầm, lệch ½ khoảng rải để không chồng sắt."}
-                  </p>
-                </div>
-              </Panel>
-              <Panel title="Danh sách vùng thép" className="min-w-0 w-full">
-                <ul className="max-h-48 space-y-1 overflow-auto text-xs">
-                  {(project.layoutPreset === "manual" ? project.zones : zones).map((z) => (
-                    <li key={z.id}>
-                      <button
-                        type="button"
-                        className={`w-full rounded px-2 py-1 text-left ${
-                          selectedZoneId === z.id ? "bg-sky-900/50 text-sky-200" : "hover:bg-zinc-800"
-                        }`}
-                        onClick={() => {
-                          setSelectedZoneId(z.id);
-                          setZoneForm(z);
-                          setPreset("manual");
-                        }}
-                      >
-                        {z.mark} · Ø{z.dia}a{z.spacing} · {z.direction}
-                      </button>
-                    </li>
+                      <Checkbox
+                        checked={project.layoutPreset === mode}
+                        onCheckedChange={() => selectLayoutPanel(mode)}
+                      />
+                      {label}
+                    </label>
                   ))}
-                </ul>
-              </Panel>
-
-              {planSelection?.kind === "bay" && selectedBaySpans() && (
-                <div
-                  ref={selectedBayPanelRef}
-                  className="rounded border border-sky-700/60 bg-sky-950/30 p-2"
-                >
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="text-xs font-semibold text-sky-300">Ô sàn đang chọn trên bản vẽ</div>
-                    <Button size="sm" variant="secondary" onClick={() => setPlanSelection(null)}>
-                      Bỏ chọn
-                    </Button>
-                  </div>
-                  <p className="mb-2 text-[11px] text-zinc-400">{selectedBaySpans()!.name}</p>
-                  <div className="mb-2">
-                    <div className="mb-1 text-[11px] text-zinc-500">Loại ô sàn</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(
-                        [
-                          ["normal", "Sàn thường"],
-                          ["opening", "Ô thủng"],
-                          ["low", "Sàn thấp"],
-                        ] as const
-                      ).map(([kind, label]) => {
-                        const active = selectedBayKind() === kind;
-                        return (
-                          <Button
-                            key={kind}
-                            size="sm"
-                            variant={active ? "default" : "secondary"}
-                            className={active ? "bg-sky-700 text-white hover:bg-sky-600" : undefined}
-                            onClick={() => setSelectedBayKind(kind)}
-                          >
-                            {label}
-                          </Button>
-                        );
-                      })}
+                  <label className="mt-1 flex items-center gap-2 text-xs text-zinc-300">
+                    <Checkbox
+                      checked={project.info.showDistRange !== false}
+                      onCheckedChange={(v) => {
+                        const on = Boolean(v);
+                        setZoneForm({ ...zoneForm, showSpacing: on });
+                        persist({
+                          ...project,
+                          info: { ...project.info, showDistRange: on },
+                          zones: project.zones.map((z) => ({ ...z, showSpacing: on })),
+                        });
+                      }}
+                    />
+                    Hiện / Ẩn khoảng rải thép sàn
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-zinc-300">
+                    <Checkbox
+                      checked={project.info.optimizeCut !== false}
+                      onCheckedChange={(v) => {
+                        persist({
+                          ...project,
+                          info: { ...project.info, optimizeCut: Boolean(v) },
+                        });
+                      }}
+                    />
+                    Cắt thép sàn tối ưu
+                  </label>
+                  {project.info.optimizeCut !== false && (
+                    <div className="space-y-1.5 rounded border border-zinc-700/80 bg-zinc-900/60 p-2">
+                      <p className="text-[11px] leading-snug text-zinc-500">
+                        Chỉ áp dụng thép ≥ Ø10 (kể cả cấu tạo). Nhỏ hơn phi 10 giữ nguyên chiều dài.
+                      </p>
+                      <Field label="Cách cắt" wide>
+                        <select
+                          className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
+                          value={project.info.optimizeCutMode === "byStock" ? "byStock" : "avoidZones"}
+                          onChange={(e) => {
+                            const optimizeCutMode =
+                              e.target.value === "byStock" ? "byStock" : "avoidZones";
+                            persist({
+                              ...project,
+                              info: { ...project.info, optimizeCutMode },
+                            });
+                          }}
+                        >
+                          <option value="avoidZones">Cắt tránh vùng</option>
+                          <option value="byStock">Cắt tự do 11,7m</option>
+                        </select>
+                      </Field>
+                      <Field label="Chiều dài nối" wide>
+                        <select
+                          className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
+                          value={
+                            project.info.lapMul === 30 || project.info.lapMul === 35
+                              ? project.info.lapMul
+                              : 40
+                          }
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            const lapMul = n === 30 || n === 35 || n === 40 ? n : 40;
+                            persist({
+                              ...project,
+                              info: { ...project.info, lapMul },
+                            });
+                          }}
+                        >
+                          <option value={30}>Nối 30D</option>
+                          <option value={35}>Nối 35D</option>
+                          <option value={40}>Nối 40D</option>
+                        </select>
+                      </Field>
                     </div>
-                    {selectedBayKind() === "low" && (
-                      <div className="mt-2">
-                        <div className="mb-1 text-[11px] text-zinc-500">Thép sàn thấp</div>
+                  )}
+                </div>
+              </div>
+
+              {project.layoutPreset === "manual" && (
+                <>
+                  <Panel title="Vẽ thép sàn" className="min-w-0 flex-1">
+                    <div className="flex flex-col gap-2.5">
+                      <Field label="Tỷ lệ bản vẽ">
+                        <Input
+                          type="number"
+                          value={project.info.drawingScale}
+                          onChange={(e) => patchInfo({ drawingScale: Number(e.target.value) || 100 })}
+                        />
+                      </Field>
+                      <Field label="Đường kính thép">
+                        <select
+                          className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
+                          value={zoneForm.dia}
+                          onChange={(e) => setZoneForm({ ...zoneForm, dia: Number(e.target.value) })}
+                        >
+                          {DIAMETERS.map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Khoảng rải thép (a)">
+                        <select
+                          className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
+                          value={zoneForm.spacing}
+                          onChange={(e) => setZoneForm({ ...zoneForm, spacing: Number(e.target.value) })}
+                        >
+                          {SPACING_OPTIONS.map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Móc thép trái" unit="mm">
+                        <Input
+                          type="number"
+                          value={zoneForm.leftHook}
+                          onChange={(e) => persistZoneHooks({ leftHook: Number(e.target.value) || 0 })}
+                        />
+                      </Field>
+                      <Field label="Móc thép phải" unit="mm">
+                        <Input
+                          type="number"
+                          value={zoneForm.rightHook}
+                          onChange={(e) => persistZoneHooks({ rightHook: Number(e.target.value) || 0 })}
+                        />
+                      </Field>
+                      <Field label="Ký hiệu khoảng rải">
+                        <Input
+                          className="w-20"
+                          value={zoneForm.spacingSymbol}
+                          onChange={(e) => setZoneForm({ ...zoneForm, spacingSymbol: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="Dày lớp bảo vệ" unit="mm">
+                        <Input
+                          type="number"
+                          value={zoneForm.cover}
+                          onChange={(e) => {
+                            const cover = Number(e.target.value) || 0;
+                            const nextForm = { ...zoneForm, cover };
+                            setZoneForm(nextForm);
+                            persist({
+                              ...project,
+                              info: { ...project.info, cover },
+                              layoutPreset: "manual",
+                              zones: selectedZoneId
+                                ? project.zones.map((z) =>
+                                    z.id === selectedZoneId ? { ...nextForm, id: selectedZoneId } : z,
+                                  )
+                                : project.zones.map((z) => ({ ...z, cover })),
+                            });
+                          }}
+                        />
+                      </Field>
+                      <Field label="Lớp thép" wide>
+                        <select
+                          className="h-7 w-full min-w-0 rounded-md border border-zinc-600 bg-zinc-950 px-2 text-sm"
+                          value={`${zoneForm.layer === "structural" ? "bottom" : zoneForm.layer}|${zoneForm.direction}`}
+                          onChange={(e) => {
+                            const [layerRaw, direction] = e.target.value.split("|") as [RebarLayer, RebarDir];
+                            const layer = layerRaw === "top" ? "top" : "bottom";
+                            setZoneForm({
+                              ...zoneForm,
+                              layer,
+                              direction,
+                              mark: rebarLayerMark(layer),
+                            });
+                          }}
+                        >
+                          <option value="bottom|X">Lớp dưới phương X</option>
+                          <option value="bottom|Y">Lớp dưới phương Y</option>
+                          <option value="top|X">Lớp trên phương X</option>
+                          <option value="top|Y">Lớp trên phương Y</option>
+                        </select>
+                      </Field>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={addZone}
+                        disabled={hasLayerDir(zoneForm.layer, zoneForm.direction)}
+                        title={
+                          hasLayerDir(zoneForm.layer, zoneForm.direction)
+                            ? `Đã có ${rebarLayerMark(zoneForm.layer)} ${zoneForm.direction}`
+                            : "Thêm vùng thép mới"
+                        }
+                      >
+                        <Plus /> Thêm vùng
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={editZone} disabled={!selectedZoneId}>
+                        Sửa
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={delZone} disabled={!selectedZoneId}>
+                        <Trash2 /> Xóa
+                      </Button>
+                    </div>
+                    {hasLayerDir(zoneForm.layer, zoneForm.direction) && (
+                      <p className="mt-1.5 text-[11px] text-amber-400/90">
+                        Đã có {rebarLayerMark(zoneForm.layer)} {zoneForm.direction} — chỉ Sửa hoặc Xóa
+                        rồi thêm lại.
+                      </p>
+                    )}
+                  </Panel>
+                  <Panel title="Danh sách vùng thép" className="min-w-0 w-full">
+                    <ul className="max-h-48 space-y-1 overflow-auto text-xs">
+                      {project.zones.map((z) => (
+                        <li key={z.id}>
+                          <button
+                            type="button"
+                            className={`w-full rounded px-2 py-1 text-left ${
+                              selectedZoneId === z.id ? "bg-sky-900/50 text-sky-200" : "hover:bg-zinc-800"
+                            }`}
+                            onClick={() => {
+                              setSelectedZoneId(z.id);
+                              setZoneForm({ ...z, mark: rebarLayerMark(z.layer) });
+                            }}
+                          >
+                            {`${z.layer === "top" ? "Lớp trên" : "Lớp dưới"} phương ${z.direction}: Ø${z.dia}a${z.spacing}`}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </Panel>
+
+                  {planSelection?.kind === "bay" && selectedBaySpans() && (
+                    <div
+                      ref={selectedBayPanelRef}
+                      className="rounded border border-sky-700/60 bg-sky-950/30 p-2"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="text-xs font-semibold text-sky-300">Ô sàn đang chọn trên bản vẽ</div>
+                        <Button size="sm" variant="secondary" onClick={() => setPlanSelection(null)}>
+                          Bỏ chọn
+                        </Button>
+                      </div>
+                      <p className="mb-2 text-[11px] text-zinc-400">{selectedBaySpans()!.name}</p>
+                      <div className="mb-2">
+                        <div className="mb-1 text-[11px] text-zinc-500">Loại ô sàn</div>
                         <div className="flex flex-wrap gap-1.5">
                           {(
                             [
-                              ["press", "Nhấn thép"],
-                              ["cut", "Cắt thép"],
+                              ["normal", "Sàn thường"],
+                              ["opening", "Ô thủng"],
+                              ["low", "Sàn thấp"],
                             ] as const
-                          ).map(([mode, label]) => {
-                            const active = selectedLowRebarMode() === mode;
+                          ).map(([kind, label]) => {
+                            const active = selectedBayKind() === kind;
                             return (
                               <Button
-                                key={mode}
+                                key={kind}
                                 size="sm"
                                 variant={active ? "default" : "secondary"}
-                                className={active ? "bg-amber-700 text-white hover:bg-amber-600" : undefined}
-                                onClick={() => setSelectedLowRebarMode(mode)}
+                                className={active ? "bg-sky-700 text-white hover:bg-sky-600" : undefined}
+                                onClick={() => setSelectedBayKind(kind)}
                               >
                                 {label}
                               </Button>
                             );
                           })}
                         </div>
+                        {selectedBayKind() === "low" && (
+                          <div className="mt-2 rounded border border-zinc-700/80 bg-zinc-950/50 p-2">
+                            <div className="mb-1.5 text-[11px] text-zinc-500">Thép sàn thấp</div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {(
+                                [
+                                  ["press", "Nhấn thép"],
+                                  ["cut", "Cắt thép"],
+                                ] as const
+                              ).map(([mode, label]) => {
+                                const active = selectedLowRebarMode() === mode;
+                                return (
+                                  <Button
+                                    key={mode}
+                                    size="sm"
+                                    variant={active ? "default" : "secondary"}
+                                    className={active ? "bg-amber-700 text-white hover:bg-amber-600" : undefined}
+                                    onClick={() => setSelectedLowRebarMode(mode)}
+                                    title={
+                                      mode === "press"
+                                        ? "Thép chạy như sàn thường; nhấn xuống tại dầm quanh ô bằng chênh cao độ"
+                                        : "Tách với sàn thường; vẫn bố trí thép trong ô thấp và lên thân dầm quanh ô"
+                                    }
+                                  >
+                                    {label}
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                            <p className="mt-1.5 text-[10px] leading-snug text-zinc-500">
+                              {selectedLowRebarMode() === "press"
+                                ? "Nhấn: thép đi thẳng xuyên ô; tại dầm quanh ô nhấn xuống bằng chênh cao độ sàn thấp."
+                                : "Cắt: tách với sàn thường; thép trong ô thấp + lên thân dầm, lệch ½ khoảng rải để không chồng sắt."}
+                            </p>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                      <div className="flex flex-col gap-2.5">
+                        <Field label="Khoảng cách Lx" unit="mm">
+                          <Input
+                            type="number"
+                            value={Math.round(selectedBaySpans()!.lx)}
+                            onChange={(e) => patchSelectedBaySpan("lx", Number(e.target.value))}
+                          />
+                        </Field>
+                        <Field label="Khoảng cách Ly" unit="mm">
+                          <Input
+                            type="number"
+                            value={Math.round(selectedBaySpans()!.ly)}
+                            onChange={(e) => patchSelectedBaySpan("ly", Number(e.target.value))}
+                          />
+                        </Field>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="success"
+                          size="sm"
+                          title="Chọn ô sàn tiếp theo (trái → phải)"
+                          onClick={selectNextPlanItem}
+                        >
+                          <ChevronRight /> Tiếp theo
+                        </Button>
+                        <Button variant="success" size="sm" onClick={applySelectionToAllSpans}>
+                          <Check /> Áp dụng cho các nhịp
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {project.layoutPreset === "economy2" && (
+                <Panel title="Thép 2 lớn tiết kiệm" className="max-w-3xl">
                   <div className="flex flex-col gap-2.5">
-                    <Field label="Khoảng cách Lx" unit="mm">
+                    <Field label="Thép lớp dưới">
                       <Input
-                        type="number"
-                        value={Math.round(selectedBaySpans()!.lx)}
-                        onChange={(e) => patchSelectedBaySpan("lx", Number(e.target.value))}
+                        value={project.economy2.bottomSpec}
+                        onChange={(e) => persist({ ...project, economy2: { ...project.economy2, bottomSpec: e.target.value } })}
                       />
                     </Field>
-                    <Field label="Khoảng cách Ly" unit="mm">
+                    <Field label="Móc thép dưới" unit="mm">
                       <Input
                         type="number"
-                        value={Math.round(selectedBaySpans()!.ly)}
-                        onChange={(e) => patchSelectedBaySpan("ly", Number(e.target.value))}
+                        value={project.economy2.bottomHook}
+                        onChange={(e) => persist({ ...project, economy2: { ...project.economy2, bottomHook: Number(e.target.value) || 0 } })}
+                      />
+                    </Field>
+                    <Field label="Thép lớp trên">
+                      <Input
+                        value={project.economy2.topSpec}
+                        onChange={(e) => persist({ ...project, economy2: { ...project.economy2, topSpec: e.target.value } })}
+                      />
+                    </Field>
+                    <Field label="Móc thép trên" unit="mm">
+                      <Input
+                        type="number"
+                        value={project.economy2.topHook}
+                        onChange={(e) => persist({ ...project, economy2: { ...project.economy2, topHook: Number(e.target.value) || 0 } })}
+                      />
+                    </Field>
+                    <Field label="Thép cấu tạo">
+                      <Input
+                        value={project.economy2.structuralSpec}
+                        onChange={(e) => persist({ ...project, economy2: { ...project.economy2, structuralSpec: e.target.value } })}
+                      />
+                    </Field>
+                    <Field label="Móc thép cấu tạo" unit="mm">
+                      <Input
+                        type="number"
+                        value={project.economy2.structuralHook}
+                        onChange={(e) => persist({ ...project, economy2: { ...project.economy2, structuralHook: Number(e.target.value) || 0 } })}
+                      />
+                    </Field>
+                    <Field label="KC đến tim 1/">
+                      <Input
+                        type="number"
+                        value={project.economy2.distToCenter}
+                        onChange={(e) => persist({ ...project, economy2: { ...project.economy2, distToCenter: Number(e.target.value) || 1 } })}
                       />
                     </Field>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="success"
-                      size="sm"
-                      title="Chọn ô sàn tiếp theo (trái → phải)"
-                      onClick={selectNextPlanItem}
-                    >
-                      <ChevronRight /> Tiếp theo
-                    </Button>
-                    <Button variant="success" size="sm" onClick={applySelectionToAllSpans}>
-                      <Check /> Áp dụng cho các nhịp
+                </Panel>
+              )}
+
+              {project.layoutPreset === "simple2" && (
+                <Panel title="Thép 2 lớp đơn giản" className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-2.5">
+                    <Field label="Thép lớp dưới">
+                      <Input
+                        value={project.simple2.bottomSpec}
+                        onChange={(e) => persist({ ...project, simple2: { ...project.simple2, bottomSpec: e.target.value } })}
+                      />
+                    </Field>
+                    <Field label="Móc thép dưới" unit="mm">
+                      <Input
+                        type="number"
+                        value={project.simple2.bottomHook}
+                        onChange={(e) => persist({ ...project, simple2: { ...project.simple2, bottomHook: Number(e.target.value) || 0 } })}
+                      />
+                    </Field>
+                    <Field label="Thép lớp trên">
+                      <Input
+                        value={project.simple2.topSpec}
+                        onChange={(e) => persist({ ...project, simple2: { ...project.simple2, topSpec: e.target.value } })}
+                      />
+                    </Field>
+                    <Field label="Móc thép trên" unit="mm">
+                      <Input
+                        type="number"
+                        value={project.simple2.topHook}
+                        onChange={(e) => persist({ ...project, simple2: { ...project.simple2, topHook: Number(e.target.value) || 0 } })}
+                      />
+                    </Field>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button size="sm" variant="secondary" className="text-amber-300" onClick={applySimple2}>
+                      Thép lớp dưới / trên
                     </Button>
                   </div>
-                </div>
+                </Panel>
               )}
             </div>
           )}
 
-          {tab === "economy2" && (
-            <Panel title="Bố trí thép 2 lớp tiết kiệm" className="max-w-3xl">
-              <div className="flex flex-col gap-2.5">
-                <Field label="Thép lớp dưới">
-                  <Input
-                    value={project.economy2.bottomSpec}
-                    onChange={(e) => persist({ ...project, economy2: { ...project.economy2, bottomSpec: e.target.value } })}
-                  />
-                </Field>
-                <Field label="Móc thép dưới" unit="mm">
-                  <Input
-                    type="number"
-                    value={project.economy2.bottomHook}
-                    onChange={(e) => persist({ ...project, economy2: { ...project.economy2, bottomHook: Number(e.target.value) || 0 } })}
-                  />
-                </Field>
-                <Field label="Thép lớp trên">
-                  <Input
-                    value={project.economy2.topSpec}
-                    onChange={(e) => persist({ ...project, economy2: { ...project.economy2, topSpec: e.target.value } })}
-                  />
-                </Field>
-                <Field label="Móc thép trên" unit="mm">
-                  <Input
-                    type="number"
-                    value={project.economy2.topHook}
-                    onChange={(e) => persist({ ...project, economy2: { ...project.economy2, topHook: Number(e.target.value) || 0 } })}
-                  />
-                </Field>
-                <Field label="Thép cấu tạo">
-                  <Input
-                    value={project.economy2.structuralSpec}
-                    onChange={(e) => persist({ ...project, economy2: { ...project.economy2, structuralSpec: e.target.value } })}
-                  />
-                </Field>
-                <Field label="Móc thép cấu tạo" unit="mm">
-                  <Input
-                    type="number"
-                    value={project.economy2.structuralHook}
-                    onChange={(e) => persist({ ...project, economy2: { ...project.economy2, structuralHook: Number(e.target.value) || 0 } })}
-                  />
-                </Field>
-                <Field label="KC đến tim 1/">
-                  <Input
-                    type="number"
-                    value={project.economy2.distToCenter}
-                    onChange={(e) => persist({ ...project, economy2: { ...project.economy2, distToCenter: Number(e.target.value) || 1 } })}
-                  />
-                </Field>
-              </div>
-              <label className="mt-2 flex items-center gap-2 text-xs text-zinc-300">
-                <Checkbox
-                  checked={project.economy2.hatAlongShort}
-                  onCheckedChange={(v) => persist({ ...project, economy2: { ...project.economy2, hatAlongShort: Boolean(v) } })}
-                />
-                Thép mũ theo phương cạnh ngắn
-              </label>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button size="sm" className="text-amber-300" variant="secondary" onClick={applyEconomy2}>
-                  Áp dụng bố trí tiết kiệm
-                </Button>
-              </div>
-            </Panel>
-          )}
-
-          {tab === "simple2" && (
-            <Panel title="Bố trí thép 2 lớp đơn giản" className="min-w-0 flex-1">
-              <div className="flex flex-col gap-2.5">
-                <Field label="Thép lớp dưới">
-                  <Input
-                    value={project.simple2.bottomSpec}
-                    onChange={(e) => persist({ ...project, simple2: { ...project.simple2, bottomSpec: e.target.value } })}
-                  />
-                </Field>
-                <Field label="Móc thép dưới" unit="mm">
-                  <Input
-                    type="number"
-                    value={project.simple2.bottomHook}
-                    onChange={(e) => persist({ ...project, simple2: { ...project.simple2, bottomHook: Number(e.target.value) || 0 } })}
-                  />
-                </Field>
-                <Field label="Thép lớp trên">
-                  <Input
-                    value={project.simple2.topSpec}
-                    onChange={(e) => persist({ ...project, simple2: { ...project.simple2, topSpec: e.target.value } })}
-                  />
-                </Field>
-                <Field label="Móc thép trên" unit="mm">
-                  <Input
-                    type="number"
-                    value={project.simple2.topHook}
-                    onChange={(e) => persist({ ...project, simple2: { ...project.simple2, topHook: Number(e.target.value) || 0 } })}
-                  />
-                </Field>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button size="sm" variant="secondary" className="text-amber-300" onClick={applySimple2}>
-                  Thép lớp dưới / trên
-                </Button>
-              </div>
-            </Panel>
-          )}
-
           {tab === "section" && (
             <Panel title="Mặt cắt sàn" className="max-w-xl">
-              <div className="flex flex-col gap-2.5">
-                <Field label="Tên mặt cắt">
-                  <Input
-                    value={project.sections[0]?.name ?? "1"}
-                    onChange={(e) => {
-                      const sections = [...project.sections];
-                      if (!sections[0]) return;
-                      sections[0] = { ...sections[0], name: e.target.value };
-                      persist({ ...project, sections });
-                    }}
-                  />
-                </Field>
-                <Field label="Vị trí cắt" unit="mm">
-                  <Input
-                    type="number"
-                    value={project.sections[0]?.at ?? 0}
-                    onChange={(e) => {
-                      const sections = [...project.sections];
-                      if (!sections[0]) return;
-                      sections[0] = { ...sections[0], at: Number(e.target.value) || 0 };
-                      persist({ ...project, sections });
-                    }}
-                  />
-                </Field>
-              </div>
-              <Button size="sm" className="mt-3" onClick={() => void exportPdf()}>
-                Xuất PDF có mặt cắt
-              </Button>
+              {(() => {
+                const sections = ensureSectionCuts(project);
+                const secX = sections.find((s) => s.direction === "X")!;
+                const secY = sections.find((s) => s.direction === "Y")!;
+                const axesX = sortAxes(project.axesX);
+                const axesY = sortAxes(project.axesY);
+                const patchSec = (
+                  dir: "X" | "Y",
+                  patch: { axisId?: string; offsetMm?: number; name?: string },
+                ) => {
+                  const next = ensureSectionCuts(project).map((s) => {
+                    if (patch.name != null) {
+                      s = { ...s, name: patch.name };
+                    }
+                    if (s.direction !== dir) return s;
+                    const axisId = patch.axisId ?? s.axisId;
+                    const offsetMm =
+                      patch.offsetMm !== undefined
+                        ? Math.round(Number(patch.offsetMm) || 0)
+                        : Math.round(Number(s.offsetMm) || 0);
+                    const updated = { ...s, axisId, offsetMm };
+                    return { ...updated, at: sectionCutAtMm(project, updated) };
+                  });
+                  persist({ ...project, sections: next });
+                };
+                const cutRow = (
+                  label: string,
+                  dir: "X" | "Y",
+                  sec: (typeof sections)[number],
+                  axes: typeof axesX,
+                ) => (
+                  <div key={dir} className="rounded-md border border-zinc-700/80 bg-zinc-950/40 p-2.5">
+                    <div className="mb-2 text-[12px] font-medium text-zinc-200">{label}</div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2">
+                      <span className="text-[12px] text-zinc-400">Vị trí cắt</span>
+                      <div className="flex items-center gap-1.5">
+                        <Select
+                          className="h-8 w-[4.5rem]"
+                          value={sec.axisId ?? axes[0]?.id ?? ""}
+                          onChange={(e) => patchSec(dir, { axisId: e.target.value })}
+                        >
+                          {axes.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name || (dir === "X" ? "?" : "?")}
+                            </option>
+                          ))}
+                        </Select>
+                        <Input
+                          className="h-8 w-[5.5rem]"
+                          type="number"
+                          value={sec.offsetMm ?? 0}
+                          onChange={(e) =>
+                            patchSec(dir, { offsetMm: Number(e.target.value) || 0 })
+                          }
+                          title="Kích thước từ trục chọn trở ra (mm)"
+                        />
+                        <span className="w-7 shrink-0 text-[12px] text-zinc-400">mm</span>
+                      </div>
+                    </div>
+                    <p className="mt-1.5 text-[10px] text-zinc-500">
+                      Cắt tại {dir === "X" ? "X" : "Y"} = {sec.at} mm (trục + khoảng cách)
+                    </p>
+                  </div>
+                );
+                return (
+                  <>
+                    <div className="flex flex-col gap-2.5">
+                      <Field label="Tên mặt cắt">
+                        <Input
+                          value={secX.name ?? "1"}
+                          onChange={(e) => patchSec("X", { name: e.target.value })}
+                        />
+                      </Field>
+                      {cutRow("Cắt theo phương trục X", "X", secX, axesX)}
+                      {cutRow("Cắt theo phương trục Y", "Y", secY, axesY)}
+                    </div>
+                    <Button size="sm" className="mt-3" onClick={() => void exportPdf()}>
+                      Xuất PDF có mặt cắt
+                    </Button>
+                  </>
+                );
+              })()}
             </Panel>
           )}
 
           {tab === "model3d" && (
             <Panel title="Mô hình 3D" className="max-w-xl">
               <p className="mb-2 text-[11px] text-zinc-400">
-                Phối cảnh isometric: cạnh nhìn thấy nét liền; cạnh che khuất (dưới sàn) nét đứt mảnh; đoạn line xuyên chỗ dầm chồng nhau được xoá.
+                Phối cảnh sàn: <b className="text-zinc-200">đà biên nét liền</b>;
+                dầm trong <b className="text-zinc-200">nét đứt</b>;
+                <b className="text-zinc-200"> cột tại giao dầm / 4 góc nét liền</b>; ô thủng khung + chéo.
+                Dùng <b className="text-zinc-200">− / % / +</b> để thu nhỏ·phóng to (50–300%).
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -2404,6 +2863,7 @@ export function SlabApp() {
           )}
           <div className="min-h-0 flex-1 overflow-auto">
             <SlabPreview
+              key={project.layoutPreset}
               project={project}
               show3d={project.show3d && tab === "model3d"}
               zoomPct={previewZoomPct}
@@ -2411,7 +2871,8 @@ export function SlabApp() {
               insertBeamMode={insertBeamMode}
               selection={planSelection}
               beamMultiSelect={beamMultiSelect}
-              onSelect={handlePlanSelect}
+              onSelect={stablePlanSelect}
+              schedule={model.schedule}
             />
           </div>
         </div>
@@ -2420,10 +2881,3 @@ export function SlabApp() {
   );
 }
 
-declare global {
-  interface Window {
-    GiaHuyMembership?: {
-      requireActive: (opts: { feature: string; app?: string }) => Promise<boolean>;
-    };
-  }
-}
