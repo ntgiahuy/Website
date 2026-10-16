@@ -67,18 +67,50 @@ function remember_me_lifetime(): int {
   return 60 * 60 * 24 * 30; // 30 ngày
 }
 
+function remember_cookie_name(): string {
+  return (string) (cfg('remember_cookie_name') ?? 'GHREMEMBER');
+}
+
+function session_cookie_path(): string {
+  $p = session_get_cookie_params();
+  $path = (string) ($p['path'] ?? '/');
+  return $path !== '' ? $path : '/';
+}
+
+function set_app_cookie(string $name, string $value, int $lifetime): void {
+  $p = session_get_cookie_params();
+  $expires = $lifetime > 0 ? time() + $lifetime : 0;
+  $secure = (bool) ($p['secure'] ?? false);
+  $path = session_cookie_path();
+  if (PHP_VERSION_ID >= 70300) {
+    setcookie($name, $value, [
+      'expires' => $expires,
+      'path' => $path,
+      'domain' => $p['domain'] ?? '',
+      'secure' => $secure,
+      'httponly' => true,
+      'samesite' => $p['samesite'] ?? 'Lax',
+    ]);
+  } else {
+    setcookie($name, $value, $expires, $path, $p['domain'] ?? '', $secure, true);
+  }
+}
+
+function clear_app_cookie(string $name): void {
+  set_app_cookie($name, '', -42000);
+}
+
 function apply_session_cookie_lifetime(int $lifetime): void {
   if (!ini_get('session.use_cookies')) {
     return;
   }
   $p = session_get_cookie_params();
-  $expires = $lifetime > 0 ? time() + $lifetime : 0;
   if ($lifetime > 0) {
-    ini_set('session.gc_maxlifetime', (string) $lifetime);
+    ini_set('session.gc_maxlifetime', (string) max($lifetime, (int) ini_get('session.gc_maxlifetime')));
   }
   if (PHP_VERSION_ID >= 70300) {
-    setcookie(session_name(), session_id(), [
-      'expires' => $expires,
+    session_set_cookie_params([
+      'lifetime' => $lifetime,
       'path' => $p['path'] ?? '/',
       'domain' => $p['domain'] ?? '',
       'secure' => (bool) ($p['secure'] ?? false),
@@ -86,16 +118,75 @@ function apply_session_cookie_lifetime(int $lifetime): void {
       'samesite' => $p['samesite'] ?? 'Lax',
     ]);
   } else {
-    setcookie(
-      session_name(),
-      session_id(),
-      $expires,
+    session_set_cookie_params(
+      $lifetime,
       $p['path'] ?? '/',
       $p['domain'] ?? '',
       (bool) ($p['secure'] ?? false),
       (bool) ($p['httponly'] ?? true)
     );
   }
+  set_app_cookie(session_name(), session_id(), $lifetime);
+}
+
+function issue_remember_token(string $username): void {
+  $username = normalize_username($username);
+  if (!valid_username($username)) {
+    return;
+  }
+  $token = bin2hex(random_bytes(32));
+  $hash = hash('sha256', $token);
+  $exp = time() + remember_me_lifetime();
+  db()->prepare(
+    'UPDATE members SET remember_token_hash = ?, remember_expires_at = ?, updated_at = ? WHERE username = ?'
+  )->execute([$hash, $exp, time(), $username]);
+  set_app_cookie(remember_cookie_name(), $token, remember_me_lifetime());
+}
+
+function clear_remember_token(?string $username = null): void {
+  $username = normalize_username($username ?: (string) ($_SESSION['username'] ?? ''));
+  if (valid_username($username)) {
+    try {
+      db()->prepare(
+        'UPDATE members SET remember_token_hash = ?, remember_expires_at = 0, updated_at = ? WHERE username = ?'
+      )->execute(['', time(), $username]);
+    } catch (Throwable $e) {
+      // cột chưa migrate — bỏ qua
+    }
+  }
+  clear_app_cookie(remember_cookie_name());
+}
+
+function try_login_from_remember_cookie(): bool {
+  if (current_username() || current_email()) {
+    return true;
+  }
+  $raw = (string) ($_COOKIE[remember_cookie_name()] ?? '');
+  if ($raw === '' || !preg_match('/^[a-f0-9]{64}$/', $raw)) {
+    return false;
+  }
+  $hash = hash('sha256', $raw);
+  try {
+    $st = db()->prepare(
+      'SELECT * FROM members WHERE remember_token_hash = ? AND remember_expires_at > ? LIMIT 1'
+    );
+    $st->execute([$hash, time()]);
+    $row = $st->fetch();
+  } catch (Throwable $e) {
+    return false;
+  }
+  if (!$row || empty($row['email_verified'])) {
+    clear_app_cookie(remember_cookie_name());
+    return false;
+  }
+  // Khôi phục session + xoay token
+  $_SESSION['email'] = normalize_email((string) $row['email']);
+  $_SESSION['username'] = normalize_username((string) ($row['username'] ?? ''));
+  $_SESSION['logged_in_at'] = time();
+  $_SESSION['remember_me'] = true;
+  apply_session_cookie_lifetime(remember_me_lifetime());
+  issue_remember_token((string) $row['username']);
+  return true;
 }
 
 function refresh_remember_me_cookie(): void {
@@ -106,19 +197,26 @@ function refresh_remember_me_cookie(): void {
 }
 
 function login_member(array $row, bool $remember = false): void {
+  $lifetime = $remember ? remember_me_lifetime() : 0;
+  apply_session_cookie_lifetime($lifetime);
   session_regenerate_id(true);
   $_SESSION['email'] = normalize_email((string) $row['email']);
   $_SESSION['username'] = normalize_username((string) ($row['username'] ?? ''));
   $_SESSION['logged_in_at'] = time();
   $_SESSION['remember_me'] = $remember;
-  apply_session_cookie_lifetime($remember ? remember_me_lifetime() : 0);
+  apply_session_cookie_lifetime($lifetime);
+  if ($remember) {
+    issue_remember_token((string) ($row['username'] ?? ''));
+  } else {
+    clear_remember_token((string) ($row['username'] ?? ''));
+  }
 }
 
 function logout_session(): void {
+  clear_remember_token((string) ($_SESSION['username'] ?? ''));
   $_SESSION = [];
   if (ini_get('session.use_cookies')) {
-    $p = session_get_cookie_params();
-    setcookie(session_name(), '', time() - 42000, $p['path'] ?? '/', $p['domain'] ?? '', (bool) ($p['secure'] ?? false), (bool) ($p['httponly'] ?? true));
+    clear_app_cookie(session_name());
   }
   session_destroy();
 }

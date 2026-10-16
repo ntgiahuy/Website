@@ -101,6 +101,8 @@ CREATE TABLE IF NOT EXISTS members (
   plan TEXT NOT NULL DEFAULT '',
   expires_at INTEGER NOT NULL,
   note TEXT NOT NULL DEFAULT '',
+  remember_token_hash TEXT NOT NULL DEFAULT '',
+  remember_expires_at INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -177,6 +179,12 @@ function db_ensure_member_auth_columns_sqlite(PDO $pdo): void {
   }
   if (!in_array('full_name', $names, true)) {
     $pdo->exec("ALTER TABLE members ADD COLUMN full_name TEXT NOT NULL DEFAULT ''");
+  }
+  if (!in_array('remember_token_hash', $names, true)) {
+    $pdo->exec("ALTER TABLE members ADD COLUMN remember_token_hash TEXT NOT NULL DEFAULT ''");
+  }
+  if (!in_array('remember_expires_at', $names, true)) {
+    $pdo->exec('ALTER TABLE members ADD COLUMN remember_expires_at INTEGER NOT NULL DEFAULT 0');
   }
   $pcols = $pdo->query('PRAGMA table_info(pending_signups)')->fetchAll();
   $pnames = array_map(static function ($c) {
@@ -277,6 +285,12 @@ SQL);
   }
   if (!db_mysql_has_column($pdo, 'members', 'full_name')) {
     $pdo->exec("ALTER TABLE members ADD COLUMN full_name VARCHAR(120) NOT NULL DEFAULT ''");
+  }
+  if (!db_mysql_has_column($pdo, 'members', 'remember_token_hash')) {
+    $pdo->exec("ALTER TABLE members ADD COLUMN remember_token_hash VARCHAR(64) NOT NULL DEFAULT ''");
+  }
+  if (!db_mysql_has_column($pdo, 'members', 'remember_expires_at')) {
+    $pdo->exec('ALTER TABLE members ADD COLUMN remember_expires_at BIGINT NOT NULL DEFAULT 0');
   }
   // lifetime (36500 ngày) vượt INT 32-bit (~2038) → cần BIGINT
   try {

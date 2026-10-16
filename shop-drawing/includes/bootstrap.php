@@ -49,6 +49,10 @@ if (preg_match('#^(.*?/shop-drawing)(?:/|$)#', $script, $m)) {
 $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
   || ((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
 
+// Hosting shared hay xóa session file ~24 phút — để Remember me sống 30 ngày
+$rememberTtl = 60 * 60 * 24 * 30;
+ini_set('session.gc_maxlifetime', (string) $rememberTtl);
+
 if (PHP_VERSION_ID >= 70300) {
   session_set_cookie_params([
     'lifetime' => 0,
@@ -74,6 +78,13 @@ require_once __DIR__ . '/embed.php';
 // Gia hạn cookie session khi đã bật Remember me
 if (!empty($_SESSION['remember_me']) && function_exists('refresh_remember_me_cookie')) {
   refresh_remember_me_cookie();
+}
+// Session PHP bị GC trên hosting → khôi phục từ cookie GHREMEMBER (DB token)
+if (
+  (empty($_SESSION['username']) && empty($_SESSION['email']))
+  && function_exists('try_login_from_remember_cookie')
+) {
+  try_login_from_remember_cookie();
 }
 
 function cfg(string $key, $default = null) {
