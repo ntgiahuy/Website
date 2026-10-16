@@ -1,0 +1,19 @@
+# Không liệt kê thư mục
+Options -Indexes
+
+# PHP session / JSON
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+</IfModule>
+
+# Cổng shop ưu tiên index.php (kiểm tra domain); app nằm trong */app/
+DirectoryIndex index.php index.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # Chỉ chặn config bí mật ở thư mục gốc shop-drawing/ (không chặn api/*)
+  RewriteRule ^config\.php$ - [F,L]
+  RewriteRule ^config\.sample\.php$ - [F,L]
+  # /cot và /cot/ đều vào index.php
+  RewriteRule ^(mong|cot|dam|san)$ $1/ [R=301,L]
+</IfModule>
