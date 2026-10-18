@@ -178,9 +178,9 @@ export function SlabPreview({
               y1={e.y1}
               x2={e.x2}
               y2={e.y2}
-              stroke={e.style === "solid" ? "#0a0a0a" : "#9ca3af"}
-              strokeWidth={e.style === "solid" ? 1.45 : 0.55}
-              strokeDasharray={e.style === "dashed" ? "3.5 2.2" : undefined}
+              stroke={e.style === "solid" ? "#111111" : "#a1a1aa"}
+              strokeWidth={e.style === "solid" ? 1.85 : 0.7}
+              strokeDasharray={e.style === "dashed" ? "4.5 2.8" : undefined}
               strokeLinecap="round"
             />
           ))}
