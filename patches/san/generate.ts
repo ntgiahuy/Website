@@ -29,8 +29,6 @@ import {
   SLAB_REBAR_HOOK_MM,
 } from "../grid";
 import type { GridAxis, PlanBeam, RebarZone, SlabProject } from "../types";
-import { buildBeamFrameScene, projectSceneToSvg } from "../view3d";
-
 const PAGE_W = 1684;
 const PAGE_H = 1191;
 const BLACK = rgb(0, 0, 0);
@@ -1279,67 +1277,6 @@ function drawSection(ctx: Ctx, x: number, y: number) {
   return sy + slabT + beamH + 28;
 }
 
-/** Phối cảnh dầm sàn isometric (hidden-line) — giống bản vẽ shop. */
-function drawPhốiCảnh(ctx: Ctx, x: number, y: number, maxW: number, maxH: number) {
-  const scene = buildBeamFrameScene(ctx.project);
-  const view = projectSceneToSvg(scene, { width: maxW, height: maxH - 28, pad: 16 });
-  const ox = x;
-  const oy = y + 4;
-
-  for (const poly of view.polygons) {
-    const pts = poly.points.split(" ").map((pair) => {
-      const [px, py] = pair.split(",").map(Number);
-      return { x: ox + px, y: oy + py };
-    });
-    if (pts.length < 3) continue;
-    const path =
-      pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${ty(p.y)}`).join(" ") + " Z";
-    // Chỉ tô trắng — nét cạnh vẽ riêng (liền / đứt)
-    ctx.page.drawSvgPath(path, {
-      color: rgb(1, 1, 1),
-      borderWidth: 0,
-    });
-    if (poly.kind === "hatch") {
-      for (let i = 0; i < pts.length; i++) {
-        const a = pts[i];
-        const b = pts[(i + 1) % pts.length];
-        for (let t = 0.2; t < 0.9; t += 0.25) {
-          const px = a.x + (b.x - a.x) * t;
-          const py = a.y + (b.y - a.y) * t;
-          ctx.page.drawCircle({ x: px, y: ty(py), size: 0.6, color: GRAY });
-        }
-      }
-    }
-  }
-
-  for (const e of view.edges) {
-    if (e.style === "dashed") {
-      line(ctx, ox + e.x1, oy + e.y1, ox + e.x2, oy + e.y2, 0.45, GRAY, [3.2, 2]);
-    } else {
-      line(ctx, ox + e.x1, oy + e.y1, ox + e.x2, oy + e.y2, 0.95, BLACK);
-    }
-  }
-
-  for (const ln of view.lines) {
-    line(ctx, ox + ln.x1, oy + ln.y1, ox + ln.x2, oy + ln.y2, 0.65, GRAY, [4, 3]);
-  }
-
-  for (const m of view.marks) {
-    const mx = ox + m.x;
-    const my = oy + m.y;
-    // Tam giác cao độ
-    const path = `M ${mx - 5} ${ty(my)} L ${mx + 5} ${ty(my)} L ${mx} ${ty(my - 8)} Z`;
-    ctx.page.drawSvgPath(path, { color: BLACK });
-    line(ctx, mx, my, mx, my + 10, 0.6);
-    textSimple(ctx, m.elevText, mx + 8, my - 2, 7, true, "left");
-    textSimple(ctx, m.hsText, mx + 8, my + 10, 6.5, false, "left");
-  }
-
-  textSimple(ctx, view.title, x + maxW / 2, y + maxH - 14, 9, true, "center");
-  textSimple(ctx, view.subtitle, x + maxW / 2, y + maxH - 2, 7, false, "center");
-  return y + maxH;
-}
-
 function drawScheduleTable(ctx: Ctx, x: number, y: number) {
   const { project } = ctx;
   const rows = buildPdfScheduleRows(ctx);
@@ -1498,10 +1435,9 @@ export async function generateSlabPdf(
   );
 
   const planBottom = drawPlan(ctx, 40, 78, 780, 400, zones);
-  const phoiBottom = drawPhốiCảnh(ctx, 860, 72, 780, 400);
-  drawSection(ctx, 860, phoiBottom + 8);
+  const sectionBottom = drawSection(ctx, 860, 72);
 
-  let y = Math.max(planBottom, phoiBottom) + 8;
+  let y = Math.max(planBottom, sectionBottom) + 8;
   y = drawShops(ctx, y + 8, model.schedule);
 
   const estTableH = 56 + Math.max(model.schedule.length, 1) * 18 + 48;

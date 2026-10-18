@@ -185,7 +185,6 @@ export function createSampleS1(): SlabProject {
     economy2: defaultEconomy2(),
     sections: sampleSections(),
     layoutPreset: "simple2",
-    show3d: false,
   });
 }
 
