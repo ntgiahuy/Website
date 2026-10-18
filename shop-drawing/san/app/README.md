@@ -6,6 +6,14 @@ Agent build xong → upload **toàn bộ file tĩnh** (index.html + assets) vào
 public_html/shop-drawing/san/app/
   index.html
   assets/...
+  assets/mobile-fit.css   # giữ lại khi ghi đè build mới
+```
+
+`mobile-fit.css` chỉnh layout mobile/iframe (không dùng `100dvh` trong hub, tránh tràn ngang).
+Sau khi upload build mới từ agent, giữ hoặc gắn lại thẻ:
+
+```html
+<link rel="stylesheet" href="./assets/mobile-fit.css">
 ```
 
 Đối tác **không** nhúng `.../san/app/` trực tiếp.
