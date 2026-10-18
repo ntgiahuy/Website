@@ -1314,9 +1314,11 @@ function drawPhốiCảnh(ctx: Ctx, x: number, y: number, maxW: number, maxH: nu
 
   for (const e of view.edges) {
     if (e.style === "dashed") {
-      line(ctx, ox + e.x1, oy + e.y1, ox + e.x2, oy + e.y2, 0.45, GRAY, [3.2, 2]);
+      // Che khuất / mặt sau: nét gạch nhạt
+      line(ctx, ox + e.x1, oy + e.y1, ox + e.x2, oy + e.y2, 0.55, GRAY, [4, 2.5]);
     } else {
-      line(ctx, ox + e.x1, oy + e.y1, ox + e.x2, oy + e.y2, 0.95, BLACK);
+      // Nhìn thấy: nét liền đậm
+      line(ctx, ox + e.x1, oy + e.y1, ox + e.x2, oy + e.y2, 1.25, BLACK);
     }
   }
 

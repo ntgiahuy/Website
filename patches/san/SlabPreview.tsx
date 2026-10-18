@@ -151,10 +151,10 @@ export function SlabPreview({
     const scene = buildBeamFrameScene(project);
     const view = projectSceneToSvg(scene, { width: 920, height: 540, pad: 40 });
     return (
-      <div className="flex h-full min-h-0 items-center justify-center bg-zinc-900 p-3">
+      <div className="flex h-full min-h-0 min-w-0 max-w-full items-center justify-center overflow-auto bg-zinc-900 p-2 sm:p-3">
         <svg
           viewBox={`0 0 ${view.width} ${view.height}`}
-          className="h-full w-full max-h-full rounded border border-zinc-700 bg-white"
+          className="h-full w-full max-h-full max-w-full rounded border border-zinc-700 bg-white"
           role="img"
           aria-label={view.title}
         >
@@ -178,9 +178,9 @@ export function SlabPreview({
               y1={e.y1}
               x2={e.x2}
               y2={e.y2}
-              stroke={e.style === "solid" ? "#0a0a0a" : "#9ca3af"}
-              strokeWidth={e.style === "solid" ? 1.45 : 0.55}
-              strokeDasharray={e.style === "dashed" ? "3.5 2.2" : undefined}
+              stroke={e.style === "solid" ? "#111111" : "#a1a1aa"}
+              strokeWidth={e.style === "solid" ? 1.85 : 0.7}
+              strokeDasharray={e.style === "dashed" ? "4.5 2.8" : undefined}
               strokeLinecap="round"
             />
           ))}
@@ -509,8 +509,8 @@ export function SlabPreview({
   const scrollH = Math.max(viewport.h, canvasH);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-zinc-950">
-      <div ref={wrapRef} className="relative min-h-0 flex-1 overflow-auto">
+    <div className="flex h-full min-h-0 min-w-0 max-w-full flex-col overflow-hidden bg-zinc-950">
+      <div ref={wrapRef} className="relative min-h-0 min-w-0 max-w-full flex-1 overflow-auto">
         <div
           className="box-border flex items-center justify-center p-1 sm:p-2"
           style={{
