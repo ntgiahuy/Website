@@ -1087,7 +1087,7 @@ export function SlabApp() {
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-zinc-950 text-zinc-100">
+    <div className="flex h-full flex-col bg-zinc-950 text-zinc-100">
       <header className="flex flex-wrap items-center gap-3 border-b border-zinc-800 bg-[#0d1117] px-3 py-2">
         <div className="ml-auto flex flex-col items-end gap-1">
           <div className="flex flex-wrap items-center justify-end gap-2">
