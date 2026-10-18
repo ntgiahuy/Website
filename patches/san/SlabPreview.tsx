@@ -20,7 +20,6 @@ import {
   SLAB_REBAR_HOOK_MM,
 } from "@/lib/grid";
 import type { PlanSelection, SlabProject } from "@/lib/types";
-import { buildBeamFrameScene, projectSceneToSvg } from "@/lib/view3d";
 
 type Anchor = { leftPct: number; topPct: number };
 
@@ -37,7 +36,6 @@ function clamp(n: number, lo: number, hi: number) {
 
 export function SlabPreview({
   project,
-  show3d,
   zoomPct = 100,
   selection = null,
   beamMultiSelect = [],
@@ -47,7 +45,6 @@ export function SlabPreview({
   editPanel = null,
 }: {
   project: SlabProject;
-  show3d?: boolean;
   /** Phóng to / thu nhỏ bản vẽ (100 = vừa khung). */
   zoomPct?: number;
   selection?: PlanSelection | null;
@@ -146,93 +143,6 @@ export function SlabPreview({
     // Chỉ neo lại khi đổi đối tượng chọn (không theo mọi frame geometry).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selection?.kind, selection && "beamId" in selection ? selection.beamId : null, selection && "segIndex" in selection ? selection.segIndex : null, selection && "axisId" in selection ? selection.axisId : null, selection && "ix" in selection ? selection.ix : null, selection && "iy" in selection ? selection.iy : null]);
-
-  if (show3d) {
-    const scene = buildBeamFrameScene(project);
-    const view = projectSceneToSvg(scene, { width: 920, height: 540, pad: 40 });
-    return (
-      <div className="flex h-full min-h-0 min-w-0 max-w-full items-center justify-center overflow-auto bg-zinc-900 p-2 sm:p-3">
-        <svg
-          viewBox={`0 0 ${view.width} ${view.height}`}
-          className="h-full w-full max-h-full max-w-full rounded border border-zinc-700 bg-white"
-          role="img"
-          aria-label={view.title}
-        >
-          <defs>
-            <pattern id="lowHatch3d" patternUnits="userSpaceOnUse" width="6" height="6">
-              <circle cx="1.2" cy="1.2" r="0.7" fill="#9ca3af" />
-            </pattern>
-          </defs>
-          {view.polygons.map((poly, i) => (
-            <polygon
-              key={`f-${i}`}
-              points={poly.points}
-              fill={poly.kind === "hatch" ? "url(#lowHatch3d)" : "#ffffff"}
-              stroke="none"
-            />
-          ))}
-          {view.edges.map((e, i) => (
-            <line
-              key={`e-${i}`}
-              x1={e.x1}
-              y1={e.y1}
-              x2={e.x2}
-              y2={e.y2}
-              stroke={e.style === "solid" ? "#111111" : "#a1a1aa"}
-              strokeWidth={e.style === "solid" ? 1.85 : 0.7}
-              strokeDasharray={e.style === "dashed" ? "4.5 2.8" : undefined}
-              strokeLinecap="round"
-            />
-          ))}
-          {view.lines.map((ln, i) => (
-            <line
-              key={`x-${i}`}
-              x1={ln.x1}
-              y1={ln.y1}
-              x2={ln.x2}
-              y2={ln.y2}
-              stroke="#6b7280"
-              strokeWidth={1}
-              strokeDasharray="6 4"
-            />
-          ))}
-          {view.marks.map((m, i) => (
-            <g key={`m-${i}`} transform={`translate(${m.x}, ${m.y})`}>
-              <polygon points="-7,0 7,0 0,-10" fill="#111" />
-              <line x1={0} y1={0} x2={0} y2={14} stroke="#111" strokeWidth={1} />
-              <text x={10} y={-2} fill="#111" fontSize="11" fontWeight="700" fontFamily="sans-serif">
-                {m.elevText}
-              </text>
-              <text x={10} y={12} fill="#374151" fontSize="10" fontFamily="sans-serif">
-                {m.hsText}
-              </text>
-            </g>
-          ))}
-          <text
-            x={view.width / 2}
-            y={view.height - 22}
-            textAnchor="middle"
-            fill="#111"
-            fontSize="13"
-            fontWeight="700"
-            fontFamily="sans-serif"
-          >
-            {view.title}
-          </text>
-          <text
-            x={view.width / 2}
-            y={view.height - 8}
-            textAnchor="middle"
-            fill="#4b5563"
-            fontSize="11"
-            fontFamily="sans-serif"
-          >
-            {view.subtitle}
-          </text>
-        </svg>
-      </div>
-    );
-  }
 
   const bayNodes: ReactNode[] = [];
   for (let ix = 0; ix < axesX.length - 1; ix++) {
@@ -499,7 +409,7 @@ export function SlabPreview({
     const ro = new ResizeObserver(sync);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [show3d]);
+  }, []);
 
   const scale = zoom / 100;
   const canvasW = Math.max(1, Math.round(viewport.w * scale));

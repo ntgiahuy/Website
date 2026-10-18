@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
-  Box,
   Check,
   ChevronRight,
   Download,
@@ -2312,38 +2311,6 @@ export function SlabApp() {
             </Panel>
           )}
 
-          {tab === "model3d" && (
-            <Panel title="Mô hình 3D" className="max-w-xl">
-              <p className="mb-2 text-[11px] text-zinc-400">
-                Phối cảnh isometric theo hướng nhìn: cạnh nhìn thấy → nét liền đậm; cạnh bị che khuất / mặt sau → nét gạch nhạt; đoạn line xuyên chỗ dầm chồng nhau được xoá.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  className="text-emerald-400"
-                  variant="secondary"
-                  onClick={() => {
-                    persist({ ...project, show3d: true });
-                    setStatus("Đã tạo phối cảnh dầm sàn 3D.");
-                  }}
-                >
-                  <Box /> Tạo mô hình 3D
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="text-red-400"
-                  onClick={() => {
-                    persist({ ...project, show3d: false });
-                    setStatus("Đã xóa mô hình 3D.");
-                  }}
-                >
-                  Del
-                </Button>
-              </div>
-            </Panel>
-          )}
-
           {tab === "info" && (
             <Panel title="Thông tin xuất PDF" className="max-w-xl">
               <div className="flex flex-col gap-2.5">
@@ -2386,7 +2353,6 @@ export function SlabApp() {
           <div className="min-h-0 min-w-0 max-w-full flex-1 overflow-auto">
             <SlabPreview
               project={project}
-              show3d={project.show3d && tab === "model3d"}
               zoomPct={previewZoomPct}
               interactive={tab === "plan" || tab === "axes" || tab === "beams" || tab === "draw"}
               insertBeamMode={insertBeamMode}

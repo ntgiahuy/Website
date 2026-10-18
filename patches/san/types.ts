@@ -212,7 +212,6 @@ export interface SlabProject {
   economy2: Economy2Layer;
   sections: SectionCut[];
   layoutPreset: LayoutPreset;
-  show3d: boolean;
 }
 
 export type TabId =
@@ -223,7 +222,6 @@ export type TabId =
   | "economy2"
   | "simple2"
   | "section"
-  | "model3d"
   | "info";
 
 export const TABS: { id: TabId; label: string }[] = [
@@ -234,6 +232,5 @@ export const TABS: { id: TabId; label: string }[] = [
   { id: "economy2", label: "Thép 2 lớp tiết kiệm" },
   { id: "simple2", label: "Thép 2 lớp đơn giản" },
   { id: "section", label: "Mặt cắt" },
-  { id: "model3d", label: "Mô hình 3D" },
   { id: "info", label: "Thông tin xuất" },
 ];
