@@ -46,3 +46,7 @@ Nếu bị khóa: mở `/shop-drawing/dang-nhap/`, không dùng email OTP / `req
 ## Build
 
 Build tĩnh → upload `shop-drawing/dam/app/`; base `/shop-drawing/dam/app/` hoặc `./`. Không publish github.io nếu khóa theo tab Đối tác.
+
+## Mobile (iframe hub)
+
+Tràn điện thoại: xem [AGENT-MOBILE.md](./AGENT-MOBILE.md) — sửa trong agent, **không** thêm CSS vào home hub.

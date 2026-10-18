@@ -58,3 +58,5 @@ Không nhúng `.../mong/app/` trực tiếp.
 - [prompts/AGENT-COT.md](./prompts/AGENT-COT.md)
 - [prompts/AGENT-DAM.md](./prompts/AGENT-DAM.md)
 - [prompts/AGENT-SAN.md](./prompts/AGENT-SAN.md)
+- [prompts/AGENT-MOBILE.md](./prompts/AGENT-MOBILE.md) — fix tràn mobile trong iframe (**sửa agent**, không sửa hub)
+- Script: [prompts/patch-agent-mobile.sh](./prompts/patch-agent-mobile.sh)

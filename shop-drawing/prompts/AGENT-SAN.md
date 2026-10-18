@@ -52,3 +52,7 @@ Nếu popup khóa: mở `/shop-drawing/dang-nhap/` (username + mật khẩu), **
 2. Deploy vào `shop-drawing/san/app/` (`index.html` ở gốc thư mục đó).
 3. Base path: `/shop-drawing/san/app/` hoặc `./`.
 4. Không publish đối tác bằng github.io nếu muốn khóa theo tab Đối tác.
+
+## Mobile (iframe hub)
+
+Tràn điện thoại: xem [AGENT-MOBILE.md](./AGENT-MOBILE.md) — sửa trong agent, **không** thêm CSS vào home hub.

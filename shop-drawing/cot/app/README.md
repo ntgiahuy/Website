@@ -16,6 +16,3 @@ Nhúng cổng đã khóa domain:
 ```
 
 `index.php` ở thư mục cha kiểm tra tên miền tab **Đối tác**.
-
-## Mobile
-Giữ `assets/mobile-fit.css` và thẻ link trong `index.html` khi upload build agent mới.
