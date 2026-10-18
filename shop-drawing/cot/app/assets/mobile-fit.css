@@ -1,0 +1,125 @@
+/* Shared mobile/iframe fit for shop apps inside hub */
+html, body {
+  height: 100%;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#root {
+  height: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Tailwind shells (dam/san): h-dvh is taller than hub iframe workspace */
+#root > .flex.h-dvh,
+#root > div.flex.h-dvh.flex-col,
+#root > div.h-dvh {
+  height: 100% !important;
+  max-height: 100% !important;
+  max-width: 100%;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Custom CSS shells (mong/cot) */
+#root > .app,
+#root > .app-root {
+  height: 100% !important;
+  max-height: 100% !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  min-width: 0;
+  overflow: hidden !important;
+}
+
+@media (max-width: 760px) {
+  #root > div > header,
+  #root .site-header,
+  #root .topbar {
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  #root > div > header img,
+  #root .site-header img,
+  #root .brand img {
+    height: 2rem !important;
+    width: auto !important;
+    max-width: 7.5rem;
+  }
+
+  #root > div > nav,
+  #root .mode-switch {
+    max-width: 100%;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #root .grid.min-h-0.flex-1,
+  #root .workspace,
+  #root .app-shell {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  #root .min-h-0.overflow-auto,
+  #root .form-cols,
+  #root .sidebar {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #root .flex.flex-nowrap,
+  #root .flex.min-w-0.flex-nowrap {
+    flex-wrap: wrap !important;
+  }
+
+  /* Dense label+input rows (san/dam) */
+  #root label.grid.w-full.min-w-0 {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #root label.grid.w-full.min-w-0 > div {
+    justify-content: flex-start !important;
+    width: 100%;
+  }
+
+  #root label.grid.w-full.min-w-0 > div > div {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  #root label.grid.w-full.min-w-0 input,
+  #root label.grid.w-full.min-w-0 select {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  /* Wide shop sheets: scroll inside pane, not the page */
+  #root .shop-scroll,
+  #root .shop-sheet,
+  #root .elevation-board {
+    max-width: 100%;
+  }
+}
+
+@media screen and (max-width: 760px) {
+  /* Override mong print/screen rules that force overflow:visible on root */
+  html, body, #root, #root > .app {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+}
