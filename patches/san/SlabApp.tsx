@@ -2334,7 +2334,7 @@ export function SlabApp() {
           {tab === "model3d" && (
             <Panel title="Mô hình 3D" className="max-w-xl">
               <p className="mb-2 text-[11px] text-zinc-400">
-                Phối cảnh isometric: cạnh nhìn thấy nét liền; cạnh che khuất (dưới sàn) nét đứt mảnh; đoạn line xuyên chỗ dầm chồng nhau được xoá.
+                Phối cảnh isometric theo hướng nhìn: cạnh nhìn thấy → nét liền đậm; cạnh bị che khuất / mặt sau → nét gạch nhạt; đoạn line xuyên chỗ dầm chồng nhau được xoá.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button
