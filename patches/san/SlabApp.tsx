@@ -1087,10 +1087,10 @@ export function SlabApp() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-zinc-950 text-zinc-100">
-      <header className="flex flex-wrap items-center gap-3 border-b border-zinc-800 bg-[#0d1117] px-3 py-2">
-        <div className="ml-auto flex flex-col items-end gap-1">
-          <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex h-full max-w-full min-w-0 flex-col overflow-hidden bg-zinc-950 text-zinc-100">
+      <header className="flex max-w-full min-w-0 flex-wrap items-center gap-2 border-b border-zinc-800 bg-[#0d1117] px-2 py-2 sm:gap-3 sm:px-3">
+        <div className="ml-auto flex min-w-0 max-w-full flex-col items-stretch gap-1 sm:items-end">
+          <div className="flex max-w-full min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2">
             <Button
               variant="secondary"
               size="sm"
@@ -1143,7 +1143,7 @@ export function SlabApp() {
         </div>
       </header>
 
-      <nav className="flex items-center gap-0.5 overflow-x-auto border-b border-zinc-800 bg-zinc-900 px-2 py-1">
+      <nav className="flex min-w-0 max-w-full items-center gap-0.5 overflow-x-auto border-b border-zinc-800 bg-zinc-900 px-2 py-1">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -1193,8 +1193,8 @@ export function SlabApp() {
         </div>
       </nav>
 
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(140px,32vh)_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]">
-        <div className="min-h-0 overflow-auto border-b border-zinc-800 bg-zinc-900 p-3 lg:border-b-0 lg:border-r">
+      <div className="grid min-h-0 min-w-0 max-w-full flex-1 grid-rows-[minmax(120px,34%)_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]">
+        <div className="min-h-0 min-w-0 max-w-full overflow-auto border-b border-zinc-800 bg-zinc-900 p-2 sm:p-3 lg:border-b-0 lg:border-r">
           {tab === "plan" && (
             <div className="flex flex-col gap-3">
               <Panel title="Thông tin sàn" className="min-w-0 w-full">
@@ -1339,7 +1339,7 @@ export function SlabApp() {
                   <div className="rounded border border-zinc-700 bg-zinc-950/60 p-2">
                     <div className="space-y-1.5">
                       {sortAxes(project.axesX ?? []).map((ax, i) => (
-                        <div key={ax.id} className="flex min-w-0 flex-nowrap items-center gap-1.5">
+                        <div key={ax.id} className="flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-nowrap">
                           <Input
                             className="w-12 max-w-12 shrink-0"
                             value={ax.name}
@@ -1390,7 +1390,7 @@ export function SlabApp() {
                   <div className="rounded border border-zinc-700 bg-zinc-950/60 p-2">
                     <div className="space-y-1.5">
                       {sortAxes(project.axesY ?? []).map((ay, i) => (
-                        <div key={ay.id} className="flex min-w-0 flex-nowrap items-center gap-1.5">
+                        <div key={ay.id} className="flex min-w-0 flex-wrap items-center gap-1.5 sm:flex-nowrap">
                           <Input
                             className="w-12 max-w-12 shrink-0"
                             value={ay.name}
@@ -1741,7 +1741,7 @@ export function SlabApp() {
                   >
                     <div className="mb-2 flex flex-col gap-1.5">
                       <div className="text-xs font-semibold text-sky-300">Dầm đang chọn</div>
-                      <div className="flex flex-nowrap items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:flex-nowrap">
                         <Button
                           size="sm"
                           variant="danger"
@@ -2363,17 +2363,17 @@ export function SlabApp() {
           )}
         </div>
 
-        <div className="flex min-h-0 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 max-w-full flex-col overflow-hidden">
           {tab === "axes" && (
-            <div className="shrink-0 border-b border-zinc-800 bg-zinc-900/80 px-3 py-2">
+            <div className="shrink-0 border-b border-zinc-800 bg-zinc-900/80 px-2 py-2 sm:px-3">
               {!planSelection && (
                 <div className="mb-1 text-[11px] text-zinc-500">
                   Nhấp số hiệu trục trên bản vẽ để chỉnh tại danh sách trục bên trái.
                 </div>
               )}
               {planSelection?.kind === "axis" && selectedAxisInfo() && (
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <div className="text-xs font-semibold text-amber-300">
+                <div className="mb-1.5 flex min-w-0 flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0 text-xs font-semibold text-amber-300">
                     Trục {selectedAxisInfo()!.dir}: {selectedAxisInfo()!.spanLabel}
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => setPlanSelection(null)}>
@@ -2383,7 +2383,7 @@ export function SlabApp() {
               )}
             </div>
           )}
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div className="min-h-0 min-w-0 max-w-full flex-1 overflow-auto">
             <SlabPreview
               project={project}
               show3d={project.show3d && tab === "model3d"}
