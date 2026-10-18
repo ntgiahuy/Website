@@ -1,0 +1,149 @@
+/* Mobile / iframe: keep shop sàn within the visible viewport (no page-level overflow). */
+html, body {
+  height: 100%;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#root {
+  height: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* App shell uses Tailwind h-dvh (=100dvh). Inside hub iframe that is taller
+   than the remaining workspace under the hub header → vertical overflow. */
+#root > .flex.h-dvh,
+#root > div.flex.h-dvh.flex-col {
+  height: 100% !important;
+  max-height: 100% !important;
+  max-width: 100%;
+  width: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Soften header on narrow screens so title + actions don't force width. */
+@media (max-width: 760px) {
+  #root > div > header {
+    padding-left: 0.55rem !important;
+    padding-right: 0.55rem !important;
+    gap: 0.5rem !important;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  #root > div > header img {
+    height: 2rem !important;
+    width: auto !important;
+    max-width: 7.5rem;
+  }
+
+  #root > div > header .border-l {
+    padding-left: 0.55rem !important;
+    min-width: 0;
+  }
+
+  #root > div > header .text-sm {
+    font-size: 0.8rem !important;
+    line-height: 1.2;
+  }
+
+  #root > div > header .text-\[11px\] {
+    font-size: 10px !important;
+    line-height: 1.25;
+  }
+
+  /* Button row: allow wrap and keep clear of the right edge */
+  #root > div > header .ml-auto {
+    width: 100%;
+    max-width: 100%;
+    align-items: stretch !important;
+  }
+
+  #root > div > header .ml-auto > .flex {
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+    gap: 0.4rem !important;
+    max-width: 100%;
+  }
+
+  /* Tab strip scrolls horizontally inside itself, not the page */
+  #root > div > nav {
+    display: flex;
+    max-width: 100%;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  /* Form / canvas grid */
+  #root .grid.min-h-0.flex-1 {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  #root .min-h-0.overflow-auto {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Drawing pane: contain SVG so it scrolls inside the pane */
+  #root .relative.min-h-0.flex-1.overflow-auto {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Axis / beam row cells that use flex-nowrap — allow wrap on phone */
+  #root .flex.flex-nowrap {
+    flex-wrap: wrap !important;
+  }
+
+  #root .flex.min-w-0.flex-nowrap {
+    flex-wrap: wrap !important;
+  }
+
+  /* Dense form rows: stack label above input on very tight widths */
+  #root label.grid.w-full.min-w-0 {
+    grid-template-columns: minmax(0, 1fr) !important;
+    justify-items: stretch;
+  }
+
+  #root label.grid.w-full.min-w-0 > span {
+    margin-bottom: 0.1rem;
+  }
+
+  #root label.grid.w-full.min-w-0 > div {
+    justify-content: flex-start !important;
+    width: 100%;
+  }
+
+  #root label.grid.w-full.min-w-0 > div > div {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  #root label.grid.w-full.min-w-0 input,
+  #root label.grid.w-full.min-w-0 select {
+    width: 100% !important;
+    max-width: 100%;
+  }
+}
+
+/* Extra-narrow phones */
+@media (max-width: 400px) {
+  #root > div > header img {
+    max-width: 5.75rem;
+    height: 1.75rem !important;
+  }
+}
