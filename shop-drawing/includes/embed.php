@@ -140,21 +140,21 @@ function render_embed_shop(string $appId): void {
   <meta name="robots" content="noindex,nofollow" />
   <title>GIAHUY · {$appEsc}</title>
   <style>
-    /* Safari: khóa viewport + iframe absolute để không phóng theo nội dung app */
+    /* Safari: 100dvh + iframe absolute — tránh -webkit-fill-available/clip (gây màn hình trống) */
     html, body {
       margin: 0;
       width: 100%;
       max-width: 100%;
       height: 100%;
       height: 100dvh;
-      height: -webkit-fill-available;
+      max-height: 100dvh;
       overflow: hidden;
-      overflow-x: clip;
       background: #0b1016;
     }
     body { position: relative; }
     iframe {
-      position: absolute; inset: 0;
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
       border: 0; width: 100%; height: 100%; max-width: 100%;
       display: block; background: #111;
     }

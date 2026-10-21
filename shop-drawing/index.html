@@ -334,51 +334,62 @@
       .tab { font-size: 0.82rem; padding: 0.42rem 0.65rem; }
       .chip { max-width: 34vw; font-size: 0.65rem; }
     }
-    /* Safari iOS: không để height:auto + overflow:auto — Safari phóng iframe theo nội dung → tràn;
-       Chrome thường vẫn “khóa” được. Khóa shell theo viewport (+ -webkit-fill-available). */
+    /*
+      Mobile / Safari:
+      - Tránh height:auto + body overflow:auto (Safari phóng iframe theo nội dung → tràn).
+      - Tránh height:-webkit-fill-available + overflow-x:clip trên html/body
+        (một số Safari iOS làm workspace/gate thành màn hình tối trống).
+      - Dùng flex + 100dvh; iframe/gate absolute trong workspace đã có chiều cao thật.
+    */
     @media (max-width: 760px) {
       html {
         height: 100%;
-        height: 100dvh;
-        height: -webkit-fill-available;
         max-width: 100%;
         overflow: hidden;
-        overflow-x: clip;
       }
       body {
         height: 100%;
         height: 100dvh;
-        height: -webkit-fill-available;
+        max-height: 100dvh;
         max-width: 100%;
         width: 100%;
         overflow: hidden;
-        overflow-x: clip;
         overscroll-behavior: none;
       }
       .shell {
+        display: flex;
+        flex-direction: column;
         height: 100%;
-        max-height: 100%;
+        max-height: 100dvh;
         max-width: 100%;
-        grid-template-rows: auto minmax(0, 1fr);
         overflow: hidden;
       }
-      .topbar { min-width: 0; max-width: 100%; }
+      .topbar { flex: none; min-width: 0; max-width: 100%; }
       .workspace {
         position: relative;
+        flex: 1 1 auto;
         min-height: 0;
         min-width: 0;
         max-width: 100%;
         overflow: hidden;
         -webkit-overflow-scrolling: touch;
       }
-      .workspace iframe {
+      .workspace > .gate,
+      .workspace > .paywall,
+      .workspace > .soon-panel.active,
+      .workspace iframe.active {
         position: absolute;
-        inset: 0;
+        top: 0; right: 0; bottom: 0; left: 0;
         width: 100%;
         height: 100%;
         max-width: 100%;
-        border: 0;
       }
+      .workspace iframe {
+        border: 0;
+        background: #111;
+        display: none;
+      }
+      .workspace iframe.active { display: block; }
       .menu-toggle { display: grid; }
       .tabs { display: none; }
     }
