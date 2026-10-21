@@ -27,7 +27,7 @@
       overflow: hidden;
     }
     a { color: var(--amber); }
-    .shell { height: 100%; max-width: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+    .shell { height: 100%; max-width: 100%; display: grid; grid-template-rows: auto 1fr; }
     .topbar {
       position: relative;
       display: flex; align-items: center; gap: 0.65rem;
@@ -175,7 +175,7 @@
     .mobile-shop-menu .tab {
       display: flex; width: 100%; text-align: left; border-radius: 10px;
     }
-    .workspace { position: relative; min-height: 0; min-width: 0; max-width: 100%; overflow: hidden; background: #070b10; }
+    .workspace { position: relative; min-height: 0; background: #070b10; }
     .soon-panel {
       display: none; height: 100%; place-items: center; padding: 1.5rem; text-align: center;
       color: var(--muted);
@@ -184,11 +184,7 @@
     .soon-panel.active { display: grid; }
     .soon-panel h2 { margin: 0 0 0.45rem; color: var(--ink); font-size: 1.35rem; letter-spacing: -0.02em; }
     .soon-panel p { margin: 0; max-width: 28ch; }
-    .workspace iframe {
-      position: absolute; inset: 0;
-      width: 100%; height: 100%; max-width: 100%;
-      border: 0; background: #111; display: none;
-    }
+    .workspace iframe { width: 100%; height: 100%; border: 0; background: #111; display: none; }
     .workspace iframe.active { display: block; }
     .gate, .paywall {
       position: absolute; inset: 0; display: block; padding: 1.1rem 1rem 2.2rem;
@@ -335,61 +331,29 @@
       .chip { max-width: 34vw; font-size: 0.65rem; }
     }
     /*
-      Mobile / Safari:
-      - Tránh height:auto + body overflow:auto (Safari phóng iframe theo nội dung → tràn).
-      - Tránh height:-webkit-fill-available + overflow-x:clip trên html/body
-        (một số Safari iOS làm workspace/gate thành màn hình tối trống).
-      - Dùng flex + 100dvh; iframe/gate absolute trong workspace đã có chiều cao thật.
+      Mobile: ưu tiên HIỆN NỘI DUNG (gate/iframe).
+      Bản -webkit-fill-available + overflow-x:clip từng làm Safari iOS màn hình tối trống.
+      Tràn ngang do app trong iframe → sửa ở agent (prompts/AGENT-MOBILE.md).
     */
     @media (max-width: 760px) {
-      html {
-        height: 100%;
-        max-width: 100%;
-        overflow: hidden;
-      }
-      body {
-        height: 100%;
-        height: 100dvh;
-        max-height: 100dvh;
-        max-width: 100%;
-        width: 100%;
-        overflow: hidden;
-        overscroll-behavior: none;
-      }
+      html, body { max-width: 100%; overflow-x: hidden; }
+      body { overflow: auto; }
       .shell {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        max-height: 100dvh;
+        min-height: 100dvh;
+        height: auto;
         max-width: 100%;
-        overflow: hidden;
+        grid-template-rows: auto minmax(70vh, 1fr);
       }
-      .topbar { flex: none; min-width: 0; max-width: 100%; }
       .workspace {
         position: relative;
-        flex: 1 1 auto;
-        min-height: 0;
-        min-width: 0;
+        min-height: 70vh;
         max-width: 100%;
-        overflow: hidden;
-        -webkit-overflow-scrolling: touch;
       }
-      .workspace > .gate,
-      .workspace > .paywall,
-      .workspace > .soon-panel.active,
-      .workspace iframe.active {
+      .gate, .paywall {
         position: absolute;
-        top: 0; right: 0; bottom: 0; left: 0;
-        width: 100%;
-        height: 100%;
-        max-width: 100%;
+        inset: 0;
+        min-height: 70vh;
       }
-      .workspace iframe {
-        border: 0;
-        background: #111;
-        display: none;
-      }
-      .workspace iframe.active { display: block; }
       .menu-toggle { display: grid; }
       .tabs { display: none; }
     }
