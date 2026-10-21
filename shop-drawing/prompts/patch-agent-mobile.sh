@@ -30,12 +30,13 @@ append_once() {
 MONG="$ROOT/mong"
 if [[ -d "$MONG" ]]; then
   echo "==> Patch mong"
-  MONG_BLOCK='/* mobile iframe fit — screen only */
+  MONG_BLOCK='/* mobile iframe fit — screen only (Safari: clip + 100% not 100vh) */
 html, body, #root, .app {
   height: 100%;
   max-width: 100%;
   margin: 0;
-  overflow-x: hidden;
+  overflow: hidden;
+  overflow-x: clip;
   box-sizing: border-box;
 }
 @media screen {
@@ -43,6 +44,7 @@ html, body, #root, .app {
     height: 100% !important;
     max-width: 100% !important;
     overflow: hidden !important;
+    overflow-x: clip !important;
   }
   .topbar, .workspace, .form-cols, .side {
     min-width: 0;
@@ -86,11 +88,12 @@ t = p.read_text(encoding="utf-8")
 n = t.replace("min-height: 100vh;", "height: 100%;\n  max-height: 100%;")
 n = n.replace("url(/cot/", "url(./").replace("url('/cot/", "url('./").replace('url("/cot/', 'url("./')
 extra = """
-/* mobile iframe fit */
+/* mobile iframe fit (Safari: overflow-x clip) */
 html, body, #root {
   height: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
+  overflow-x: clip;
 }
 @media (max-width: 760px) {
   .site-header img { max-height: 2rem; width: auto; }
@@ -111,11 +114,12 @@ PY
   fi
   if [[ -f "$COT/src/index.css" ]]; then
     append_once "$COT/src/index.css" "mobile iframe fit" \
-'/* mobile iframe fit */
+'/* mobile iframe fit (Safari: overflow-x clip) */
 html, body, #root {
   height: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
+  overflow-x: clip;
 }' || true
   fi
 else
@@ -148,11 +152,12 @@ PY
 
 add_globals_height() {
   local repo="$1"
-  local block='/* mobile iframe fit */
+  local block='/* mobile iframe fit (Safari: overflow-x clip, height 100% not 100vh) */
 html, body, #root, #__next {
   height: 100%;
   max-width: 100%;
   overflow: hidden;
+  overflow-x: clip;
 }'
   local found=0
   for g in "$repo/app/globals.css" "$repo/src/app/globals.css" "$repo/styles/globals.css" "$repo/app/global.css" "$repo/src/index.css"; do

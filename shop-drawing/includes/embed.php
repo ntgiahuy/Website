@@ -136,12 +136,28 @@ function render_embed_shop(string $appId): void {
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <title>GIAHUY · {$appEsc}</title>
   <style>
-    html, body { margin: 0; height: 100%; background: #0b1016; }
-    iframe { border: 0; width: 100%; height: 100%; display: block; background: #111; }
+    /* Safari: khóa viewport + iframe absolute để không phóng theo nội dung app */
+    html, body {
+      margin: 0;
+      width: 100%;
+      max-width: 100%;
+      height: 100%;
+      height: 100dvh;
+      height: -webkit-fill-available;
+      overflow: hidden;
+      overflow-x: clip;
+      background: #0b1016;
+    }
+    body { position: relative; }
+    iframe {
+      position: absolute; inset: 0;
+      border: 0; width: 100%; height: 100%; max-width: 100%;
+      display: block; background: #111;
+    }
   </style>
 </head>
 <body>

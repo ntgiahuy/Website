@@ -1,13 +1,25 @@
-# Lệnh / tin nhắn dán agent — fix mobile (không sửa home hub)
+# Lệnh / tin nhắn dán agent — fix mobile (không thêm mobile-fit.css ở hub)
 
-**Home shop drawing (`Website/shop-drawing`) giữ nguyên** — không thêm `mobile-fit.css` ở hub.  
+Không thêm file `mobile-fit.css` vào home hub.  
 Sửa CSS / class layout **trong từng repo agent**, rồi build → upload vào `shop-drawing/{mong|cot|dam|san}/app/`.
+
+Hub đã khóa iframe cho Safari (`overflow-x: clip`, iframe `position: absolute`, `-webkit-fill-available`). App agent vẫn phải dùng `height: 100%` thay vì `100vh`/`h-dvh`.
 
 ---
 
-## Vì sao tràn trên điện thoại
+## Vì sao Chrome OK mà Safari tràn
 
-App nằm trong iframe hub (dưới header). Dùng `h-dvh` / `100vh` / `min-height: 100vh` = cao bằng cả màn hình máy → **cao hơn khung iframe** → tràn. Toolbar / form sát mép cũng làm cảm giác “không canh vừa”.
+1. App trong iframe hub. `h-dvh` / `100vh` / `min-height: 100vh` = cao bằng màn hình máy → cao hơn khung iframe.
+2. **Safari (iOS)** hay **phóng iframe theo chiều cao nội dung** khi parent `height: auto` / `overflow: auto`. Chrome thường vẫn kẹp được → cùng code, Chrome không tràn, Safari tràn.
+3. Safari xử lý `overflow-x: hidden` kém hơn `overflow-x: clip` với flex child `min-width: auto`.
+4. Thanh địa chỉ Safari làm `100vh`/`100dvh` lệch → thêm lệch dọc.
+
+**Trong agent bắt buộc:**
+- Shell: `h-full` / `height: 100%` (không `h-dvh` / `100vh` cho shell chính).
+- `html, body, #root { height: 100%; max-width: 100%; overflow: hidden; overflow-x: clip; }`.
+- Mọi flex/grid pane: `min-width: 0; max-width: 100%`.
+- Không dùng `100vw` cho shell (Safari tính cả scrollbar/safe-area dễ tràn ngang).
+- Kiểm tra trên **Safari iOS** (hoặc Safari desktop responsive), không chỉ Chrome.
 
 ---
 
@@ -34,15 +46,15 @@ chmod +x patch-agent-mobile.sh
 ```
 Fix layout mobile khi app chạy trong iframe hub shop-drawing (dưới header). Không thêm file mobile-fit.css riêng; sửa CSS/source gốc.
 
-Yêu cầu:
-1) html, body, #root, .app: height 100%; max-width 100%; overflow-x hidden; box-sizing border-box.
-2) Không dùng min-height: 100vh / 100dvh cho shell chính khi có thể — dùng height: 100% để vừa iframe.
+Yêu cầu (ưu tiên Safari iOS — Chrome đã ổn):
+1) html, body, #root, .app: height 100%; max-width 100%; overflow: hidden; overflow-x: clip; box-sizing border-box.
+2) Không dùng min-height: 100vh / 100dvh / h-dvh cho shell — dùng height: 100%.
 3) .topbar / .workspace / .form-cols: min-width 0; max-width 100%.
-4) Nút toolbar wrap (flex-wrap) trên max-width 760px; tab/mode-switch overflow-x auto trong chính nó, không làm rộng trang.
-5) Form trên mobile: thêm padding ngang ~0.5–0.75rem; tránh đẩy unit "mm" sát mép phải.
-6) .shop-sheet / bản vẽ rộng: cuộn trong .shop-scroll, không làm document.scrollWidth > clientWidth.
-7) Quy tắc @media print giữ nguyên (overflow visible khi in); chỉ sửa @media screen / mặc định.
-8) Build lại và xác nhận trên viewport ~390×844: document.documentElement.scrollWidth === clientWidth.
+4) Toolbar flex-wrap ≤760px; tab/mode-switch overflow-x auto trong chính nó.
+5) Form mobile: padding ngang ~0.5–0.75rem.
+6) .shop-sheet rộng: cuộn trong .shop-scroll; document.scrollWidth === clientWidth.
+7) @media print giữ overflow visible; chỉ sửa screen.
+8) Không dùng width: 100vw cho shell. Test Safari ~390×844.
 
 Không đụng auth/membership.js hub. Base path vẫn ./ hoặc /shop-drawing/mong/app/.
 ```
@@ -54,15 +66,15 @@ Không đụng auth/membership.js hub. Base path vẫn ./ hoặc /shop-drawing/m
 ```
 Fix layout mobile khi app chạy trong iframe hub shop-drawing. Không thêm mobile-fit.css; sửa App.css / index.css / App.tsx.
 
-Yêu cầu:
-1) html, body, #root: height 100%; max-width 100%; overflow-x hidden.
-2) .app-root: đổi min-height: 100vh → height: 100%; max-height: 100%; max-width: 100%; overflow: hidden (hoặc overflow-x hidden + overflow-y auto chỉ trong vùng nội dung).
-3) .site-header: flex-wrap; logo max-height ~2rem trên max-width 760px; brand-copy min-width 0.
+Yêu cầu (ưu tiên Safari iOS — Chrome đã ổn):
+1) html, body, #root: height 100%; max-width 100%; overflow: hidden; overflow-x: clip.
+2) .app-root: min-height 100vh → height/max-height 100%; overflow: hidden; overflow-x: clip.
+3) .site-header flex-wrap; logo ≤2rem trên mobile; brand-copy min-width 0.
 4) .app-shell / .sidebar / .workspace / .elevation-board: min-width 0; max-width 100%.
-5) .elevation-board và bảng ngang: overflow-x auto trong pane, không tràn document.
-6) Modal: max-height dùng 100svh / calc(100% - 24px) ổn; không làm body rộng hơn viewport.
-7) Font url dùng path tương đối ./fonts/... (không hardcode /cot/fonts/ nếu base path hub là /shop-drawing/cot/app/).
-8) Viewport ~390×844: scrollWidth === clientWidth.
+5) Bảng ngang: overflow-x auto trong pane.
+6) Modal: max-height 100svh / calc(100% - 24px); không dùng 100vw.
+7) Font url ./fonts/... (không /cot/fonts/).
+8) Test Safari ~390×844: scrollWidth === clientWidth.
 
 Không đụng auth hub. Build → upload shop-drawing/cot/app/.
 ```
@@ -76,16 +88,16 @@ Fix layout mobile trong iframe hub. Không thêm mobile-fit.css; sửa class Tai
 
 File chính thường là components/beam/BeamApp.tsx (shell `flex h-dvh flex-col`).
 
-Yêu cầu:
-1) Đổi shell `h-dvh` → `h-full` (hoặc `h-[100%]`). Thêm vào globals/layout: html, body, #root { height: 100%; max-width: 100%; overflow: hidden; }.
-2) Header nút: đã flex-wrap thì giữ; trên ≤760px căn trái, gap nhỏ hơn, logo max-h-8.
-3) Nav tab: giữ overflow-x-auto; đảm bảo parent max-w-full min-w-0, không đẩy rộng trang.
-4) Lưới form: trên mobile stack 1 cột nếu đang 2 cột quá chật; input/label min-w-0; padding ngang đủ.
-5) Pane bản vẽ: min-w-0; overflow auto trong pane.
-6) Không dùng w-screen / 100vw cho shell.
-7) Kiểm tra 390×844: documentElement.scrollWidth === clientWidth; chiều cao app ≈ chiều cao iframe (không = 100dvh máy).
+Yêu cầu (ưu tiên Safari iOS — Chrome đã ổn):
+1) Shell `h-dvh` → `h-full`. globals: html, body, #root { height:100%; max-width:100%; overflow:hidden; overflow-x:clip; }.
+2) Header wrap; ≤760px logo max-h-8; gap nhỏ.
+3) Nav overflow-x-auto; parent min-w-0 max-w-full.
+4) Form mobile stack 1 cột nếu chật; min-w-0.
+5) Pane bản vẽ min-w-0; overflow auto trong pane.
+6) Không w-screen / 100vw.
+7) Test Safari: scrollWidth === clientWidth; app height = 100% iframe (không 100dvh máy).
 
-Không đụng membership hub. Build static → upload shop-drawing/dam/app/ với path tương đối ./ (không /dam/ tuyệt đối nếu deploy dưới hub).
+Không đụng membership hub. Build → upload shop-drawing/dam/app/ (path ./).
 ```
 
 ---
@@ -97,14 +109,14 @@ Fix layout mobile trong iframe hub. Không thêm mobile-fit.css; sửa class Tai
 
 File chính thường là components/slab/SlabApp.tsx (shell `flex h-dvh flex-col`).
 
-Yêu cầu:
-1) Đổi shell `h-dvh` → `h-full`. html, body, #root { height: 100%; max-width: 100%; overflow: hidden; }.
-2) Header: wrap nút; logo nhỏ hơn trên mobile; title/subtitle min-w-0.
-3) Nav tab overflow-x-auto trong nav; parent min-w-0 max-w-full.
-4) Form label+input (grid cols label|input): trên ≤760px stack 1 cột, input width 100%.
-5) Các hàng flex-nowrap (trục/dầm): cho phép flex-wrap trên mobile.
-6) Preview/canvas: min-w-0; overflow auto trong pane, không tràn trang.
-7) 390×844: scrollWidth === clientWidth; app height = 100% iframe, không 100dvh.
+Yêu cầu (ưu tiên Safari iOS — Chrome đã ổn):
+1) Shell `h-dvh` → `h-full`. html, body, #root { height:100%; max-width:100%; overflow:hidden; overflow-x:clip; }.
+2) Header wrap; logo nhỏ trên mobile; title min-w-0.
+3) Nav overflow-x-auto; parent min-w-0 max-w-full.
+4) Form label|input ≤760px stack 1 cột, input 100%.
+5) flex-nowrap (trục/dầm) → wrap trên mobile.
+6) Preview min-w-0; overflow auto trong pane.
+7) Test Safari: scrollWidth === clientWidth; height = 100% iframe.
 
 Không đụng membership hub. Build → upload shop-drawing/san/app/.
 ```

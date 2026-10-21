@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>GIA HUY — Shop Drawing</title>
   <meta name="description" content="Shop thép móng, cột, dầm, sàn. Đăng nhập username + mật khẩu · dùng thử · thành viên theo thời hạn." />
   <link rel="icon" href="./assets/icon.png" />
@@ -17,7 +17,7 @@
       --header-h: 58px;
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; }
+    html, body { margin: 0; height: 100%; max-width: 100%; }
     body {
       font-family: "Be Vietnam Pro", sans-serif; color: var(--ink);
       background:
@@ -27,7 +27,7 @@
       overflow: hidden;
     }
     a { color: var(--amber); }
-    .shell { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+    .shell { height: 100%; max-width: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
     .topbar {
       position: relative;
       display: flex; align-items: center; gap: 0.65rem;
@@ -175,7 +175,7 @@
     .mobile-shop-menu .tab {
       display: flex; width: 100%; text-align: left; border-radius: 10px;
     }
-    .workspace { position: relative; min-height: 0; background: #070b10; }
+    .workspace { position: relative; min-height: 0; min-width: 0; max-width: 100%; overflow: hidden; background: #070b10; }
     .soon-panel {
       display: none; height: 100%; place-items: center; padding: 1.5rem; text-align: center;
       color: var(--muted);
@@ -184,7 +184,11 @@
     .soon-panel.active { display: grid; }
     .soon-panel h2 { margin: 0 0 0.45rem; color: var(--ink); font-size: 1.35rem; letter-spacing: -0.02em; }
     .soon-panel p { margin: 0; max-width: 28ch; }
-    .workspace iframe { width: 100%; height: 100%; border: 0; background: #111; display: none; }
+    .workspace iframe {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%; max-width: 100%;
+      border: 0; background: #111; display: none;
+    }
     .workspace iframe.active { display: block; }
     .gate, .paywall {
       position: absolute; inset: 0; display: block; padding: 1.1rem 1rem 2.2rem;
@@ -330,9 +334,51 @@
       .tab { font-size: 0.82rem; padding: 0.42rem 0.65rem; }
       .chip { max-width: 34vw; font-size: 0.65rem; }
     }
+    /* Safari iOS: không để height:auto + overflow:auto — Safari phóng iframe theo nội dung → tràn;
+       Chrome thường vẫn “khóa” được. Khóa shell theo viewport (+ -webkit-fill-available). */
     @media (max-width: 760px) {
-      body { overflow: auto; }
-      .shell { min-height: 100dvh; height: auto; grid-template-rows: auto minmax(70vh, 1fr); }
+      html {
+        height: 100%;
+        height: 100dvh;
+        height: -webkit-fill-available;
+        max-width: 100%;
+        overflow: hidden;
+        overflow-x: clip;
+      }
+      body {
+        height: 100%;
+        height: 100dvh;
+        height: -webkit-fill-available;
+        max-width: 100%;
+        width: 100%;
+        overflow: hidden;
+        overflow-x: clip;
+        overscroll-behavior: none;
+      }
+      .shell {
+        height: 100%;
+        max-height: 100%;
+        max-width: 100%;
+        grid-template-rows: auto minmax(0, 1fr);
+        overflow: hidden;
+      }
+      .topbar { min-width: 0; max-width: 100%; }
+      .workspace {
+        position: relative;
+        min-height: 0;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        -webkit-overflow-scrolling: touch;
+      }
+      .workspace iframe {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        border: 0;
+      }
       .menu-toggle { display: grid; }
       .tabs { display: none; }
     }
