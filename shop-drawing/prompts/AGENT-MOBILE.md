@@ -1,135 +1,258 @@
-# Lệnh / tin nhắn dán agent — fix mobile (không thêm mobile-fit.css ở hub)
+# Lệnh dán agent — fix tràn điện thoại (Safari)
 
-Không thêm file `mobile-fit.css` vào home hub.  
-Sửa CSS / class layout **trong từng repo agent**, rồi build → upload vào `shop-drawing/{mong|cot|dam|san}/app/`.
+**Không sửa hub** (`Website/shop-drawing/index.html`).  
+**Không thêm** `mobile-fit.css`.  
+Sửa **source trong từng repo** → build → upload vào `shop-drawing/{mong|cot|dam|san}/app/`.
 
-Hub đã khóa iframe cho Safari (`overflow-x: clip`, iframe `position: absolute`, `-webkit-fill-available`). App agent vẫn phải dùng `height: 100%` thay vì `100vh`/`h-dvh`.
-
----
-
-## Vì sao Chrome OK mà Safari tràn
-
-1. App trong iframe hub. `h-dvh` / `100vh` / `min-height: 100vh` = cao bằng màn hình máy → cao hơn khung iframe.
-2. **Safari (iOS)** hay **phóng iframe theo chiều cao nội dung** khi parent `height: auto` / `overflow: auto`. Chrome thường vẫn kẹp được → cùng code, Chrome không tràn, Safari tràn.
-3. Safari xử lý `overflow-x: hidden` kém hơn `overflow-x: clip` với flex child `min-width: auto`.
-4. Thanh địa chỉ Safari làm `100vh`/`100dvh` lệch → thêm lệch dọc.
-
-**Trong agent bắt buộc:**
-- Shell: `h-full` / `height: 100%` (không `h-dvh` / `100vh` cho shell chính).
-- `html, body, #root { height: 100%; max-width: 100%; overflow: hidden; overflow-x: clip; }`.
-- Mọi flex/grid pane: `min-width: 0; max-width: 100%`.
-- Không dùng `100vw` cho shell (Safari tính cả scrollbar/safe-area dễ tràn ngang).
-- Kiểm tra trên **Safari iOS** (hoặc Safari desktop responsive), không chỉ Chrome.
+App chạy trong **iframe** dưới header hub.  
+`h-dvh` / `100vh` / `100dvh` = cao bằng máy → **cao hơn iframe** → Safari tràn (Chrome thường che được).
 
 ---
 
 ## Cách dùng
 
-1. Mở Cursor agent đúng repo: `ntgiahuy/mong` · `ntgiahuy/cot` · `ntgiahuy/dam` · `ntgiahuy/san`
-2. Copy **một khối** tương ứng bên dưới → gửi agent
-3. Agent sửa source → build → bạn upload `dist`/`docs` vào hub `shop-drawing/<app>/app/`
-
-Hoặc chạy script patch local (sau khi clone 4 repo cạnh nhau):
-
-```bash
-# Từ thư mục chứa mong/ cot/ dam/ san/
-curl -fsSL https://raw.githubusercontent.com/ntgiahuy/Website/cursor/shop-drawing-email-otp-4719/shop-drawing/prompts/patch-agent-mobile.sh -o patch-agent-mobile.sh
-# hoặc copy file shop-drawing/prompts/patch-agent-mobile.sh từ repo Website
-chmod +x patch-agent-mobile.sh
-./patch-agent-mobile.sh /path/to/parent   # parent chứa mong cot dam san
-```
+1. Mở Cursor agent đúng repo (link bên dưới từng khối).
+2. Copy **cả khối** ` ``` ` … ` ``` ` → dán gửi agent.
+3. Agent phải: sửa source → build → đưa zip/filebin `dist`/`docs`/`out`.
+4. Bạn upload đè vào hub path ghi trong khối.
+5. Test **Safari iPhone** (~390×844): không tràn ngang; form nằm gọn trong khung.
 
 ---
 
-## Tin nhắn dán — MÓNG (`ntgiahuy/mong`)
+## Nghiệm thu (agent phải tự chạy trước khi báo xong)
 
+Trong DevTools (iframe app), console phải in `OK`:
+
+```js
+(() => {
+  const w = document.documentElement;
+  const badH = !!document.querySelector('.h-dvh, [class*="h-dvh"]')
+    || /min-height:\s*100(vh|dvh)/i.test(document.documentElement.outerHTML);
+  const sx = w.scrollWidth > w.clientWidth + 1;
+  const root = getComputedStyle(document.documentElement);
+  const body = getComputedStyle(document.body);
+  const ok =
+    !sx &&
+    (root.height === '100%' || root.height.endsWith('px')) &&
+    root.overflowX !== 'visible' &&
+    body.overflowX !== 'visible';
+  console.log({ ok, scrollWidth: w.scrollWidth, clientWidth: w.clientWidth, badH, overflowX: root.overflowX });
+  return ok && !sx ? 'OK' : 'FAIL';
+})()
 ```
-Fix layout mobile khi app chạy trong iframe hub shop-drawing (dưới header). Không thêm file mobile-fit.css riêng; sửa CSS/source gốc.
 
-Yêu cầu (ưu tiên Safari iOS — Chrome đã ổn):
-1) html, body, #root, .app: height 100%; max-width 100%; overflow: hidden; overflow-x: clip; box-sizing border-box.
-2) Không dùng min-height: 100vh / 100dvh / h-dvh cho shell — dùng height: 100%.
-3) .topbar / .workspace / .form-cols: min-width 0; max-width 100%.
-4) Toolbar flex-wrap ≤760px; tab/mode-switch overflow-x auto trong chính nó.
-5) Form mobile: padding ngang ~0.5–0.75rem.
-6) .shop-sheet rộng: cuộn trong .shop-scroll; document.scrollWidth === clientWidth.
-7) @media print giữ overflow visible; chỉ sửa screen.
-8) Không dùng width: 100vw cho shell. Test Safari ~390×844.
-
-Không đụng auth/membership.js hub. Base path vẫn ./ hoặc /shop-drawing/mong/app/.
-```
+Shell chính **không** được còn class/`min-height` dùng `100vh` / `100dvh` / `h-dvh`.
 
 ---
 
-## Tin nhắn dán — CỘT (`ntgiahuy/cot`)
+## 1) MÓNG — dán vào agent repo `ntgiahuy/mong`
+
+Agent: https://github.com/ntgiahuy/mong
 
 ```
-Fix layout mobile khi app chạy trong iframe hub shop-drawing. Không thêm mobile-fit.css; sửa App.css / index.css / App.tsx.
+Bạn đang ở repo ntgiahuy/mong (Vite + React). App được nhúng iframe tại https://giahuy.net/shop-drawing/ (tab Shop thép móng). Trên Safari iPhone UI bị tràn / không canh vừa khung iframe; Chrome thường ổn. ĐÃ thử prompt mềm trước đó — không đủ. Làm đúng từng bước dưới, không thêm mobile-fit.css, không đụng hub Website.
 
-Yêu cầu (ưu tiên Safari iOS — Chrome đã ổn):
-1) html, body, #root: height 100%; max-width 100%; overflow: hidden; overflow-x: clip.
-2) .app-root: min-height 100vh → height/max-height 100%; overflow: hidden; overflow-x: clip.
-3) .site-header flex-wrap; logo ≤2rem trên mobile; brand-copy min-width 0.
-4) .app-shell / .sidebar / .workspace / .elevation-board: min-width 0; max-width 100%.
-5) Bảng ngang: overflow-x auto trong pane.
-6) Modal: max-height 100svh / calc(100% - 24px); không dùng 100vw.
-7) Font url ./fonts/... (không /cot/fonts/).
-8) Test Safari ~390×844: scrollWidth === clientWidth.
+BẮT BUỘC sửa source:
 
-Không đụng auth hub. Build → upload shop-drawing/cot/app/.
+A) src/index.css
+- html, body, #root:
+  height: 100%; width: 100%; max-width: 100%; margin: 0;
+  overflow: hidden; overflow-x: clip; box-sizing: border-box;
+  (KHÔNG min-height: 100vh / 100dvh)
+- .app: height: 100%; max-height: 100%; max-width: 100%; min-width: 0;
+  display: flex; flex-direction: column; overflow: hidden; overflow-x: clip;
+- .app-body / vùng form cuộn: flex: 1; min-height: 0; min-width: 0; max-width: 100%;
+  overflow-x: clip; overflow-y: auto; -webkit-overflow-scrolling: touch;
+- .topbar, .workspace, .form-cols, .form-col, .panel, .field:
+  min-width: 0; max-width: 100%; box-sizing: border-box;
+- @media (max-width: 760px):
+  * padding ngang app/form ~0.7rem (trái+phải), không sát mép
+  * .field: flex-wrap: wrap; gap hợp lý
+  * .field-controls: max-width: 100%; justify-content: flex-end; flex-wrap: wrap
+  * input.num / .unit không đẩy scrollWidth > clientWidth
+  * toolbar/mode-switch: wrap hoặc overflow-x: auto TRONG chính nó (không làm tràn body)
+- Bản vẽ rộng (.shop-sheet ~1782px): CHỈ cuộn trong .shop-scroll; document/body không tràn ngang
+- @media print: giữ overflow visible như cũ — chỉ sửa screen
+
+B) Tìm toàn repo: xóa mọi shell min-height: 100vh / 100dvh / h-dvh / h-screen cho khung chính.
+
+C) Build (npm run build hoặc script docs hiện có). Base path vẫn relative ./ (hub: /shop-drawing/mong/app/).
+
+D) Nghiệm thu viewport 390×844 (Safari hoặc WebKit):
+- document.documentElement.scrollWidth === clientWidth
+- Không còn h-dvh / 100vh trên shell
+- Form “Móng đơn”: label + ô số + “mm” không bị cắt / không tạo thanh cuộn ngang trang
+
+E) Trả về: diff tóm tắt + link zip/filebin thư mục build (docs/ hoặc dist/) để upload đè shop-drawing/mong/app/.
 ```
+
+Upload hub: `shop-drawing/mong/app/`
 
 ---
 
-## Tin nhắn dán — DẦM (`ntgiahuy/dam`)
+## 2) CỘT — dán vào agent repo `ntgiahuy/cot`
+
+Agent: https://github.com/ntgiahuy/cot
 
 ```
-Fix layout mobile trong iframe hub. Không thêm mobile-fit.css; sửa class Tailwind / CSS gốc.
+Bạn đang ở repo ntgiahuy/cot (Vite + React). App nhúng iframe hub https://giahuy.net/shop-drawing/ (Shop thép cột). Safari iPhone bị tràn / không khít iframe. Prompt trước chưa đủ — làm đúng checklist. Không mobile-fit.css, không sửa hub Website.
 
-File chính thường là components/beam/BeamApp.tsx (shell `flex h-dvh flex-col`).
+BẮT BUỘC:
 
-Yêu cầu (ưu tiên Safari iOS — Chrome đã ổn):
-1) Shell `h-dvh` → `h-full`. globals: html, body, #root { height:100%; max-width:100%; overflow:hidden; overflow-x:clip; }.
-2) Header wrap; ≤760px logo max-h-8; gap nhỏ.
-3) Nav overflow-x-auto; parent min-w-0 max-w-full.
-4) Form mobile stack 1 cột nếu chật; min-w-0.
-5) Pane bản vẽ min-w-0; overflow auto trong pane.
-6) Không w-screen / 100vw.
-7) Test Safari: scrollWidth === clientWidth; app height = 100% iframe (không 100dvh máy).
+A) src/index.css
+html, body, #root {
+  height: 100%; width: 100%; max-width: 100%; margin: 0;
+  overflow: hidden; overflow-x: clip; box-sizing: border-box;
+}
 
-Không đụng membership hub. Build → upload shop-drawing/dam/app/ (path ./).
+B) src/App.css — ĐỔI NGAY:
+.app-root {
+  /* SAI: min-height: 100vh; overflow-x: hidden; */
+  height: 100%;
+  max-height: 100%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overflow-x: clip;
+}
+- .app-shell, .sidebar, .workspace, .elevation-board, .site-header, .file-toolbar:
+  min-width: 0; max-width: 100%;
+- @media (max-width: 900px): stack cột; sidebar/workspace không tạo tràn ngang body
+- Bảng / elevation ngang: overflow-x: auto trong pane, không trên body
+- .modal: max-width: 100%; max-height: calc(100% - 24px) hoặc 100svh; KHÔNG width: 100vw
+- Font: url("./fonts/...") — không "/cot/fonts/" (vỡ khi embed hub)
+
+C) Grep toàn repo: bỏ min-height: 100vh / 100dvh / h-dvh trên shell.
+
+D) Build → output docs/ hoặc dist/ với base ./ 
+
+E) Nghiệm thu 390×844 Safari/WebKit: scrollWidth === clientWidth; shell height 100% iframe.
+
+F) Trả zip/filebin để upload đè shop-drawing/cot/app/.
 ```
+
+Upload hub: `shop-drawing/cot/app/`
 
 ---
 
-## Tin nhắn dán — SÀN (`ntgiahuy/san`)
+## 3) DẦM — dán vào agent repo `ntgiahuy/dam`
+
+Agent: https://github.com/ntgiahuy/dam
 
 ```
-Fix layout mobile trong iframe hub. Không thêm mobile-fit.css; sửa class Tailwind / CSS gốc.
+Bạn đang ở repo ntgiahuy/dam (Next + Tailwind). App nhúng iframe hub https://giahuy.net/shop-drawing/ (Shop thép dầm). Safari iPhone tràn vì shell còn h-dvh. Không mobile-fit.css, không sửa hub Website.
 
-File chính thường là components/slab/SlabApp.tsx (shell `flex h-dvh flex-col`).
+BẮT BUỘC (đúng file):
 
-Yêu cầu (ưu tiên Safari iOS — Chrome đã ổn):
-1) Shell `h-dvh` → `h-full`. html, body, #root { height:100%; max-width:100%; overflow:hidden; overflow-x:clip; }.
-2) Header wrap; logo nhỏ trên mobile; title min-w-0.
-3) Nav overflow-x-auto; parent min-w-0 max-w-full.
-4) Form label|input ≤760px stack 1 cột, input 100%.
-5) flex-nowrap (trục/dầm) → wrap trên mobile.
-6) Preview min-w-0; overflow auto trong pane.
-7) Test Safari: scrollWidth === clientWidth; height = 100% iframe.
+A) components/beam/BeamApp.tsx
+Tìm dòng shell kiểu:
+  className="flex h-dvh flex-col ..."
+ĐỔI THÀNH:
+  className="flex h-full max-h-full min-h-0 w-full max-w-full flex-col overflow-hidden ..."
+Grep cả repo: thay mọi h-dvh / h-screen / min-h-screen của shell chính → h-full (kèm min-h-0 max-h-full).
 
-Không đụng membership hub. Build → upload shop-drawing/san/app/.
+B) app/globals.css
+Thêm/sửa:
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+#root, body > div: first layout wrapper: height 100%; min-height 0; max-width 100%.
+
+C) Mobile ≤760px:
+- header wrap; logo max-h-8; title min-w-0
+- nav: overflow-x-auto; parent min-w-0 max-w-full
+- Panel min-w-[280px] / min-w-[320px]: trên mobile đổi min-w-0 w-full (không đẩy ngang)
+- Pane bản vẽ: min-w-0; overflow-auto trong pane
+- Cấm w-screen / w-[100vw] trên shell
+
+D) Build static đúng script repo (docs/ hoặc out/) basePath relative để chạy tại /shop-drawing/dam/app/.
+
+E) Nghiệm thu 390×844: không còn class h-dvh trong DOM shell; scrollWidth === clientWidth.
+
+F) Trả zip/filebin upload đè shop-drawing/dam/app/.
 ```
+
+Upload hub: `shop-drawing/dam/app/`
 
 ---
 
-## Checklist sau khi agent xong
+## 4) SÀN — dán vào agent repo `ntgiahuy/san`
 
-| Repo | Upload vào |
-|------|------------|
+Agent: https://github.com/ntgiahuy/san
+
+```
+Bạn đang ở repo ntgiahuy/san (Next + Tailwind). App nhúng iframe hub https://giahuy.net/shop-drawing/ (Shop thép sàn). Safari iPhone tràn / không khít. Source còn shell h-dvh. Không mobile-fit.css, không sửa hub Website.
+
+BẮT BUỘC:
+
+A) components/slab/SlabApp.tsx
+Tìm:
+  className="flex h-dvh flex-col ..."
+ĐỔI:
+  className="flex h-full max-h-full min-h-0 w-full max-w-full flex-col overflow-hidden ..."
+Grep: mọi h-dvh / h-screen shell → h-full + min-h-0.
+
+B) app/globals.css
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  overflow-x: clip;
+  box-sizing: border-box;
+}
+Font embed hub: ưu tiên ./fonts/... không hardcode /san/fonts/ nếu làm vỡ path.
+
+C) Mobile ≤760px:
+- header wrap; logo nhỏ; title min-w-0
+- nav overflow-x-auto; parent min-w-0 max-w-full
+- Hàng trục/dầm flex-nowrap → flex-wrap trên mobile; input min-w-0 w-full
+- Form label|input stack 1 cột khi hẹp
+- Preview pane min-w-0 overflow-auto
+- Grid dùng minmax(..., 32vh) cho hàng: đổi sang % hoặc fr dựa trên parent height 100% (tránh 32vh máy > iframe)
+
+D) Build static → docs/out với path ./ cho /shop-drawing/san/app/.
+
+E) Nghiệm thu 390×844 Safari/WebKit: scrollWidth === clientWidth; không h-dvh trên shell.
+
+F) Trả zip/filebin upload đè shop-drawing/san/app/.
+```
+
+Upload hub: `shop-drawing/san/app/`
+
+---
+
+## Sau khi 4 agent xong
+
+| Repo | Upload vào hub |
+|------|----------------|
 | mong | `shop-drawing/mong/app/` |
 | cot  | `shop-drawing/cot/app/` |
 | dam  | `shop-drawing/dam/app/` |
 | san  | `shop-drawing/san/app/` |
 
-Hub `shop-drawing/index.html` / auth / `membership.js` **không** cần đổi vì việc này.
+Giữ nguyên `config.php`, auth, `membership.js`, `shop-drawing/index.html`.
+
+---
+
+## Script patch local (tuỳ chọn)
+
+Nếu clone 4 repo cạnh nhau:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ntgiahuy/Website/cursor/shop-drawing-email-otp-4719/shop-drawing/prompts/patch-agent-mobile.sh -o patch-agent-mobile.sh
+chmod +x patch-agent-mobile.sh
+./patch-agent-mobile.sh /path/to/parent   # chứa mong cot dam san
+```
+
+Vẫn nên dùng tin nhắn dán ở trên trong Cursor agent từng repo — script chỉ hỗ trợ CSS thô.
