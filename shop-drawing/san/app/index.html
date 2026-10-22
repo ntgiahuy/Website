@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="./favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="./favicon-96x96.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GiaHuy Shop drawing sàn</title>
+    <script>
+      (function () {
+        var host = String(location.hostname || "")
+          .replace(/^www\./i, "")
+          .toLowerCase();
+        if (!host || host === "localhost" || host === "127.0.0.1" || host === "::1") return;
+        if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(host)) return;
+        try {
+          if (window.top === window.self) {
+            location.replace("https://giahuy.net/shop-drawing/?app=san");
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <!-- membership.js trên hub — KHÔNG copy vào san/app/ -->
+    <script
+      src="/shop-drawing/assets/membership.js"
+      data-api="/shop-drawing/api/"
+      data-activate-url="/shop-drawing/dang-nhap/"
+    ></script>
+    <script type="module" crossorigin src="./assets/index-wHSxH0wt.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Dr196Hgi.css">
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
